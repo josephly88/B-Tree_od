@@ -3,7 +3,7 @@
 #include "b_tree.h"
 using namespace std;
 
-#define INS 10
+#define INS 5
 #define DEL 10
 
 struct S{
@@ -30,19 +30,25 @@ int main(int argc, char** argv){
 
     BTree* t = new BTree(argv[1], atoi(argv[2]));
 
-    if (t->get_file()->is_open()){
-        cout << "Size of BTreeNode is : " << sizeof(BTreeNode) << endl;
+    if (t->file.is_open()){
         cout << "Block size is : " << argv[2] << endl;
-        cout << "Degree is : " << t->get_degree() << endl;
+        cout << "Size of BTreeNode is : " << sizeof(BTreeNode) << endl;        
+        cout << "Size of K-V is : " << sizeof(int) + sizeof(char) + sizeof(streamoff) << "(" << sizeof(streamoff) << ")" << endl;
+        cout << "Degree is : " << t->m << endl;
+        cout << endl;
     }
     else{
         cout << "Unable to open file" << endl;
         return 0;
     }
 
-    char v = random_char();
-    //t->insertion(0, v);
-    t->traverse();
+    for(int i = 0; i < INS; i++){
+        char v = random_char();
+        t->insertion(i, v);
+        cout << "-Insertion: " << i  << '(' << v << ')' << endl;
+        t->traverse();
+    }
+    
 
 	return 0;
 }

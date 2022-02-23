@@ -8,36 +8,47 @@
 using namespace std;
 
 class BTreeNode{
-	int m;				// degree
-	int min_num; 		// minimun number of node
-	int num_key;		// the number of keys
-	int *key;			// keys array
-	char *value; 		// value array
-	streamoff *child;	// array of child pointers
-	bool is_leaf;		// Is leaf or not
 
 	public:
-		BTreeNode(int _m, bool _is_leaf);
+		int m;				// degree
+		int min_num; 		// minimun number of node
+		int num_key;		// the number of keys
+		int *key;			// keys array
+		char *value; 		// value array
+		streamoff *child;	// array of child pointers
+		bool is_leaf;		// Is leaf or not
+		streamoff offset;
+
+		fstream* file_ptr;
+	
+		BTreeNode(int _m, bool _is_leaf, fstream* _file_ptr, streamoff _offset);
 
 		void traverse(int level);
+
+		void traverse_insert(int _k, char _v);
+		void direct_insert(int _k, char _v, streamoff node_off1 = 0, streamoff node_off2 = 0);
 		
 	// BTree class can now access the private members of BTreeNode
 	friend class BTree;
 };
 
 class BTree{
-	int m;				// degree
-	streamoff root;		// Pointer to root node
-	fstream file;
-	bool exist;
-
 	public:
+		int m;				// degree
+		streamoff root;		// Pointer to root node
+		fstream file;
+		int block;
+		bool exist;
+
 		BTree(string filename, int block_size);
-		fstream* get_file();
-		int get_degree();
-		
+
 		void traverse();
+
+		void insertion(int _k, char _v);
 		
 };
+
+BTreeNode* node_read(fstream* file, streamoff offset);
+void node_write(fstream* file, streamoff offset, BTreeNode* node);
 
 #endif /* B_TREE_H */
