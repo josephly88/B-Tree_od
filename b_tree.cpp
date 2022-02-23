@@ -16,7 +16,7 @@ void tree_write(fstream* file, BTree* tree){
 
 BTreeNode* node_read(fstream* file, streamoff offset){
     BTreeNode* node = (BTreeNode*) malloc(sizeof(BTreeNode));
-
+    
     file->seekg(offset, ios::beg);
     file->read((char*)node, sizeof(BTreeNode));
 
@@ -46,8 +46,8 @@ BTree::BTree(string filename, int _block_size, fstream* _file){
     file_ptr = _file;
     block_size = _block_size;
     m = (_block_size - sizeof(BTreeNode) - sizeof(streamoff)) / (sizeof(int) + sizeof(char) + sizeof(streamoff));
-    root_exist = false;
     node_cap = (_block_size - sizeof(BTree)) * 8;
+    root_off = 0;
 
     tree_write(file_ptr, this);
 
@@ -99,7 +99,7 @@ void BTree::set_node_id(int block_id, bool bit){
 void BTree::traverse(){
     cout << endl << "Tree Traversal: " << endl;
 
-    if(root_exist){
+    if(root_off){
         BTreeNode* root = node_read(file_ptr, root_off);
         root->traverse(0);
         delete root;
@@ -112,7 +112,7 @@ void BTree::traverse(){
 
 void BTree::insertion(int _k, char _v){
 
-    if(root_exist){
+    if(root_off){
         BTreeNode* root = node_read(file_ptr, root_off);
         root->traverse_insert(_k, _v);
         delete root;
@@ -126,10 +126,13 @@ void BTree::insertion(int _k, char _v){
         */
     }
     else{
-        BTreeNode* root = new BTreeNode(m, true, file_ptr, 1 * block_size);
-        node_write(file_ptr, 1 * block_size, root);
-        root_exist = true;
-        root_off = 1 * block_size;
+        int root_id = get_free_node_id();
+        root_off = root_id * block_size;
+        tree_write(file_ptr, this);
+
+        BTreeNode* root = new BTreeNode(m, true, file_ptr, root_off);
+        node_write(file_ptr, root_off, root);
+        delete root;
         insertion(_k, _v);     
     }
 }

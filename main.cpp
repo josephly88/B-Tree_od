@@ -41,6 +41,8 @@ int main(int argc, char** argv){
             cout << "Read file <" << argv[1] << ">" << endl;
             file.open(argv[1], ios::in | ios::out | ios::binary);
             t = tree_read(&file);
+            t->file_ptr = &file;
+            tree_write(&file, t);
         }
         else{
             cout << "Create file <" << argv[1] << ">" << endl;
@@ -50,8 +52,6 @@ int main(int argc, char** argv){
             t = new BTree(argv[1], block_size, &file);
         }
     }
-
-    return 0;
     
     if (file.is_open()){
         cout << endl;
@@ -60,14 +60,13 @@ int main(int argc, char** argv){
         cout << "Size of K-V : " << sizeof(int) + sizeof(char) + sizeof(streamoff) << "(" << sizeof(streamoff) << ")" << endl;
         cout << "Degree : " << t->m << endl;
         cout << "Node capacity : " << t->node_cap << endl;
+        cout << "Root offset : " << t->root_off << endl;
         cout << endl;
     }
     else{
         cout << "Unable to open file" << endl;
         return 0;
     }
-
-    
 
     for(int i = 0; i < INS; i++){
         char v = random_char();

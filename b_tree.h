@@ -38,7 +38,6 @@ class BTree{
 		streamoff root_off;		// Pointer to root node
 		fstream* file_ptr;
 		int block_size;
-		bool root_exist;
 		int node_cap;
 
 		BTree(string filename, int _block_size, fstream* file);
