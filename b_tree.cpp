@@ -1,5 +1,19 @@
 #include "b_tree.h"
 
+BTree* tree_read(fstream* file){
+    BTree* tree = (BTree*) malloc(sizeof(BTree));
+
+    file->seekg(0, ios::beg);
+    file->read((char*) tree, sizeof(BTree));
+
+    return tree;
+}
+
+void tree_write(fstream* file, BTree* tree){
+    file->seekg(0, ios::beg);
+    file->write((char*) tree, sizeof(BTree));
+}
+
 BTreeNode* node_read(fstream* file, streamoff offset){
     BTreeNode* node = (BTreeNode*) malloc(sizeof(BTreeNode));
 
@@ -26,19 +40,54 @@ void node_write(fstream* file, streamoff offset, BTreeNode* node){
     file->write((char*)node->child, (node->m + 1) * sizeof(streamoff));
 }
 
-BTree::BTree(string filename, int block_size){
+BTree::BTree(string filename, int _block_size, fstream* _file){
     //file.open(filename, ios::in | ios::out | ios::binary);
-    file.open(filename, ios::in | ios::out | ios::trunc | ios::binary);
-    block = block_size;
-    m = (block_size - sizeof(BTreeNode) - sizeof(streamoff)) / (sizeof(int) + sizeof(char) + sizeof(streamoff));
-    exist = false;
+    _file->open(filename, ios::in | ios::out | ios::trunc | ios::binary);
+    file_ptr = _file;
+    block_size = _block_size;
+    m = (_block_size - sizeof(BTreeNode) - sizeof(streamoff)) / (sizeof(int) + sizeof(char) + sizeof(streamoff));
+    root_exist = false;
+    node_cap = (_block_size - sizeof(BTree)) * 8;
+
+    tree_write(file_ptr, this);
+
+    // Set the bit map to all 0
+    void* empty_bytes = calloc(1, node_cap / 8);
+    file_ptr->seekp(sizeof(BTree), ios::beg);
+    file_ptr->write((char*)empty_bytes, node_cap / 8);
+    free(empty_bytes);
+
+    set_node_id(0, true);
+
+    /*
+    uint8_t new_byte;
+    file_ptr->seekg(sizeof(BTree), ios::beg);
+    file_ptr->read((char*)&new_byte, sizeof(uint8_t));
+    cout << "!! read addr " << sizeof(BTree) << " is " << (int)new_byte << endl;
+    */
+}
+
+void BTree::set_node_id(int block_id, bool bit){
+    int offset = sizeof(BTree) + (block_id / 8);
+
+    file_ptr->seekg(offset, ios::beg);
+    uint8_t byte;
+    file_ptr->read((char*)(&byte), sizeof(uint8_t));
+
+    if(bit)
+        byte |= (1UL << (block_id % 8));
+    else
+        byte &= ~(1UL << (block_id % 8));
+
+    file_ptr->seekp(offset, ios::beg);
+    file_ptr->write((char*)(&byte), sizeof(uint8_t));
 }
 
 void BTree::traverse(){
     cout << endl << "Tree Traversal: " << endl;
 
-    if(exist){
-        BTreeNode* root = node_read(&file, 1 * block);
+    if(root_exist){
+        BTreeNode* root = node_read(file_ptr, root_off);
         root->traverse(0);
         delete root;
     }
@@ -50,8 +99,8 @@ void BTree::traverse(){
 
 void BTree::insertion(int _k, char _v){
 
-    if(exist){
-        BTreeNode* root = node_read(&file, 1 * block);
+    if(root_exist){
+        BTreeNode* root = node_read(file_ptr, root_off);
         root->traverse_insert(_k, _v);
         delete root;
 
@@ -64,9 +113,10 @@ void BTree::insertion(int _k, char _v){
         */
     }
     else{
-        BTreeNode* root = new BTreeNode(m, true, &file, 1 * block);
-        node_write(&file, 1 * block, root);
-        exist = true;
+        BTreeNode* root = new BTreeNode(m, true, file_ptr, 1 * block_size);
+        node_write(file_ptr, 1 * block_size, root);
+        root_exist = true;
+        root_off = 1 * block_size;
         insertion(_k, _v);     
     }
 }

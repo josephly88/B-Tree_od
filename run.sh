@@ -1,3 +1,3 @@
 #!/bin/sh
 
-./demo.out tree.dat 137
+./demo.out tree.dat

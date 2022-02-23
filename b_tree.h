@@ -35,12 +35,16 @@ class BTreeNode{
 class BTree{
 	public:
 		int m;				// degree
-		streamoff root;		// Pointer to root node
-		fstream file;
-		int block;
-		bool exist;
+		streamoff root_off;		// Pointer to root node
+		fstream* file_ptr;
+		int block_size;
+		bool root_exist;
+		int node_cap;
 
-		BTree(string filename, int block_size);
+		BTree(string filename, int _block_size, fstream* file);
+
+		//int get_free_node_id();
+		void set_node_id(int block_id, bool bit);
 
 		void traverse();
 
@@ -48,6 +52,8 @@ class BTree{
 		
 };
 
+BTree* tree_read(fstream* file);
+void tree_write(fstream* file, BTree* tree);
 BTreeNode* node_read(fstream* file, streamoff offset);
 void node_write(fstream* file, streamoff offset, BTreeNode* node);
 
