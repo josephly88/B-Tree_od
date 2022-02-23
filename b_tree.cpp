@@ -58,16 +58,29 @@ BTree::BTree(string filename, int _block_size, fstream* _file){
     free(empty_bytes);
 
     set_node_id(0, true);
+}
 
-    /*
-    uint8_t new_byte;
+int BTree::get_free_node_id(){
     file_ptr->seekg(sizeof(BTree), ios::beg);
-    file_ptr->read((char*)&new_byte, sizeof(uint8_t));
-    cout << "!! read addr " << sizeof(BTree) << " is " << (int)new_byte << endl;
-    */
+    int id = 0;
+    while(id < node_cap){
+        uint8_t byte;
+        file_ptr->read((char*) &byte, sizeof(uint8_t));
+        for(int i = 0; i < 8; i++){
+            if( !(byte & 1) ){
+                set_node_id(id, true);
+                return id;
+            }
+            byte >>= 1;
+            id++;
+        }
+    }
+    return 0;
 }
 
 void BTree::set_node_id(int block_id, bool bit){
+    if(block_id >= node_cap) return;
+
     int offset = sizeof(BTree) + (block_id / 8);
 
     file_ptr->seekg(offset, ios::beg);

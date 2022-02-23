@@ -43,7 +43,7 @@ class BTree{
 
 		BTree(string filename, int _block_size, fstream* file);
 
-		//int get_free_node_id();
+		int get_free_node_id();
 		void set_node_id(int block_id, bool bit);
 
 		void traverse();
