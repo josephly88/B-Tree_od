@@ -60,7 +60,7 @@ int main(int argc, char** argv){
         cout << "Size of K-V : " << sizeof(int) + sizeof(char) + sizeof(streamoff) << "(" << sizeof(streamoff) << ")" << endl;
         cout << "Degree : " << t->m << endl;
         cout << "Node capacity : " << t->node_cap << endl;
-        cout << "Root offset : " << t->root_off << endl;
+        cout << "Root id : " << t->root_id << endl;
         cout << endl;
     }
     else{
