@@ -40,7 +40,8 @@ int main(int argc, char** argv){
         if(fileExists(argv[1])){
             cout << "Read file <" << argv[1] << ">" << endl;
             file.open(argv[1], ios::in | ios::out | ios::binary);
-            t = tree_read(&file);
+            t = (BTree*) calloc(1, sizeof(BTree));
+            tree_read(&file, t);
             t->file_ptr = &file;
             tree_write(&file, t);
         }

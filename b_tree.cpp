@@ -1,12 +1,8 @@
 #include "b_tree.h"
 
-BTree* tree_read(fstream* file){
-    BTree* tree = (BTree*) malloc(sizeof(BTree));
-
+void tree_read(fstream* file, BTree* tree){
     file->seekg(0, ios::beg);
     file->read((char*) tree, sizeof(BTree));
-
-    return tree;
 }
 
 void tree_write(fstream* file, BTree* tree){
@@ -35,9 +31,8 @@ BTree::BTree(string filename, int _block_size, fstream* _file){
 }
 
 
-BTreeNode* BTree::node_read(int id){
+void BTree::node_read(int id, BTreeNode* node){
     streamoff offset = id * block_size;
-    BTreeNode* node = (BTreeNode*) malloc(sizeof(BTreeNode));
     
     file_ptr->seekg(offset, ios::beg);
     file_ptr->read((char*)node, sizeof(BTreeNode));
@@ -47,9 +42,7 @@ BTreeNode* BTree::node_read(int id){
     node->value = new char[node->m];
     file_ptr->read((char*)node->value, node->m * sizeof(char));
     node->child_id = new int[node->m + 1];
-    file_ptr->read((char*)node->child_id, (node->m + 1) * sizeof(int));    
-
-    return node;
+    file_ptr->read((char*)node->child_id, (node->m + 1) * sizeof(int)); 
 }
 
 void BTree::node_write(int id, BTreeNode* node){
@@ -103,7 +96,8 @@ void BTree::traverse(){
     cout << endl << "Tree Traversal: " << endl;
 
     if(root_id){
-        BTreeNode* root = node_read(root_id);
+        BTreeNode* root = (BTreeNode*) calloc(1, sizeof(BTreeNode));
+        node_read(root_id, root);
         root->traverse(this, 0);
         delete root;
     }
@@ -116,7 +110,8 @@ void BTree::traverse(){
 void BTree::insertion(int _k, char _v){
 
     if(root_id){
-        BTreeNode* root = node_read(root_id);
+        BTreeNode* root = (BTreeNode*) calloc(1, sizeof(BTreeNode));
+        node_read(root_id, root);
         root->traverse_insert(this, _k, _v);
         delete root;
 
@@ -153,7 +148,8 @@ void BTreeNode::traverse(BTree* t, int level){
     int i = 0;
     for(i = 0; i < num_key; i++){
         if(!is_leaf){
-            BTreeNode* node = t->node_read(child_id[i]);
+            BTreeNode* node = (BTreeNode*) calloc(1, sizeof(BTreeNode));
+            t->node_read(child_id[i], node);
             node->traverse(t, level + 1);
             delete node;
         }
@@ -161,7 +157,8 @@ void BTreeNode::traverse(BTree* t, int level){
         cout << key[i] << '(' << value[i] << ')' << endl;;
     }
     if(!is_leaf){
-        BTreeNode* node = t->node_read(child_id[i]);
+        BTreeNode* node = (BTreeNode*) calloc(1, sizeof(BTreeNode));
+        t->node_read(child_id[i], node);
         node->traverse(t, level + 1);
         delete node;
     }
@@ -179,7 +176,8 @@ void BTreeNode::traverse_insert(BTree* t, int _k, char _v){
                 break;
         }
         
-        BTreeNode* node = t->node_read(child_id[i]);
+        BTreeNode* node = (BTreeNode*) calloc(1, sizeof(BTreeNode));
+        t->node_read(child_id[i], node);
         node->traverse_insert(t, _k, _v);
         delete node;
         /*

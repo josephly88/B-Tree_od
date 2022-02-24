@@ -20,7 +20,7 @@ class BTree{
 
 		BTree(string filename, int _block_size, fstream* file);
 
-		BTreeNode* node_read(int id);
+		void node_read(int id, BTreeNode* node);
 		void node_write(int id, BTreeNode* node);
 
 		int get_free_node_id();
@@ -55,7 +55,7 @@ class BTreeNode{
 	friend class BTree;
 };
 
-BTree* tree_read(fstream* file);
+void tree_read(fstream* file, BTree* tree);
 void tree_write(fstream* file, BTree* tree);
 
 #endif /* B_TREE_H */
