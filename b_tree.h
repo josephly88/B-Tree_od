@@ -27,8 +27,10 @@ class BTree{
 		void set_node_id(int block_id, bool bit);
 
 		void traverse();
+		char* search(int _k);
 
 		void insertion(int _k, char _v);
+		
 		
 };
 
@@ -47,6 +49,7 @@ class BTreeNode{
 		BTreeNode(int _m, bool _is_leaf, int _node_id);
 
 		void traverse(BTree* t, int level);
+		char* search(BTree* t, int _k);
 
 		void traverse_insert(BTree* t, int _k, char _v);
 		void direct_insert(BTree* t, int _k, char _v, int node_id1 = 0, int node_id2 = 0);

@@ -107,6 +107,17 @@ void BTree::traverse(){
     cout << endl;
 }
 
+char* BTree::search(int _k){
+    if(root_id){
+        BTreeNode* root = (BTreeNode*) calloc(1, sizeof(BTreeNode));
+        node_read(root_id, root);
+        return root->search(this, _k);
+        delete root;
+    }
+    else
+        return NULL;
+}
+
 void BTree::insertion(int _k, char _v){
 
     if(root_id){
@@ -170,6 +181,33 @@ void BTreeNode::traverse(BTree* t, int level){
         node->traverse(t, level + 1);
         delete node;
     }
+}
+
+char* BTreeNode::search(BTree* t, int _k){
+    int i;
+    for(i = 0; i < num_key; i++){
+        if(_k == key[i]) return &value[i];
+        if(_k < key[i]){
+            if(!is_leaf){
+                BTreeNode* child = (BTreeNode*) calloc(1, sizeof(BTreeNode));
+                t->node_read(child_id[i], child);
+                char* ret = child->search(t, _k);
+                delete child;
+                return ret;
+            }
+            else
+                return NULL;
+        }
+    }
+    if(!is_leaf){
+        BTreeNode* child = (BTreeNode*) calloc(1, sizeof(BTreeNode));
+        t->node_read(child_id[i], child);
+        char* ret = child->search(t, _k);
+        delete child;
+        return ret;
+    }
+    else
+        return NULL;
 }
 
 void BTreeNode::traverse_insert(BTree* t, int _k, char _v){
