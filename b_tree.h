@@ -29,9 +29,7 @@ class BTree{
 		void traverse();
 		char* search(int _k);
 
-		void insertion(int _k, char _v);
-		
-		
+		void insertion(int _k, char _v);		
 };
 
 class BTreeNode{
@@ -47,6 +45,7 @@ class BTreeNode{
 		int node_id;
 	
 		BTreeNode(int _m, bool _is_leaf, int _node_id);
+		~BTreeNode();
 
 		void traverse(BTree* t, int level);
 		char* search(BTree* t, int _k);

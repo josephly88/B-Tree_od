@@ -30,7 +30,6 @@ BTree::BTree(string filename, int _block_size, fstream* _file){
     set_node_id(0, true);
 }
 
-
 void BTree::node_read(int id, BTreeNode* node){
     streamoff offset = id * block_size;
     
@@ -161,6 +160,12 @@ BTreeNode::BTreeNode(int _m, bool _is_leaf, int _node_id){
     child_id = new int[m+1];
     is_leaf = _is_leaf;
     node_id = _node_id;
+}
+
+BTreeNode::~BTreeNode(){
+    delete key;
+    delete value;
+    delete child_id;
 }
 
 void BTreeNode::traverse(BTree* t, int level){
