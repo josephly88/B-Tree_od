@@ -30,6 +30,8 @@ int main(int argc, char** argv){
     BTree* t;
     fstream file;
 
+    srand(time(0));
+
     if(argc < 2){
         cout << "-- Not enough input arguments. --" << endl;
         cout << "Format:" << endl;
@@ -71,8 +73,9 @@ int main(int argc, char** argv){
 
     for(int i = 0; i < INS; i++){
         char v = random_char();
-        t->insertion(i, v);
-        cout << "-Insertion: " << i  << '(' << v << ')' << endl;
+        int k = random_num(0, 100);
+        t->insertion(k, v);
+        cout << "-Insertion: " << k  << '(' << v << ')' << endl;
     }
     t->traverse();
 
