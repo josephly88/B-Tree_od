@@ -50,6 +50,7 @@ class BTreeNode{
 
 		void traverse_insert(BTree* t, int _k, char _v);
 		void direct_insert(BTree* t, int _k, char _v, int node_id1 = 0, int node_id2 = 0);
+		void split(BTree*t, int node_id, int parent_id);
 		
 	// BTree class can now access the private members of BTreeNode
 	friend class BTree;

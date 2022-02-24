@@ -113,15 +113,22 @@ void BTree::insertion(int _k, char _v){
         BTreeNode* root = (BTreeNode*) calloc(1, sizeof(BTreeNode));
         node_read(root_id, root);
         root->traverse_insert(this, _k, _v);
+
+        node_read(root_id, root);
+        if(root->num_key >= m){            
+            int new_root_id = get_free_node_id();
+            BTreeNode* new_root = new BTreeNode(m, false, new_root_id);
+            node_write(new_root_id, new_root);
+
+            root->split(this, root_id, new_root_id);
+            root_id = new_root_id;
+
+            tree_write(file_ptr, this);
+
+            delete new_root;
+        }        
         delete root;
 
-        /*
-        if(root->num_key >= m){
-            BTreeNode* new_root = new BTreeNode(m, false);
-            root->split(root, new_root);
-            root = new_root;
-        }
-        */
     }
     else{
         root_id = get_free_node_id();
@@ -136,6 +143,7 @@ void BTree::insertion(int _k, char _v){
 
 BTreeNode::BTreeNode(int _m, bool _is_leaf, int _node_id){
     m = _m;
+    min_num = (_m % 2 == 0) ? _m / 2 - 1 : _m / 2;
     num_key = 0;
     key = new int[m];
     value = new char[m];
@@ -176,14 +184,14 @@ void BTreeNode::traverse_insert(BTree* t, int _k, char _v){
                 break;
         }
         
-        BTreeNode* node = (BTreeNode*) calloc(1, sizeof(BTreeNode));
-        t->node_read(child_id[i], node);
-        node->traverse_insert(t, _k, _v);
-        delete node;
-        /*
-        if(child[i]->num_key >= m)
-            split(child[i], this);
-        */
+        BTreeNode* child = (BTreeNode*) calloc(1, sizeof(BTreeNode));
+        t->node_read(child_id[i], child);
+        child->traverse_insert(t, _k, _v);
+                
+        if(child->num_key >= m)
+            split(t, child_id[i], node_id);
+
+        delete child;
     }
 }
 
@@ -212,4 +220,36 @@ void BTreeNode::direct_insert(BTree* t, int _k, char _v, int node_id1, int node_
     num_key++;
 
     t->node_write(node_id, this);
+}
+
+void BTreeNode::split(BTree*t, int node_id, int parent_id){
+    BTreeNode* node = (BTreeNode*) calloc(1, sizeof(BTreeNode));
+    t->node_read(node_id, node);
+
+    BTreeNode* parent = (BTreeNode*) calloc(1, sizeof(BTreeNode));
+    t->node_read(parent_id, parent);
+
+    int new_node_id = t->get_free_node_id();
+    BTreeNode* new_node = new BTreeNode(m, node->is_leaf, new_node_id);
+
+    int i, j;
+    for( i = min_num+1, j = 0; i < node->num_key; i++, j++){
+        new_node->key[j] = node->key[i];
+        new_node->value[j] = node->value[i];
+        if(!node->is_leaf)
+            new_node->child_id[j] = node->child_id[i];
+        new_node->num_key++;
+    }
+    if(!node->is_leaf)
+        new_node->child_id[j] = node->child_id[i];
+            
+    parent->direct_insert(t, node->key[min_num], node->value[min_num], node_id, new_node_id);
+    node->num_key = min_num;
+
+    t->node_write(node_id, node);
+    t->node_write(new_node_id, new_node);
+
+    delete node;
+    delete parent;
+    delete new_node;
 }

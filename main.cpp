@@ -4,7 +4,7 @@
 #include "b_tree.h"
 using namespace std;
 
-#define INS 5
+#define INS 1
 #define DEL 10
 
 struct S{
@@ -73,7 +73,7 @@ int main(int argc, char** argv){
 
     for(int i = 0; i < INS; i++){
         char v = random_char();
-        int k = random_num(0, 100);
+        int k = random_num(0,1000);
         t->insertion(k, v);
         cout << "-Insertion: " << k  << '(' << v << ')' << endl;
     }
