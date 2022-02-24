@@ -104,7 +104,7 @@ void BTree::traverse(){
 
     if(root_id){
         BTreeNode* root = node_read(root_id);
-        root->traverse(0);
+        root->traverse(this, 0);
         delete root;
     }
     else
@@ -117,7 +117,7 @@ void BTree::insertion(int _k, char _v){
 
     if(root_id){
         BTreeNode* root = node_read(root_id);
-        root->traverse_insert(_k, _v);
+        root->traverse_insert(this, _k, _v);
         delete root;
 
         /*
@@ -132,15 +132,14 @@ void BTree::insertion(int _k, char _v){
         root_id = get_free_node_id();
         tree_write(file_ptr, this);            
 
-        BTreeNode* root = new BTreeNode(this, m, true, root_id);
+        BTreeNode* root = new BTreeNode(m, true, root_id);
         node_write(root_id, root);
         delete root;
         insertion(_k, _v);     
     }
 }
 
-BTreeNode::BTreeNode(BTree* _t, int _m, bool _is_leaf, int _node_id){
-    t = _t;
+BTreeNode::BTreeNode(int _m, bool _is_leaf, int _node_id){
     m = _m;
     num_key = 0;
     key = new int[m];
@@ -150,12 +149,12 @@ BTreeNode::BTreeNode(BTree* _t, int _m, bool _is_leaf, int _node_id){
     node_id = _node_id;
 }
 
-void BTreeNode::traverse(int level){
+void BTreeNode::traverse(BTree* t, int level){
     int i = 0;
     for(i = 0; i < num_key; i++){
         if(!is_leaf){
             BTreeNode* node = t->node_read(child_id[i]);
-            node->traverse(level + 1);
+            node->traverse(t, level + 1);
             delete node;
         }
         for(int j = 0; j < level; j++) cout << '\t';
@@ -163,14 +162,14 @@ void BTreeNode::traverse(int level){
     }
     if(!is_leaf){
         BTreeNode* node = t->node_read(child_id[i]);
-        node->traverse(level + 1);
+        node->traverse(t, level + 1);
         delete node;
     }
 }
 
-void BTreeNode::traverse_insert(int _k, char _v){
+void BTreeNode::traverse_insert(BTree* t, int _k, char _v){
     if(is_leaf)
-        direct_insert(_k, _v);
+        direct_insert(t, _k, _v);
     else{
         int i;
         for(i = 0; i < num_key; i++){
@@ -181,7 +180,7 @@ void BTreeNode::traverse_insert(int _k, char _v){
         }
         
         BTreeNode* node = t->node_read(child_id[i]);
-        node->traverse_insert(_k, _v);
+        node->traverse_insert(t, _k, _v);
         delete node;
         /*
         if(child[i]->num_key >= m)
@@ -190,7 +189,7 @@ void BTreeNode::traverse_insert(int _k, char _v){
     }
 }
 
-void BTreeNode::direct_insert(int _k, char _v, int node_id1, int node_id2){
+void BTreeNode::direct_insert(BTree* t, int _k, char _v, int node_id1, int node_id2){
     /* Assume the list is not full */
     if(num_key >= m) return;
 

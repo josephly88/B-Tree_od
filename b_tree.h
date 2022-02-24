@@ -35,7 +35,6 @@ class BTree{
 class BTreeNode{
 
 	public:
-		BTree* t;
 		int m;				// degree
 		int min_num; 		// minimun number of node
 		int num_key;		// the number of keys
@@ -45,18 +44,16 @@ class BTreeNode{
 		bool is_leaf;		// Is leaf or not
 		int node_id;
 	
-		BTreeNode(BTree* _t, int _m, bool _is_leaf, int _node_id);
+		BTreeNode(int _m, bool _is_leaf, int _node_id);
 
-		void traverse(int level);
+		void traverse(BTree* t, int level);
 
-		void traverse_insert(int _k, char _v);
-		void direct_insert(int _k, char _v, int node_id1 = 0, int node_id2 = 0);
+		void traverse_insert(BTree* t, int _k, char _v);
+		void direct_insert(BTree* t, int _k, char _v, int node_id1 = 0, int node_id2 = 0);
 		
 	// BTree class can now access the private members of BTreeNode
 	friend class BTree;
 };
-
-
 
 BTree* tree_read(fstream* file);
 void tree_write(fstream* file, BTree* tree);
