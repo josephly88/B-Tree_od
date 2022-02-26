@@ -45,6 +45,9 @@ void BTree::node_read(int id, BTreeNode* node){
 }
 
 void BTree::node_write(int id, BTreeNode* node){
+    if(id == 0)
+        cout << " Error : Attempt to write node id = 0 " << endl;
+
     streamoff offset = id * block_size;
 
     file_ptr->seekp(offset, ios::beg);
@@ -76,6 +79,11 @@ int BTree::get_free_node_id(){
 void BTree::set_node_id(int block_id, bool bit){
     if(block_id >= node_cap) return;
 
+    if(bit)
+        cout << " !! New node created: " << block_id << endl;
+    else
+        cout << " !! Node destoryed: " << block_id << endl;
+
     int offset = sizeof(BTree) + (block_id / 8);
 
     file_ptr->seekg(offset, ios::beg);
@@ -89,6 +97,10 @@ void BTree::set_node_id(int block_id, bool bit){
 
     file_ptr->seekp(offset, ios::beg);
     file_ptr->write((char*)(&byte), sizeof(uint8_t));
+
+    file_ptr->seekg(offset, ios::beg);
+    uint8_t byte1;
+    file_ptr->read((char*)(&byte1), sizeof(uint8_t));
 }
 
 void BTree::traverse(){
@@ -131,6 +143,7 @@ void BTree::insertion(int _k, char _v){
             node_write(new_root_id, new_root);
 
             root->split(this, root_id, new_root_id);
+            node_read(new_root_id, new_root);
             root_id = new_root_id;
 
             tree_write(file_ptr, this);
@@ -149,6 +162,29 @@ void BTree::insertion(int _k, char _v){
         delete root;
         insertion(_k, _v);     
     }
+}
+
+void BTree::deletion(int _k){
+    if(root_id){
+        BTreeNode* root = (BTreeNode*) calloc(1, sizeof(BTreeNode));
+        node_read(root_id, root);
+        root->traverse_delete(this, _k);
+
+        node_read(root_id, root);
+        if(root->num_key == 0){
+            set_node_id(root_id, false);  
+            if(root->is_leaf){
+                root_id = 0;             
+            }
+            else{
+                root_id = root->child_id[0];
+            }
+            tree_write(file_ptr, this);
+        } 
+        delete root;          
+    }
+    else
+        return;
 }
 
 BTreeNode::BTreeNode(int _m, bool _is_leaf, int _node_id){
@@ -242,24 +278,29 @@ void BTreeNode::direct_insert(BTree* t, int _k, char _v, int node_id1, int node_
     /* Assume the list is not full */
     if(num_key >= m) return;
 
-    int i;
-    for(i = num_key; i > 0; i--){
-        if(_k == key[i-1]) 
+    int idx;
+    for(idx = 0; idx < num_key; idx++){
+        if(_k == key[idx])
             return;     // No two keys are the same
-        else if(_k < key[i-1]){
-            key[i] = key[i-1];
-            value[i] = value[i-1];
-            if(!is_leaf) child_id[i+1] = child_id[i];
+        else{
+            if(_k < key[idx])
+                break;
         }
-        else
-            break;
+    }
+
+    int i;
+    for(i = num_key; i > idx; i--){
+        key[i] = key[i-1];
+        value[i] = value[i-1];
+        if(!is_leaf) child_id[i+1] = child_id[i];
     }
     if(!is_leaf) child_id[i+1] = child_id[i];
 
-    key[i] = _k;
-    value[i] = _v;
-    if(node_id1 != 0) child_id[i] = node_id1;
-    if(node_id2 != 0) child_id[i+1] = node_id2;
+
+    key[idx] = _k;
+    value[idx] = _v;
+    if(node_id1 != 0) child_id[idx] = node_id1;
+    if(node_id2 != 0) child_id[idx+1] = node_id2;
     num_key++;
 
     t->node_write(node_id, this);
@@ -295,4 +336,178 @@ void BTreeNode::split(BTree*t, int node_id, int parent_id){
     delete node;
     delete parent;
     delete new_node;
+}
+
+void BTreeNode::traverse_delete(BTree *t, int _k){
+    int i;
+    bool found = false;
+    for(i = 0; i < num_key; i++){
+        if(_k <= key[i]){
+            if(_k == key[i]) found = true;
+            break;
+        }
+    }
+
+    if(is_leaf){            
+        if(found)
+            direct_delete(t, _k);
+    } 
+    else{
+        if(found){
+            BTreeNode* node = (BTreeNode*) calloc(1, sizeof(BTreeNode));
+            t->node_read(child_id[i+1], node);
+
+            int succ_id = node->get_succ(t);
+            BTreeNode* succ = (BTreeNode*) calloc(1, sizeof(BTreeNode));            
+            t->node_read(succ_id, succ);
+
+            if(succ->num_key > min_num){
+                // Borrow from succ
+                key[i] = succ->key[0];
+                value[i] = succ->value[0];
+                t->node_write(node_id, this);
+                node->traverse_delete(t, key[i]);
+                rebalance(t, i+1);
+            }
+            else{
+                t->node_read(child_id[i], node);
+
+                int pred_id = node->get_pred(t);
+                BTreeNode* pred = (BTreeNode*) calloc(1, sizeof(BTreeNode));            
+                t->node_read(pred_id, pred);
+
+                // Borrow from pred
+                key[i] = pred->key[node->num_key - 1];
+                value[i] = pred->value[node->num_key - 1];
+                t->node_write(node_id, this);
+                node->traverse_delete(t, key[i]);
+                rebalance(t, i);
+
+                delete pred;
+            }
+
+            delete node;
+            delete succ;
+        }
+        else{
+            BTreeNode* node = (BTreeNode*) calloc(1, sizeof(BTreeNode));
+            t->node_read(child_id[i], node);
+
+            node->traverse_delete(t, _k);
+            rebalance(t, i);
+        }
+    }
+}
+
+void BTreeNode::direct_delete(BTree* t, int _k){
+    int i;
+    for(i = 0; i < num_key; i++){
+        if(key[i] == _k) break;
+    }
+    
+    if(i == num_key) return;
+
+    if(i < num_key-1){
+        for(; i < num_key-1; i++){
+            key[i] = key[i+1];
+            value[i] = value[i+1];
+            if(!is_leaf) child_id[i] = child_id[i+1];
+        }
+        if(!is_leaf) child_id[i] = child_id[i+1];
+    }
+    num_key--;
+
+    t->node_write(node_id, this);
+
+    t->file_ptr->seekg(24, ios::beg);
+    uint8_t byte;
+    t->file_ptr->read((char*)(&byte), sizeof(uint8_t));
+}
+
+void BTreeNode::rebalance(BTree* t, int idx){
+
+    BTreeNode* node = (BTreeNode*) calloc(1, sizeof(BTreeNode));
+    t->node_read(child_id[idx], node);
+
+    if(node->num_key >= min_num){
+        delete node;
+        return;
+    }
+
+    BTreeNode *left = (BTreeNode*) calloc(1, sizeof(BTreeNode));
+    if(idx - 1 >= 0)
+        t->node_read(child_id[idx - 1], left);
+    BTreeNode *right = (BTreeNode*) calloc(1, sizeof(BTreeNode));
+    if(idx + 1 <= num_key)
+        t->node_read(child_id[idx + 1], right);
+    int trans_node_id;
+
+    if(idx - 1 >= 0 && left->num_key > min_num){
+        //Borrowing from left
+        t->node_read(child_id[idx-1], left);
+        t->node_read(child_id[idx], right);
+        trans_node_id = (left->is_leaf) ? 0 : left->child_id[left->num_key];
+        right->direct_insert(t, key[idx-1], value[idx-1], trans_node_id);
+        key[idx-1] = left->key[left->num_key - 1];
+        value[idx-1] = left->value[left->num_key - 1];
+        t->node_write(node_id, this);        
+        left->direct_delete(t, key[idx-1]);
+    }
+    else if(idx + 1 <= num_key && right->num_key > min_num){
+        //Borrowing from right
+        t->node_read(child_id[idx], left);
+        t->node_read(child_id[idx+1], right);
+        trans_node_id = (right->is_leaf) ? 0 : right->child_id[0];
+        left->direct_insert(t, key[idx], value[idx], 0, trans_node_id);
+        key[idx] = right->key[0];
+        value[idx] = right->value[0];
+        t->node_write(node_id, this); 
+        right->direct_delete(t, key[idx]);
+    }   
+    else{
+        //Merge with right unless idx = num_key
+        if(idx == num_key) idx -= 1;
+
+        t->node_read(child_id[idx], left);
+        t->node_read(child_id[idx+1], right);
+        trans_node_id = (right->is_leaf) ? 0 : right->child_id[0];
+        left->direct_insert(t, key[idx], value[idx], 0, trans_node_id);
+        for(int i = 0; i < right->num_key; i++){
+            trans_node_id = (right->is_leaf) ? 0 : right->child_id[i+1];
+            left->direct_insert(t, right->key[i], right->value[i], 0, trans_node_id);
+        }
+        direct_delete(t, key[idx]);
+        child_id[idx] = left->node_id;
+        t->node_write(node_id, this);
+
+        t->set_node_id(right->node_id, false);
+    }
+
+    delete node;
+    delete left,
+    delete right;
+}
+
+int BTreeNode::get_pred(BTree* t){
+    if(is_leaf)
+        return node_id;
+    else{
+        BTreeNode* node = (BTreeNode*) calloc(1, sizeof(BTreeNode));
+        t->node_read(child_id[num_key], node);
+        int ret = node->get_pred(t);
+        delete node;
+        return ret;
+    }        
+}
+
+int BTreeNode::get_succ(BTree* t){
+    if(is_leaf)
+        return node_id;
+    else{
+        BTreeNode* node = (BTreeNode*) calloc(1, sizeof(BTreeNode));
+        t->node_read(child_id[0], node);
+        int ret = node->get_succ(t);
+        delete node;
+        return ret;
+    }
 }

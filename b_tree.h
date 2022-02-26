@@ -29,7 +29,8 @@ class BTree{
 		void traverse();
 		char* search(int _k);
 
-		void insertion(int _k, char _v);		
+		void insertion(int _k, char _v);
+		void deletion(int _k);		
 };
 
 class BTreeNode{
@@ -52,7 +53,13 @@ class BTreeNode{
 
 		void traverse_insert(BTree* t, int _k, char _v);
 		void direct_insert(BTree* t, int _k, char _v, int node_id1 = 0, int node_id2 = 0);
-		void split(BTree*t, int node_id, int parent_id);
+		void split(BTree* t, int node_id, int parent_id);
+
+		void traverse_delete(BTree* t, int _k);
+		void direct_delete(BTree* t, int _k);
+		void rebalance(BTree* t, int idx);
+		int get_pred(BTree* t);
+		int get_succ(BTree* t);	
 		
 	// BTree class can now access the private members of BTreeNode
 	friend class BTree;

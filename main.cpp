@@ -5,7 +5,7 @@
 using namespace std;
 
 #define INS 10
-#define DEL 10
+#define DEL 1
 
 struct S{
     char value;
@@ -23,6 +23,37 @@ char random_char(){
 bool fileExists(const char* file) {
     struct stat buf;
     return (stat(file, &buf) == 0);
+}
+
+void command(BTree* t, fstream* file){
+    while(1){
+        t->traverse();
+        cout << "Type your instruction " << endl;
+
+        char opt;
+        cin >> opt;
+
+        if(opt == 'i'){
+            int key;
+            cin >> key;
+
+            char v = random_char();
+            //int k = random_num(0,1000);
+            t->insertion(key, v);
+            cout << "-Insertion: " << key  << '(' << v << ')' << endl;
+        }
+        else if(opt == 'd'){
+            int key;
+            cin >> key;
+
+            t->deletion(key);
+            cout << "-Deletion: " << key  <<  endl;
+        }
+        else
+            break;
+
+        tree_read(file, t);
+    }
 }
 
 int main(int argc, char** argv){
@@ -71,14 +102,27 @@ int main(int argc, char** argv){
         return 0;
     }
 
-    for(int i = 0; i < INS; i++){
+/*
+    int ins[] = {0, 1, 2, 3, 4};
+    int del[] = {0};
+    for(int i = 0; i < sizeof(ins) / sizeof(ins[0]); i++){
         char v = random_char();
-        //int k = random_num(0,1000);
-        int k = i;
-        t->insertion(k, v);
-        cout << "-Insertion: " << k  << '(' << v << ')' << endl;
+        t->insertion(ins[i], v);
+        cout << "-Insertion: " << ins[i]  << '(' << v << ')' << endl;
+        t->traverse();
     }
+    for(int i = 0; i < sizeof(del) / sizeof(del[0]); i++){
+        t->deletion(del[0]);
+        cout << "-Deletion: " << del[0]  <<  endl;
+        t->traverse();
+    }
+    char v = random_char();
+    t->insertion(0, v);
+    cout << "-Insertion: " << 0  << '(' << v << ')' << endl;
     t->traverse();
+*/
+
+    command(t, &file);
 
     delete t;
 
