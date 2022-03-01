@@ -79,11 +79,6 @@ int BTree::get_free_node_id(){
 void BTree::set_node_id(int block_id, bool bit){
     if(block_id >= node_cap) return;
 
-    if(bit)
-        cout << " !! New node created: " << block_id << endl;
-    else
-        cout << " !! Node destoryed: " << block_id << endl;
-
     int offset = sizeof(BTree) + (block_id / 8);
 
     file_ptr->seekg(offset, ios::beg);
