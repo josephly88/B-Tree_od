@@ -30,6 +30,17 @@ BTree::BTree(string filename, int _block_size, fstream* _file){
     set_node_id(0, true);
 }
 
+void BTree::stat(){
+    cout << endl;
+    cout << "Block size : " << block_size << endl;
+    cout << "Size of BTreeNode : " << sizeof(BTreeNode) << endl;        
+    cout << "Size of K-V : " << sizeof(int) + sizeof(char) + sizeof(streamoff) << "(" << sizeof(streamoff) << ")" << endl;
+    cout << "Degree : " << m << endl;
+    cout << "Node capacity : " << node_cap << endl;
+    cout << "Root id : " << root_id << endl;
+    cout << endl;
+}
+
 void BTree::node_read(int id, BTreeNode* node){
     streamoff offset = id * block_size;
     
@@ -200,6 +211,9 @@ BTreeNode::~BTreeNode(){
 }
 
 void BTreeNode::traverse(BTree* t, int level){
+    for(int j = 0; j < level; j++) cout << '\t';
+        cout << '[' << node_id << ']' << endl;;
+
     int i = 0;
     for(i = 0; i < num_key; i++){
         if(!is_leaf){

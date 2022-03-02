@@ -4,8 +4,8 @@
 #include "b_tree.h"
 using namespace std;
 
-#define INS 20
-#define DEL 10
+#define INS 4
+#define DEL 0
 
 struct S{
     char value;
@@ -88,14 +88,7 @@ int main(int argc, char** argv){
     }
     
     if (file.is_open()){
-        cout << endl;
-        cout << "Block size : " << t->block_size << endl;
-        cout << "Size of BTreeNode : " << sizeof(BTreeNode) << endl;        
-        cout << "Size of K-V : " << sizeof(int) + sizeof(char) + sizeof(streamoff) << "(" << sizeof(streamoff) << ")" << endl;
-        cout << "Degree : " << t->m << endl;
-        cout << "Node capacity : " << t->node_cap << endl;
-        cout << "Root id : " << t->root_id << endl;
-        cout << endl;
+        t->stat();
     }
     else{
         cout << "Unable to open file" << endl;
@@ -103,9 +96,7 @@ int main(int argc, char** argv){
     }
 
     for(int i = 0; i < INS; i++){
-        int k = random_num(0, INS);
-        while(S[k].exist == true)
-            k = random_num(0, INS);
+        int k = i;
         char v = random_char();
         S[k].value = v;
         S[k].exist = true;
@@ -115,9 +106,7 @@ int main(int argc, char** argv){
     t->traverse();
 
     for(int i = 0; i < DEL; i++){
-        int k = random_num(0, INS);
-        if(S[k].exist == false)
-            i--;
+        int k = i;
         S[k].exist = false;
         cout << "-Deletion: " << k << endl;
         t->deletion(k);

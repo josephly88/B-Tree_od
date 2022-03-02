@@ -20,6 +20,8 @@ class BTree{
 
 		BTree(string filename, int _block_size, fstream* file);
 
+		void stat();
+
 		void node_read(int id, BTreeNode* node);
 		void node_write(int id, BTreeNode* node);
 
