@@ -27,6 +27,7 @@ class BTree{
 
 		int get_free_node_id();
 		void set_node_id(int block_id, bool bit);
+		void print_used_node_id();
 
 		void traverse();
 		char* search(int _k);

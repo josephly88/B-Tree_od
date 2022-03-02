@@ -109,6 +109,27 @@ void BTree::set_node_id(int block_id, bool bit){
     file_ptr->read((char*)(&byte1), sizeof(uint8_t));
 }
 
+void BTree::print_used_node_id(){
+    cout << endl;
+    cout << "Used node : " << endl;
+
+    file_ptr->seekg(sizeof(BTree), ios::beg);
+    int id = 0;
+    while(id < node_cap){
+        uint8_t byte;
+        file_ptr->read((char*) &byte, sizeof(uint8_t));
+        for(int i = 0; i < 8; i++){
+            if( (byte & 1) ){
+                cout << " " << id;
+            }
+            byte >>= 1;
+            id++;
+        }
+    }
+
+    cout << endl << endl;
+}
+
 void BTree::traverse(){
     cout << endl << "Tree Traversal: " << endl;
 

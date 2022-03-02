@@ -103,6 +103,7 @@ int main(int argc, char** argv){
         t->insertion(k, v);
         cout << "-Insertion: " << k  << '(' << v << ')' << endl;
         t->traverse();
+        t->print_used_node_id();
     }
 
     for(int i = 0; i < DEL; i++){
