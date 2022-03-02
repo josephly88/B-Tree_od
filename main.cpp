@@ -4,7 +4,7 @@
 #include "b_tree.h"
 using namespace std;
 
-#define INS 4
+#define INS 7
 #define DEL 0
 
 struct S{

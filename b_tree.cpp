@@ -146,11 +146,10 @@ void BTree::insertion(int _k, char _v){
             delete root;
             return;
         }
-        else{
-            if(dup_node_id != root_id){
-                set_node_id(root_id, false);
-                root_id = dup_node_id;
-            }
+
+        if(dup_node_id != root_id){
+            set_node_id(root_id, false);
+            root_id = dup_node_id;
         }
 
         node_read(root_id, root);
@@ -159,9 +158,7 @@ void BTree::insertion(int _k, char _v){
             BTreeNode* new_root = new BTreeNode(m, false, new_root_id);
             node_write(new_root_id, new_root);
 
-            root->split(this, root_id, new_root_id);
-            node_read(new_root_id, new_root);
-            root_id = new_root_id;
+            root_id = root->split(this, root_id, new_root_id);
 
             tree_write(file_ptr, this);
 
@@ -324,17 +321,18 @@ int BTreeNode::direct_insert(BTree* t, int _k, char _v, int node_id1, int node_i
     if(node_id2 != 0) child_id[idx+1] = node_id2;
     num_key++;
 
-    int dup_node_id = t->get_free_node_id();
-    node_id = dup_node_id;
+    int old_node_id = node_id;
+    node_id = t->get_free_node_id();
+    t->set_node_id(old_node_id, false);
 
-    t->node_write(dup_node_id, this);
+    t->node_write(node_id, this);
 
-    return dup_node_id;
+    return node_id;
 }
 
-void BTreeNode::split(BTree*t, int node_id, int parent_id){
+int BTreeNode::split(BTree*t, int spt_node_id, int parent_id){
     BTreeNode* node = (BTreeNode*) calloc(1, sizeof(BTreeNode));
-    t->node_read(node_id, node);
+    t->node_read(spt_node_id, node);
 
     BTreeNode* parent = (BTreeNode*) calloc(1, sizeof(BTreeNode));
     t->node_read(parent_id, parent);
@@ -352,16 +350,22 @@ void BTreeNode::split(BTree*t, int node_id, int parent_id){
     }
     if(!node->is_leaf)
         new_node->child_id[j] = node->child_id[i];
-            
-    parent->direct_insert(t, node->key[min_num], node->value[min_num], node_id, new_node_id);
-    node->num_key = min_num;
 
-    t->node_write(node_id, node);
+    int old_node_id = node->node_id;
+    node->node_id = t->get_free_node_id();            
+    int dup_par_id = parent->direct_insert(t, node->key[min_num], node->value[min_num], node->node_id, new_node_id);
+    node->num_key = min_num;    
+    
+    t->set_node_id(old_node_id, false);
+
+    t->node_write(node->node_id, node);
     t->node_write(new_node_id, new_node);
 
     delete node;
     delete parent;
     delete new_node;
+
+    return dup_par_id;
 }
 
 void BTreeNode::traverse_delete(BTree *t, int _k){

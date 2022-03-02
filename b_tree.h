@@ -55,7 +55,7 @@ class BTreeNode{
 
 		int traverse_insert(BTree* t, int _k, char _v);
 		int direct_insert(BTree* t, int _k, char _v, int node_id1 = 0, int node_id2 = 0);
-		void split(BTree* t, int node_id, int parent_id);
+		int split(BTree* t, int node_id, int parent_id);
 
 		void traverse_delete(BTree* t, int _k);
 		void direct_delete(BTree* t, int _k);
