@@ -351,12 +351,12 @@ int BTreeNode::split(BTree*t, int spt_node_id, int parent_id){
     if(!node->is_leaf)
         new_node->child_id[j] = node->child_id[i];
 
-    int old_node_id = node->node_id;
     node->node_id = t->get_free_node_id();            
     int dup_par_id = parent->direct_insert(t, node->key[min_num], node->value[min_num], node->node_id, new_node_id);
     node->num_key = min_num;    
     
-    t->set_node_id(old_node_id, false);
+    t->set_node_id(spt_node_id, false);
+    t->set_node_id(parent_id, false);
 
     t->node_write(node->node_id, node);
     t->node_write(new_node_id, new_node);
