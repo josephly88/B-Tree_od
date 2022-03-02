@@ -140,7 +140,18 @@ void BTree::insertion(int _k, char _v){
     if(root_id){
         BTreeNode* root = (BTreeNode*) calloc(1, sizeof(BTreeNode));
         node_read(root_id, root);
-        root->traverse_insert(this, _k, _v);
+        int dup_node_id = root->traverse_insert(this, _k, _v);
+
+        if(dup_node_id == 0){
+            delete root;
+            return;
+        }
+        else{
+            if(dup_node_id != root_id){
+                set_node_id(root_id, false);
+                root_id = dup_node_id;
+            }
+        }
 
         node_read(root_id, root);
         if(root->num_key >= m){            
@@ -260,14 +271,15 @@ char* BTreeNode::search(BTree* t, int _k){
         return NULL;
 }
 
-void BTreeNode::traverse_insert(BTree* t, int _k, char _v){
-    if(is_leaf)
-        direct_insert(t, _k, _v);
+int BTreeNode::traverse_insert(BTree* t, int _k, char _v){
+    if(is_leaf){
+        return direct_insert(t, _k, _v);
+    }        
     else{
         int i;
         for(i = 0; i < num_key; i++){
             if(_k == key[i])
-                return;            
+                return 0;       //tmp        
             if(_k < key[i])
                 break;
         }
@@ -283,14 +295,14 @@ void BTreeNode::traverse_insert(BTree* t, int _k, char _v){
     }
 }
 
-void BTreeNode::direct_insert(BTree* t, int _k, char _v, int node_id1, int node_id2){
+int BTreeNode::direct_insert(BTree* t, int _k, char _v, int node_id1, int node_id2){
     /* Assume the list is not full */
-    if(num_key >= m) return;
+    if(num_key >= m) return node_id;
 
     int idx;
     for(idx = 0; idx < num_key; idx++){
         if(_k == key[idx])
-            return;     // No two keys are the same
+            return node_id;     // No two keys are the same
         else{
             if(_k < key[idx])
                 break;
@@ -312,7 +324,12 @@ void BTreeNode::direct_insert(BTree* t, int _k, char _v, int node_id1, int node_
     if(node_id2 != 0) child_id[idx+1] = node_id2;
     num_key++;
 
-    t->node_write(node_id, this);
+    int dup_node_id = t->get_free_node_id();
+    node_id = dup_node_id;
+
+    t->node_write(dup_node_id, this);
+
+    return dup_node_id;
 }
 
 void BTreeNode::split(BTree*t, int node_id, int parent_id){

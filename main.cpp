@@ -102,8 +102,8 @@ int main(int argc, char** argv){
         S[k].exist = true;
         t->insertion(k, v);
         cout << "-Insertion: " << k  << '(' << v << ')' << endl;
+        t->traverse();
     }
-    t->traverse();
 
     for(int i = 0; i < DEL; i++){
         int k = i;
