@@ -147,10 +147,8 @@ void BTree::insertion(int _k, char _v){
             return;
         }
 
-        if(dup_node_id != root_id){
-            set_node_id(root_id, false);
+        if(dup_node_id != root_id)
             root_id = dup_node_id;
-        }
 
         node_read(root_id, root);
         if(root->num_key >= m){            
@@ -276,19 +274,35 @@ int BTreeNode::traverse_insert(BTree* t, int _k, char _v){
         int i;
         for(i = 0; i < num_key; i++){
             if(_k == key[i])
-                return 0;       //tmp        
+                return 0;     
             if(_k < key[i])
                 break;
         }
         
         BTreeNode* child = (BTreeNode*) calloc(1, sizeof(BTreeNode));
         t->node_read(child_id[i], child);
-        child->traverse_insert(t, _k, _v);
+        int dup_child_id = child->traverse_insert(t, _k, _v);
+
+        if(dup_child_id == 0){
+            delete child;
+            return 0;
+        }
+
+        if(dup_child_id != child_id[i]){
+            child_id[i] = dup_child_id;
+            int old_node_id = node_id;
+            node_id = t->get_free_node_id();
+            t->set_node_id(old_node_id, false);
+            t->node_write(node_id, this);
+        }
                 
+        t->node_read(child_id[i], child);
         if(child->num_key >= m)
-            split(t, child_id[i], node_id);
+            node_id = split(t, child_id[i], node_id);
 
         delete child;
+
+        return node_id;
     }
 }
 
