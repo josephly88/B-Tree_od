@@ -60,7 +60,7 @@ class BTreeNode{
 
 		int traverse_delete(BTree* t, int _k);
 		int direct_delete(BTree* t, int _k);
-		void rebalance(BTree* t, int idx);
+		int rebalance(BTree* t, int idx);
 		int get_pred(BTree* t);
 		int get_succ(BTree* t);	
 		

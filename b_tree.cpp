@@ -465,11 +465,25 @@ int BTreeNode::traverse_delete(BTree *t, int _k){
             delete succ;
         }
         else{
-            BTreeNode* node = (BTreeNode*) calloc(1, sizeof(BTreeNode));
-            t->node_read(child_id[i], node);
+            BTreeNode* child = (BTreeNode*) calloc(1, sizeof(BTreeNode));
+            t->node_read(child_id[i], child);
 
-            node->traverse_delete(t, _k);
-            rebalance(t, i);
+            int dup_child_id = child->traverse_delete(t, _k);
+
+            if(dup_child_id == 0){
+                delete child;
+                return 0;
+            }
+
+            if(dup_child_id != child_id[i]){
+                child_id[i] = dup_child_id;
+                int old_child_id = node_id;
+                node_id = t->get_free_node_id();
+                t->set_node_id(old_child_id, false);
+                t->node_write(node_id, this);
+            }
+
+            return rebalance(t, i);
         }
     }
 }
@@ -501,14 +515,14 @@ int BTreeNode::direct_delete(BTree* t, int _k){
     return node_id;
 }
 
-void BTreeNode::rebalance(BTree* t, int idx){
+int BTreeNode::rebalance(BTree* t, int idx){
 
     BTreeNode* node = (BTreeNode*) calloc(1, sizeof(BTreeNode));
     t->node_read(child_id[idx], node);
 
     if(node->num_key >= min_num){
         delete node;
-        return;
+        return node_id;
     }
 
     BTreeNode *left = (BTreeNode*) calloc(1, sizeof(BTreeNode));

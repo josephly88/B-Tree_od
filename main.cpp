@@ -4,8 +4,8 @@
 #include "b_tree.h"
 using namespace std;
 
-#define INS 4
-#define DEL 4
+#define INS 21
+#define DEL 1
 
 struct S{
     char value;
@@ -98,8 +98,6 @@ int main(int argc, char** argv){
     for(int i = 0; i < INS; i++){
         int k = i;
         char v = random_char();
-        S[k].value = v;
-        S[k].exist = true;
         t->insertion(k, v);
         cout << "-Insertion: " << k  << '(' << v << ')' << endl;
         t->traverse();
@@ -107,11 +105,11 @@ int main(int argc, char** argv){
     }
 
     for(int i = 0; i < DEL; i++){
-        int k = i;
-        S[k].exist = false;
+        int k = INS - i - 1;
         cout << "-Deletion: " << k << endl;
         t->deletion(k);
         t->traverse();
+        t->print_used_node_id();
     }
 
 
