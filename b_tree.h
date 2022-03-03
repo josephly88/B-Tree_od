@@ -26,8 +26,8 @@ class BTree{
 		void node_read(int id, BTreeNode* node);
 		void node_write(int id, BTreeNode* node);
 
-		int get_free_node_id();
-		void set_node_id(int block_id, bool bit);
+		int get_free_block_id();
+		void set_block_id(int block_id, bool bit);
 		void print_used_node_id();
 
 		void traverse();

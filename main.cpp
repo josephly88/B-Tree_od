@@ -6,7 +6,7 @@
 using namespace std;
 
 #define INS 30
-#define DEL 0
+#define DEL 30
 #define RANGE 1000
 
 struct S{
@@ -149,11 +149,6 @@ int main(int argc, char** argv){
 
     loop_insert(t);
     loop_delete(t);
-
-    delete_n_print(t, 0);
-    delete_n_print(t, 4);
-    delete_n_print(t, 22);
-    delete_n_print(t, 17);
 
     cout << "Expected result: " << endl;
     for(int i = 0; i < RANGE; i++){
