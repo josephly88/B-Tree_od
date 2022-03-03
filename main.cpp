@@ -1,11 +1,12 @@
 #include <iostream>
 #include <time.h>
 #include <sys/stat.h>
+#include <chrono>
 #include "b_tree.h"
 using namespace std;
 
-#define INS 50
-#define DEL 40
+#define INS 30
+#define DEL 30
 
 struct S{
     char value;
@@ -95,6 +96,8 @@ int main(int argc, char** argv){
         return 0;
     }
 
+    chrono::duration<double> sum = chrono::duration<double>::zero();
+
     for(int i = 0; i < INS; i++){
         int k = random_num(0, INS);
         while(S[k].exist == true)
@@ -102,22 +105,46 @@ int main(int argc, char** argv){
         char v = random_char();
         S[k].value = v;
         S[k].exist = true;
-        t->insertion(k, v);
-        cout << "-Insertion: " << k  << '(' << v << ')' << endl;
-    }
-    t->traverse();
-    t->print_used_node_id();
 
-    for(int i = 0; i < DEL; i++){
-        int k = random_num(0, INS);
-        if(S[k].exist == false)
-            i--;
-        S[k].exist = false;
-        cout << "-Deletion: " << k << endl;
-        t->deletion(k);
+        cout << "-Insertion: " << k  << '(' << v << ')' << endl;
+        auto start = chrono::system_clock::now();
+        t->insertion(k, v);
+        auto end = std::chrono::system_clock::now();        
+        chrono::duration<double> diff = end - start;
+        sum += diff;
+
+        cout << "-Duration: " << diff.count() << endl;
+        
         t->traverse();
         t->print_used_node_id();
     }
+
+    if(INS)
+        cout << endl << "Average Insertion time : " << sum.count() / INS << endl << endl;
+
+    sum = chrono::duration<double>::zero();
+
+    for(int i = 0; i < DEL; i++){
+        int k = random_num(0, INS);
+        while(S[k].exist == false)
+            k = random_num(0, INS);
+        S[k].exist = false;
+
+        cout << "-Deletion: " << k << endl;
+        auto start = chrono::system_clock::now();
+        t->deletion(k);
+        auto end = std::chrono::system_clock::now();
+        chrono::duration<double> diff = end - start;
+        sum += diff;
+
+        cout << "-Duration: " << diff.count() << endl;
+
+        t->traverse();
+        t->print_used_node_id();
+    }
+
+    if(DEL)
+        cout << endl << "Average Deletion time : " << sum.count() / DEL << endl << endl;
 
     cout << "Expected result: " << endl;
     for(int i = 0; i < INS; i++){
@@ -126,6 +153,7 @@ int main(int argc, char** argv){
         }
     }
     cout << endl << endl;
+    
 
     //command(t, &file);
 
