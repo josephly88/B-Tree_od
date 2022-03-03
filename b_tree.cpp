@@ -372,8 +372,8 @@ void BTreeNode::traverse_delete(BTree *t, int _k){
                 t->node_read(pred_id, pred);
 
                 // Borrow from pred
-                key[i] = pred->key[node->num_key - 1];
-                value[i] = pred->value[node->num_key - 1];
+                key[i] = pred->key[pred->num_key - 1];
+                value[i] = pred->value[pred->num_key - 1];
                 t->node_write(node_id, this);
                 node->traverse_delete(t, key[i]);
                 rebalance(t, i);
