@@ -9,6 +9,7 @@ using namespace std;
 
 class BTree;
 class BTreeNode;
+class removeList;
 
 class BTree{
 	public:
@@ -54,18 +55,28 @@ class BTreeNode{
 		void traverse(BTree* t, int level);
 		char* search(BTree* t, int _k);
 
-		int traverse_insert(BTree* t, int _k, char _v);
-		int direct_insert(BTree* t, int _k, char _v, int node_id1 = 0, int node_id2 = 0);
-		int split(BTree* t, int node_id, int parent_id);
+		int traverse_insert(BTree* t, int _k, char _v, removeList** _list);
+		int direct_insert(BTree* t, int _k, char _v, removeList** _list, int node_id1 = 0, int node_id2 = 0);
+		int split(BTree* t, int node_id, int parent_id, removeList** _list);
 
-		int traverse_delete(BTree* t, int _k);
-		int direct_delete(BTree* t, int _k);
-		int rebalance(BTree* t, int idx);
+		int traverse_delete(BTree* t, int _k, removeList** _list);
+		int direct_delete(BTree* t, int _k, removeList** _list);
+		int rebalance(BTree* t, int idx, removeList** _list);
 		int get_pred(BTree* t);
 		int get_succ(BTree* t);	
 		
 	// BTree class can now access the private members of BTreeNode
 	friend class BTree;
+};
+
+class removeList{
+	int id;
+	removeList* next;
+
+	public:
+		removeList(int _id, removeList* _next);
+
+		void removeNode(BTree* t);
 };
 
 void tree_read(fstream* file, BTree* tree);

@@ -112,8 +112,6 @@ int main(int argc, char** argv){
         t->print_used_node_id();
     }
 
-
-
     //command(t, &file);
 
     delete t;
