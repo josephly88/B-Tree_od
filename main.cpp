@@ -6,12 +6,13 @@
 using namespace std;
 
 #define INS 30
-#define DEL 30
+#define DEL 0
+#define RANGE 1000
 
 struct S{
     char value;
     bool exist;
-}S[INS];
+}S[RANGE];
 
 int random_num(int base, int max){
     return rand() % max + base;
@@ -24,6 +25,56 @@ char random_char(){
 bool fileExists(const char* file) {
     struct stat buf;
     return (stat(file, &buf) == 0);
+}
+
+void insert_n_print(BTree* t, int k, char v){
+    cout << "-Insertion: " << k  << '(' << v << ')' << endl;
+    auto start = chrono::system_clock::now();
+    t->insertion(k, v);
+    auto end = std::chrono::system_clock::now();        
+    chrono::duration<double> diff = end - start;
+
+    cout << "-Duration: " << diff.count() << endl;
+    
+    t->traverse();
+    t->print_used_node_id();
+}
+
+void loop_insert(BTree* t){
+
+    for(int i = 0; i < INS; i++){
+        int k;
+        k = i;
+        //do{ k = random_num(0, RANGE);}while(S[k].exist == true);
+        char v = random_char();
+        S[k].value = v;
+        S[k].exist = true;
+
+        insert_n_print(t, k, v);
+    }
+}
+
+void delete_n_print(BTree* t, int k){
+    cout << "-Deletion: " << k << endl;
+    auto start = chrono::system_clock::now();
+    t->deletion(k);
+    auto end = std::chrono::system_clock::now();
+    chrono::duration<double> diff = end - start;
+
+    cout << "-Duration: " << diff.count() << endl;
+    t->traverse();
+    t->print_used_node_id();
+}
+
+void loop_delete(BTree* t){
+
+    for(int i = 0; i < DEL; i++){
+        int k;
+        do{ k = random_num(0, RANGE);}while(S[k].exist == false);
+        S[k].exist = false;
+
+        delete_n_print(t, k);
+    }
 }
 
 void command(BTree* t, fstream* file){
@@ -96,64 +147,21 @@ int main(int argc, char** argv){
         return 0;
     }
 
-    chrono::duration<double> sum = chrono::duration<double>::zero();
+    loop_insert(t);
+    loop_delete(t);
 
-    for(int i = 0; i < INS; i++){
-        int k = random_num(0, INS);
-        while(S[k].exist == true)
-            k = random_num(0, INS);
-        char v = random_char();
-        S[k].value = v;
-        S[k].exist = true;
-
-        cout << "-Insertion: " << k  << '(' << v << ')' << endl;
-        auto start = chrono::system_clock::now();
-        t->insertion(k, v);
-        auto end = std::chrono::system_clock::now();        
-        chrono::duration<double> diff = end - start;
-        sum += diff;
-
-        cout << "-Duration: " << diff.count() << endl;
-        
-        t->traverse();
-        t->print_used_node_id();
-    }
-
-    if(INS)
-        cout << endl << "Average Insertion time : " << sum.count() / INS << endl << endl;
-
-    sum = chrono::duration<double>::zero();
-
-    for(int i = 0; i < DEL; i++){
-        int k = random_num(0, INS);
-        while(S[k].exist == false)
-            k = random_num(0, INS);
-        S[k].exist = false;
-
-        cout << "-Deletion: " << k << endl;
-        auto start = chrono::system_clock::now();
-        t->deletion(k);
-        auto end = std::chrono::system_clock::now();
-        chrono::duration<double> diff = end - start;
-        sum += diff;
-
-        cout << "-Duration: " << diff.count() << endl;
-
-        t->traverse();
-        t->print_used_node_id();
-    }
-
-    if(DEL)
-        cout << endl << "Average Deletion time : " << sum.count() / DEL << endl << endl;
+    delete_n_print(t, 0);
+    delete_n_print(t, 4);
+    delete_n_print(t, 22);
+    delete_n_print(t, 17);
 
     cout << "Expected result: " << endl;
-    for(int i = 0; i < INS; i++){
+    for(int i = 0; i < RANGE; i++){
         if(S[i].exist == true){
             cout << " " << i << "(" << S[i].value << ")";
         }
     }
-    cout << endl << endl;
-    
+    cout << endl << endl;   
 
     //command(t, &file);
 

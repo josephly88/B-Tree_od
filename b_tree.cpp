@@ -170,8 +170,10 @@ void BTree::insertion(int _k, char _v){
             return;
         }
 
-        if(dup_node_id != root_id)
+        if(dup_node_id != root_id){
             root_id = dup_node_id;
+            tree_write(file_ptr, this);
+        }            
 
         node_read(root_id, root);
         if(root->num_key >= m){            
@@ -216,8 +218,10 @@ void BTree::deletion(int _k){
             return;
         }
 
-        if(root_id != dup_node_id)
+        if(root_id != dup_node_id){
             root_id = dup_node_id;
+            tree_write(file_ptr, this);
+        }            
 
         node_read(root_id, root);
         if(root->num_key == 0){
@@ -368,7 +372,6 @@ int BTreeNode::direct_insert(BTree* t, int _k, char _v, removeList** list, int n
     }
     if(!is_leaf) child_id[i+1] = child_id[i];
 
-
     key[idx] = _k;
     value[idx] = _v;
     if(node_id1 != 0) child_id[idx] = node_id1;
@@ -464,8 +467,8 @@ int BTreeNode::traverse_delete(BTree *t, int _k, removeList** list){
                 t->node_read(pred_id, pred);
 
                 // Borrow from pred
-                key[i] = pred->key[node->num_key - 1];
-                value[i] = pred->value[node->num_key - 1];
+                key[i] = pred->key[pred->num_key - 1];
+                value[i] = pred->value[pred->num_key - 1];
                 child_id[i] = node->traverse_delete(t, key[i], list);
                 *list = new removeList(node_id, *list);
                 node_id = t->get_free_node_id();
