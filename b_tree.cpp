@@ -450,9 +450,11 @@ int BTreeNode::traverse_delete(BTree *t, int _k, removeList** list){
                 // Borrow from succ
                 key[i] = succ->key[0];
                 value[i] = succ->value[0];
+                child_id[i+1] = node->traverse_delete(t, key[i], list);
+                *list = new removeList(node_id, *list);
+                node_id = t->get_free_node_id();
                 t->node_write(node_id, this);
-                node->traverse_delete(t, key[i], list);
-                rebalance(t, i+1, list);
+                i = i+1;
             }
             else{
                 t->node_read(child_id[i], node);
@@ -464,15 +466,18 @@ int BTreeNode::traverse_delete(BTree *t, int _k, removeList** list){
                 // Borrow from pred
                 key[i] = pred->key[node->num_key - 1];
                 value[i] = pred->value[node->num_key - 1];
+                child_id[i] = node->traverse_delete(t, key[i], list);
+                *list = new removeList(node_id, *list);
+                node_id = t->get_free_node_id();
                 t->node_write(node_id, this);
-                node->traverse_delete(t, key[i], list);
-                rebalance(t, i, list);
-
+                
                 delete pred;
             }
 
             delete node;
             delete succ;
+
+            return rebalance(t, i, list);
         }
         else{
             BTreeNode* child = (BTreeNode*) calloc(1, sizeof(BTreeNode));
@@ -546,37 +551,44 @@ int BTreeNode::rebalance(BTree* t, int idx, removeList** list){
         t->node_read(child_id[idx-1], left);
         t->node_read(child_id[idx], right);
         trans_node_id = (left->is_leaf) ? 0 : left->child_id[left->num_key];
-        right->direct_insert(t, key[idx-1], value[idx-1], list, trans_node_id);
+        child_id[idx] = right->direct_insert(t, key[idx-1], value[idx-1], list, trans_node_id);
         key[idx-1] = left->key[left->num_key - 1];
         value[idx-1] = left->value[left->num_key - 1];
-        t->node_write(node_id, this);        
-        left->direct_delete(t, key[idx-1], list);
+        child_id[idx-1] = left->direct_delete(t, key[idx-1], list);
+        *list = new removeList(node_id, *list);
+        node_id = t->get_free_node_id();
+        t->node_write(node_id, this);                
     }
     else if(idx + 1 <= num_key && right->num_key > min_num){
         //Borrowing from right
         t->node_read(child_id[idx], left);
         t->node_read(child_id[idx+1], right);
         trans_node_id = (right->is_leaf) ? 0 : right->child_id[0];
-        left->direct_insert(t, key[idx], value[idx], list, 0, trans_node_id);
+        child_id[idx] = left->direct_insert(t, key[idx], value[idx], list, 0, trans_node_id);
         key[idx] = right->key[0];
         value[idx] = right->value[0];
-        t->node_write(node_id, this); 
-        right->direct_delete(t, key[idx], list);
+        child_id[idx+1] = right->direct_delete(t, key[idx], list);
+        *list = new removeList(node_id, *list);
+        node_id = t->get_free_node_id();
+        t->node_write(node_id, this);         
     }   
     else{
         //Merge with right unless idx = num_key
         if(idx == num_key) idx -= 1;
-
         t->node_read(child_id[idx], left);
         t->node_read(child_id[idx+1], right);
         trans_node_id = (right->is_leaf) ? 0 : right->child_id[0];
-        left->direct_insert(t, key[idx], value[idx], 0, trans_node_id);
+        child_id[idx] = left->direct_insert(t, key[idx], value[idx], list, 0, trans_node_id);
         for(int i = 0; i < right->num_key; i++){
+            t->node_read(child_id[idx], left);
             trans_node_id = (right->is_leaf) ? 0 : right->child_id[i+1];
-            left->direct_insert(t, right->key[i], right->value[i], 0, trans_node_id);
+            child_id[idx] = left->direct_insert(t, right->key[i], right->value[i], list, 0, trans_node_id);
         }
-        direct_delete(t, key[idx], list);
+        t->node_read(child_id[idx], left);
+        node_id = direct_delete(t, key[idx], list);
         child_id[idx] = left->node_id;
+        *list = new removeList(node_id, *list);
+        node_id = t->get_free_node_id();
         t->node_write(node_id, this);
 
         *list = new removeList(right->node_id, *list);
@@ -585,6 +597,8 @@ int BTreeNode::rebalance(BTree* t, int idx, removeList** list){
     delete node;
     delete left,
     delete right;
+
+    return node_id;
 }
 
 int BTreeNode::get_pred(BTree* t){
