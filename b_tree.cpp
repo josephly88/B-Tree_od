@@ -201,7 +201,15 @@ void BTree::deletion(int _k){
     if(root_id){
         BTreeNode* root = (BTreeNode*) calloc(1, sizeof(BTreeNode));
         node_read(root_id, root);
-        root->traverse_delete(this, _k);
+        int dup_node_id = root->traverse_delete(this, _k);
+
+        if(dup_node_id == 0){
+            delete root;
+            return;
+        }
+
+        if(root_id != dup_node_id)
+            root_id = dup_node_id;
 
         node_read(root_id, root);
         if(root->num_key == 0){
@@ -403,7 +411,7 @@ int BTreeNode::split(BTree*t, int spt_node_id, int parent_id){
     return dup_par_id;
 }
 
-void BTreeNode::traverse_delete(BTree *t, int _k){
+int BTreeNode::traverse_delete(BTree *t, int _k){
     int i;
     bool found = false;
     for(i = 0; i < num_key; i++){
@@ -415,7 +423,9 @@ void BTreeNode::traverse_delete(BTree *t, int _k){
 
     if(is_leaf){            
         if(found)
-            direct_delete(t, _k);
+            return direct_delete(t, _k);
+        else
+            return 0;
     } 
     else{
         if(found){
@@ -464,13 +474,13 @@ void BTreeNode::traverse_delete(BTree *t, int _k){
     }
 }
 
-void BTreeNode::direct_delete(BTree* t, int _k){
+int BTreeNode::direct_delete(BTree* t, int _k){
     int i;
     for(i = 0; i < num_key; i++){
         if(key[i] == _k) break;
     }
     
-    if(i == num_key) return;
+    if(i == num_key) return 0;
 
     if(i < num_key-1){
         for(; i < num_key-1; i++){
@@ -482,11 +492,13 @@ void BTreeNode::direct_delete(BTree* t, int _k){
     }
     num_key--;
 
+    int old_node_id = node_id;
+    node_id = t->get_free_node_id();
+    t->set_node_id(old_node_id, false);
+
     t->node_write(node_id, this);
 
-    t->file_ptr->seekg(24, ios::beg);
-    uint8_t byte;
-    t->file_ptr->read((char*)(&byte), sizeof(uint8_t));
+    return node_id;
 }
 
 void BTreeNode::rebalance(BTree* t, int idx){

@@ -4,8 +4,8 @@
 #include "b_tree.h"
 using namespace std;
 
-#define INS 20
-#define DEL 0
+#define INS 4
+#define DEL 4
 
 struct S{
     char value;
