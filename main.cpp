@@ -5,8 +5,8 @@
 #include "b_tree.h"
 using namespace std;
 
-#define INS 30
-#define DEL 30
+#define INS 1
+#define DEL 1
 #define RANGE 1000
 
 struct S{
@@ -77,37 +77,6 @@ void loop_delete(BTree* t){
     }
 }
 
-void command(BTree* t, fstream* file){
-    while(1){
-        t->traverse();
-        cout << "Type your instruction " << endl;
-
-        char opt;
-        cin >> opt;
-
-        if(opt == 'i'){
-            int key;
-            cin >> key;
-
-            char v = random_char();
-            //int k = random_num(0,1000);
-            t->insertion(key, v);
-            cout << "-Insertion: " << key  << '(' << v << ')' << endl;
-        }
-        else if(opt == 'd'){
-            int key;
-            cin >> key;
-
-            t->deletion(key);
-            cout << "-Deletion: " << key  <<  endl;
-        }
-        else
-            break;
-
-        tree_read(file, t);
-    }
-}
-
 int main(int argc, char** argv){
 
     BTree* t;
@@ -139,13 +108,12 @@ int main(int argc, char** argv){
         }
     }
     
-    if (file.is_open()){
-        t->stat();
-    }
-    else{
+    if (!file.is_open()){
         cout << "Unable to open file" << endl;
         return 0;
     }
+
+    t->stat();
 
     loop_insert(t);
     loop_delete(t);
@@ -157,8 +125,6 @@ int main(int argc, char** argv){
         }
     }
     cout << endl << endl;   
-
-    //command(t, &file);
 
     delete t;
 
