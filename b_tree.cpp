@@ -14,15 +14,15 @@ BTree::BTree(string filename, int _block_size, fstream* _file){
     file_ptr = _file;
     block_size = _block_size;
     m = (_block_size - sizeof(BTreeNode) - sizeof(int)) / (sizeof(int) + sizeof(char) + sizeof(int));
-    node_cap = (_block_size - sizeof(BTree)) * 8;
+    block_cap = (_block_size - sizeof(BTree)) * 8;
     root_id = 0;
 
     tree_write(file_ptr, this);
 
     // Set the bit map to all 0
-    void* empty_bytes = calloc(1, node_cap / 8);
+    void* empty_bytes = calloc(1, block_cap / 8);
     file_ptr->seekp(sizeof(BTree), ios::beg);
-    file_ptr->write((char*)empty_bytes, node_cap / 8);
+    file_ptr->write((char*)empty_bytes, block_cap / 8);
     free(empty_bytes);
 
     set_block_id(0, true);
@@ -34,30 +34,28 @@ void BTree::stat(){
     cout << "Size of BTreeNode : " << sizeof(BTreeNode) << endl;        
     cout << "Size of K-V : " << sizeof(int) + sizeof(char) + sizeof(streamoff) << "(" << sizeof(streamoff) << ")" << endl;
     cout << "Degree : " << m << endl;
-    cout << "Node capacity : " << node_cap << endl;
+    cout << "Node capacity : " << block_cap << endl;
     cout << "Root id : " << root_id << endl;
     cout << endl;
 }
 
-void BTree::node_read(int id, BTreeNode* node){
-    streamoff offset = id * block_size;
+void BTree::node_read(int node_id, BTreeNode* node){
+    streamoff offset = node_id * block_size;
     
     file_ptr->seekg(offset, ios::beg);
     file_ptr->read((char*)node, sizeof(BTreeNode));
-
-    node->key = new int[node->m];
-    file_ptr->read((char*)node->key, node->m * sizeof(int));
+node->key = new int[node->m]; file_ptr->read((char*)node->key, node->m * sizeof(int));
     node->value = new char[node->m];
     file_ptr->read((char*)node->value, node->m * sizeof(char));
     node->child_id = new int[node->m + 1];
     file_ptr->read((char*)node->child_id, (node->m + 1) * sizeof(int)); 
 }
 
-void BTree::node_write(int id, BTreeNode* node){
-    if(id == 0)
+void BTree::node_write(int node_id, BTreeNode* node){
+    if(node_id == 0)
         cout << " Error : Attempt to write node id = 0 " << endl;
 
-    streamoff offset = id * block_size;
+    streamoff offset = node_id * block_size;
 
     file_ptr->seekp(offset, ios::beg);
     file_ptr->write((char*)node, sizeof(BTreeNode));
@@ -70,7 +68,7 @@ void BTree::node_write(int id, BTreeNode* node){
 int BTree::get_free_block_id(){
     file_ptr->seekg(sizeof(BTree), ios::beg);
     int id = 0;
-    while(id < node_cap){
+    while(id < block_cap){
         uint8_t byte;
         file_ptr->read((char*) &byte, sizeof(uint8_t));
         for(int i = 0; i < 8; i++){
@@ -86,7 +84,7 @@ int BTree::get_free_block_id(){
 }
 
 void BTree::set_block_id(int block_id, bool bit){
-    if(block_id >= node_cap) return;
+    if(block_id >= block_cap) return;
 
     int offset = sizeof(BTree) + (block_id / 8);
 
@@ -107,13 +105,13 @@ void BTree::set_block_id(int block_id, bool bit){
     file_ptr->read((char*)(&byte1), sizeof(uint8_t));
 }
 
-void BTree::print_used_node_id(){
+void BTree::print_used_block_id(){
     cout << endl;
     cout << "Used node : " << endl;
 
     file_ptr->seekg(sizeof(BTree), ios::beg);
     int id = 0;
-    while(id < node_cap){
+    while(id < block_cap){
         uint8_t byte;
         file_ptr->read((char*) &byte, sizeof(uint8_t));
         for(int i = 0; i < 8; i++){
@@ -654,12 +652,12 @@ CMB::~CMB(){
 	close(fd);
 }
 
-void CMB::cmb_read(void* buf, off_t offset, int size){
+void CMB::read(void* buf, off_t offset, int size){
 	void* virt_addr = (char*)map_base + offset;	
 	memcpy(buf, virt_addr, size);
 }
 
-void CMB::cmb_write(off_t offset, void* buf, int size){
+void CMB::write(off_t offset, void* buf, int size){
 	void* virt_addr = (char*)map_base + offset;	
 	memcpy(virt_addr, buf, size);
 }

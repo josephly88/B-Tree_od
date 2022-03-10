@@ -21,6 +21,7 @@ using namespace std;
 class BTree;
 class BTreeNode;
 class removeList;
+class CMB;
 
 class BTree{
 	public:
@@ -28,18 +29,18 @@ class BTree{
 		int root_id;		// Pointer to root node
 		fstream* file_ptr;
 		int block_size;
-		int node_cap;
+		int block_cap;
 
 		BTree(string filename, int _block_size, fstream* file);
 
 		void stat();
 
-		void node_read(int id, BTreeNode* node);
-		void node_write(int id, BTreeNode* node);
+		void node_read(int node_id, BTreeNode* node);
+		void node_write(int node_id, BTreeNode* node);
 
 		int get_free_block_id();
 		void set_block_id(int block_id, bool bit);
-		void print_used_node_id();
+		void print_used_block_id();
 
 		void traverse();
 		char* search(int _k);
@@ -101,8 +102,8 @@ class CMB{
 		CMB(off_t bar_addr);
 		~CMB();
 		
-		void cmb_read(void* buf, off_t offset, int size);
-		void cmb_write(off_t offset, void* buf, int size);
+		void read(void* buf, off_t offset, int size);
+		void write(off_t offset, void* buf, int size);
 
 };
 

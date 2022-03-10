@@ -5,8 +5,8 @@
 #include "b_tree.h"
 using namespace std;
 
-#define INS 1
-#define DEL 1
+#define INS 30
+#define DEL 30
 #define RANGE 1000
 
 struct S{
@@ -37,7 +37,7 @@ void insert_n_print(BTree* t, int k, char v){
     cout << "-Duration: " << diff.count() << endl;
     
     t->traverse();
-    t->print_used_node_id();
+    t->print_used_block_id();
 }
 
 void loop_insert(BTree* t){
@@ -63,7 +63,7 @@ void delete_n_print(BTree* t, int k){
 
     cout << "-Duration: " << diff.count() << endl;
     t->traverse();
-    t->print_used_node_id();
+    t->print_used_block_id();
 }
 
 void loop_delete(BTree* t){
@@ -78,21 +78,6 @@ void loop_delete(BTree* t){
 }
 
 int main(int argc, char** argv){
-
-	CMB* cmb = new CMB(0xc0000000);
-
-	u_int64_t write = 0x99775533;
-	cmb->cmb_write(0, &write, sizeof(u_int64_t));
-
-	u_int64_t read = 0;
-	cmb->cmb_read(&read, 0, sizeof(u_int64_t));
-
-	
-	printf("Value at address 0x%p : 0x%lX\n", 0, read);
-
-	delete cmb;
-
-	return 0;
 
     BTree* t;
     fstream file;
