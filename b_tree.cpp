@@ -8,7 +8,7 @@ void tree_write(fstream* file, BTree* tree){
     file->write((char*) tree, sizeof(BTree));
 }
 
-BTree::BTree(string filename, int _block_size, fstream* _file){
+BTree::BTree(string filename, int _block_size, fstream* _file, off_t _cmb_addr){
     //file.open(filename, ios::in | ios::out | ios::binary);
     _file->open(filename, ios::in | ios::out | ios::trunc | ios::binary);
     file_ptr = _file;
@@ -16,6 +16,7 @@ BTree::BTree(string filename, int _block_size, fstream* _file){
     m = (_block_size - sizeof(BTreeNode) - sizeof(int)) / (sizeof(int) + sizeof(char) + sizeof(int));
     block_cap = (_block_size - sizeof(BTree)) * 8;
     root_id = 0;
+	cmb_addr = _cmb_addr;
 
     tree_write(file_ptr, this);
 
@@ -26,6 +27,14 @@ BTree::BTree(string filename, int _block_size, fstream* _file){
     free(empty_bytes);
 
     set_block_id(0, true);
+}
+
+BTree::~BTree(){
+	
+}
+
+void BTree::reopen(fstream* file){
+	file_ptr = file;
 }
 
 void BTree::stat(){

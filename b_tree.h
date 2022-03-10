@@ -30,13 +30,20 @@ class BTree{
 		fstream* file_ptr;
 		int block_size;
 		int block_cap;
+		CMB* cmb;
+		off_t cmb_addr;
 
-		BTree(string filename, int _block_size, fstream* file);
+		BTree(string filename, int _block_size, fstream* file, off_t _cmb_addr);
+		~BTree();
+
+		void reopen(fstream* file);
 
 		void stat();
 
 		void node_read(int node_id, BTreeNode* node);
 		void node_write(int node_id, BTreeNode* node);
+
+		void update_node_id(int node_id, int block_id);
 
 		int get_free_block_id();
 		void set_block_id(int block_id, bool bit);

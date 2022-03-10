@@ -81,6 +81,7 @@ int main(int argc, char** argv){
 
     BTree* t;
     fstream file;
+    off_t cmb_addr = 0xc0000000;
 
     srand(time(0));
 
@@ -91,20 +92,22 @@ int main(int argc, char** argv){
         return 0;
     }
     else{
+	// Existed tree file
         if(fileExists(argv[1])){
             cout << "Read file <" << argv[1] << ">" << endl;
             file.open(argv[1], ios::in | ios::out | ios::binary);
             t = (BTree*) calloc(1, sizeof(BTree));
             tree_read(&file, t);
-            t->file_ptr = &file;
+			t->reopen(&file);
             tree_write(&file, t);
         }
         else{
+	// Create a new tree file
             cout << "Create file <" << argv[1] << ">" << endl;
             cout << "Please input the block size: ";
             int block_size;
             cin >> block_size;
-            t = new BTree(argv[1], block_size, &file);
+            t = new BTree(argv[1], block_size, &file, cmb_addr);
         }
     }
     
