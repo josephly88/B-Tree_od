@@ -9,7 +9,7 @@ void tree_write(fstream* file, BTree* tree){
 }
 
 BTree::BTree(string filename, int _block_size, fstream* _file, off_t _cmb_addr){
-    //file.open(filename, ios::in | ios::out | ios::binary);
+	// Create new file and initialize the tree
     _file->open(filename, ios::in | ios::out | ios::trunc | ios::binary);
     file_ptr = _file;
     block_size = _block_size;
@@ -19,6 +19,9 @@ BTree::BTree(string filename, int _block_size, fstream* _file, off_t _cmb_addr){
 	cmb_addr = _cmb_addr;
 
     tree_write(file_ptr, this);
+
+	// Map CMB
+	cmb = new CMB(cmb_addr);
 
     // Set the bit map to all 0
     void* empty_bytes = calloc(1, block_cap / 8);
@@ -30,11 +33,12 @@ BTree::BTree(string filename, int _block_size, fstream* _file, off_t _cmb_addr){
 }
 
 BTree::~BTree(){
-	
+	delete cmb;	
 }
 
 void BTree::reopen(fstream* file){
 	file_ptr = file;
+	cmb = new CMB(cmb_addr);
 }
 
 void BTree::stat(){
