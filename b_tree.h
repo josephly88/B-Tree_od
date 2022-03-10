@@ -108,6 +108,8 @@ class CMB{
 	public:
 		CMB(off_t bar_addr);
 		~CMB();
+
+		void* get_map_base();
 		
 		void read(void* buf, off_t offset, int size);
 		void write(off_t offset, void* buf, int size);

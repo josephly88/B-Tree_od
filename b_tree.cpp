@@ -53,11 +53,14 @@ void BTree::stat(){
 }
 
 void BTree::node_read(int node_id, BTreeNode* node){
-    streamoff offset = node_id * block_size;
+
+	u_int64_t block_id = node_id;
+
+    streamoff offset = block_id * block_size;
     
     file_ptr->seekg(offset, ios::beg);
     file_ptr->read((char*)node, sizeof(BTreeNode));
-node->key = new int[node->m]; file_ptr->read((char*)node->key, node->m * sizeof(int));
+	node->key = new int[node->m]; file_ptr->read((char*)node->key, node->m * sizeof(int));
     node->value = new char[node->m];
     file_ptr->read((char*)node->value, node->m * sizeof(char));
     node->child_id = new int[node->m + 1];
@@ -65,10 +68,11 @@ node->key = new int[node->m]; file_ptr->read((char*)node->key, node->m * sizeof(
 }
 
 void BTree::node_write(int node_id, BTreeNode* node){
-    if(node_id == 0)
-        cout << " Error : Attempt to write node id = 0 " << endl;
+    if(node_id == 0) cout << " Error : Attempt to write node id = 0 " << endl;
 
-    streamoff offset = node_id * block_size;
+	u_int64_t block_id = node_id;
+
+    streamoff offset = block_id * block_size;
 
     file_ptr->seekp(offset, ios::beg);
     file_ptr->write((char*)node, sizeof(BTreeNode));
@@ -76,6 +80,12 @@ void BTree::node_write(int node_id, BTreeNode* node){
     file_ptr->write((char*)node->key, node->m * sizeof(int));
     file_ptr->write((char*)node->value, node->m * sizeof(char));
     file_ptr->write((char*)node->child_id, (node->m + 1) * sizeof(int));
+}
+
+void BTree::update_node_id(int node_id, int block_id){
+	off_t offset = (off_t)cmb->get_map_base() + node_id * sizeof(u_int64_t);
+    u_int64_t writeval = (u_int64_t)block_id;
+	cmb->write(offset, &writeval, sizeof(u_int64_t));
 }
 
 int BTree::get_free_block_id(){
@@ -675,3 +685,6 @@ void CMB::write(off_t offset, void* buf, int size){
 	memcpy(virt_addr, buf, size);
 }
 
+void* CMB::get_map_base(){
+	return map_base;
+}
