@@ -1,8 +1,6 @@
 #include "b_tree.h"
 
-void tree_read(fstream* file, BTree* tree){
-    file->seekg(0, ios::beg);
-    file->read((char*) tree, sizeof(BTree));
+void tree_read(fstream* file, BTree* tree){ file->seekg(0, ios::beg); file->read((char*) tree, sizeof(BTree));
 }
 
 void tree_write(fstream* file, BTree* tree){
@@ -640,3 +638,29 @@ void removeList::removeNode(BTree* t){
     }
     t->set_block_id(id, false);  
 }
+
+CMB::CMB(off_t bar_addr){
+	if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) == -1) FATAL;
+	printf("/dev/mem opened.\n");
+
+	/* Map one page */
+	map_base = mmap(0, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, bar_addr & ~MAP_MASK);
+	if (map_base == (void*)-1) FATAL;
+	printf("Memory mapped at address %p.\n\n", map_base);
+}
+
+CMB::~CMB(){
+	if (munmap(map_base, MAP_SIZE) == -1) FATAL;
+	close(fd);
+}
+
+void CMB::cmb_read(void* buf, off_t offset, int size){
+	void* virt_addr = (char*)map_base + offset;	
+	memcpy(buf, virt_addr, size);
+}
+
+void CMB::cmb_write(off_t offset, void* buf, int size){
+	void* virt_addr = (char*)map_base + offset;	
+	memcpy(virt_addr, buf, size);
+}
+

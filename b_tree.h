@@ -4,8 +4,19 @@
 #include <iostream>
 #include <string>
 #include <fstream>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/mman.h>
+
 #include "b_tree.h"
 using namespace std;
+
+#define FATAL do { fprintf(stderr, "Error at line %d, file %s (%d) [%s]\n", \
+  __LINE__, __FILE__, errno, strerror(errno)); exit(1); } while(0)
+
+#define MAP_SIZE 4096UL
+#define MAP_MASK (MAP_SIZE - 1)
 
 class BTree;
 class BTreeNode;
@@ -81,5 +92,18 @@ class removeList{
 
 void tree_read(fstream* file, BTree* tree);
 void tree_write(fstream* file, BTree* tree);
+
+class CMB{
+	int fd;
+	void* map_base;
+
+	public:
+		CMB(off_t bar_addr);
+		~CMB();
+		
+		void cmb_read(void* buf, off_t offset, int size);
+		void cmb_write(off_t offset, void* buf, int size);
+
+};
 
 #endif /* B_TREE_H */

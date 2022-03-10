@@ -79,6 +79,21 @@ void loop_delete(BTree* t){
 
 int main(int argc, char** argv){
 
+	CMB* cmb = new CMB(0xc0000000);
+
+	u_int64_t write = 0x99775533;
+	cmb->cmb_write(0, &write, sizeof(u_int64_t));
+
+	u_int64_t read = 0;
+	cmb->cmb_read(&read, 0, sizeof(u_int64_t));
+
+	
+	printf("Value at address 0x%p : 0x%lX\n", 0, read);
+
+	delete cmb;
+
+	return 0;
+
     BTree* t;
     fstream file;
 
