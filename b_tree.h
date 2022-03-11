@@ -96,7 +96,7 @@ class removeList{
 	public:
 		removeList(int _id, removeList* _next);
 
-		void removeNode(BTree* t);
+		void removeBlock(BTree* t);
 };
 
 void tree_read(fstream* file, BTree* tree);

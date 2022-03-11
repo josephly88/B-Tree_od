@@ -202,8 +202,9 @@ void BTree::insertion(int _k, char _v){
         }            
 
         node_read(root_id, root);
-        if(root->num_key >= m){            
+        if(root->num_key >= m){  
             int new_root_id = get_free_block_id();
+            update_node_id(new_root_id, new_root_id);
             BTreeNode* new_root = new BTreeNode(m, false, new_root_id);
             node_write(new_root_id, new_root);
 
@@ -214,7 +215,7 @@ void BTree::insertion(int _k, char _v){
             delete new_root;
         }
         if(rmlist){
-            rmlist->removeNode(this);
+            rmlist->removeBlock(this);
             delete rmlist;
         }
         delete root;
@@ -262,7 +263,7 @@ void BTree::deletion(int _k){
             tree_write(file_ptr, this);
         } 
         if(rmlist){
-            rmlist->removeNode(this);
+            rmlist->removeBlock(this);
             delete rmlist;
         }
         delete root;          
@@ -421,6 +422,7 @@ int BTreeNode::split(BTree*t, int spt_node_id, int parent_id, removeList** list)
     t->node_read(parent_id, parent);
 
     int new_node_id = t->get_free_block_id();
+    t->update_node_id(new_node_id, new_node_id);
     BTreeNode* new_node = new BTreeNode(m, node->is_leaf, new_node_id);
 
     int i, j;
@@ -434,12 +436,13 @@ int BTreeNode::split(BTree*t, int spt_node_id, int parent_id, removeList** list)
     if(!node->is_leaf)
         new_node->child_id[j] = node->child_id[i];
 
-    node->node_id = t->get_free_block_id();            
+    int old_block_id = t->get_block_id(node->node_id);
+
+    t->update_node_id(node->node_id, t->get_free_block_id());
     int dup_par_id = parent->direct_insert(t, node->key[min_num], node->value[min_num], list, node->node_id, new_node_id);
     node->num_key = min_num;    
     
-    *list = new removeList(spt_node_id, *list);
-    *list = new removeList(parent_id, *list);
+    *list = new removeList(old_block_id, *list);
 
     t->node_write(node->node_id, node);
     t->node_write(new_node_id, new_node);
@@ -660,9 +663,9 @@ removeList::removeList(int _id, removeList* _next){
     next = _next;
 }
 
-void removeList::removeNode(BTree* t){
+void removeList::removeBlock(BTree* t){
     if(next){
-        next->removeNode(t);
+        next->removeBlock(t);
         delete next;
     }
     t->set_block_id(id, false);  
