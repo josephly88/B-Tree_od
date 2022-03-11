@@ -569,12 +569,16 @@ int BTreeNode::rebalance(BTree* t, int idx, removeList** list){
         t->node_read(child_id[idx-1], left);
         t->node_read(child_id[idx], right);
         trans_node_id = (left->is_leaf) ? 0 : left->child_id[left->num_key];
+            // Insert to right
         child_id[idx] = right->direct_insert(t, key[idx-1], value[idx-1], list, trans_node_id);
+            // Borrow from left
         key[idx-1] = left->key[left->num_key - 1];
         value[idx-1] = left->value[left->num_key - 1];
+            // Delete from left
         child_id[idx-1] = left->direct_delete(t, key[idx-1], list);
-        *list = new removeList(node_id, *list);
-        node_id = t->get_free_block_id();
+
+        *list = new removeList(t->get_block_id(node_id), *list);
+        t->update_node_id(node_id, t->get_free_block_id());
         t->node_write(node_id, this);                
     }
     else if(idx + 1 <= num_key && right->num_key > min_num){
@@ -582,12 +586,16 @@ int BTreeNode::rebalance(BTree* t, int idx, removeList** list){
         t->node_read(child_id[idx], left);
         t->node_read(child_id[idx+1], right);
         trans_node_id = (right->is_leaf) ? 0 : right->child_id[0];
+            // Insert to left
         child_id[idx] = left->direct_insert(t, key[idx], value[idx], list, 0, trans_node_id);
+            // Borrow from right
         key[idx] = right->key[0];
         value[idx] = right->value[0];
+            // Delete form left
         child_id[idx+1] = right->direct_delete(t, key[idx], list);
-        *list = new removeList(node_id, *list);
-        node_id = t->get_free_block_id();
+
+        *list = new removeList(t->get_block_id(node_id), *list);
+        t->update_node_id(node_id, t->get_free_block_id());
         t->node_write(node_id, this);         
     }   
     else{
@@ -596,20 +604,24 @@ int BTreeNode::rebalance(BTree* t, int idx, removeList** list){
         t->node_read(child_id[idx], left);
         t->node_read(child_id[idx+1], right);
         trans_node_id = (right->is_leaf) ? 0 : right->child_id[0];
+            // Insert parent's kv to left
         child_id[idx] = left->direct_insert(t, key[idx], value[idx], list, 0, trans_node_id);
+            // Insert right to left
         for(int i = 0; i < right->num_key; i++){
             t->node_read(child_id[idx], left);
             trans_node_id = (right->is_leaf) ? 0 : right->child_id[i+1];
             child_id[idx] = left->direct_insert(t, right->key[i], right->value[i], list, 0, trans_node_id);
         }
         t->node_read(child_id[idx], left);
+            // Delete the parent's kv
         node_id = direct_delete(t, key[idx], list);
         child_id[idx] = left->node_id;
-        *list = new removeList(node_id, *list);
-        node_id = t->get_free_block_id();
+
+        *list = new removeList(t->get_block_id(node_id), *list);
+        t->update_node_id(node_id, t->get_free_block_id());
         t->node_write(node_id, this);
 
-        *list = new removeList(right->node_id, *list);
+        *list = new removeList(t->get_block_id(right->node_id), *list);
     }
 
     delete node;
