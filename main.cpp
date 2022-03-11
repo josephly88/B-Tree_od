@@ -5,9 +5,9 @@
 #include "b_tree.h"
 using namespace std;
 
-#define INS 1
-#define DEL 0
-#define RANGE 1000
+#define INS 4
+#define DEL 4
+#define RANGE 100
 
 struct S{
     char value;
@@ -75,7 +75,7 @@ void loop_delete(BTree* t){
 
     for(int i = 0; i < DEL; i++){
         int k;
-        do{ k = random_num(0, RANGE);}while(S[k].exist == false);
+        do{ k = random_num(0, RANGE);}while(t->search(k) == NULL);
         S[k].exist = false;
 
         delete_n_print(t, k);

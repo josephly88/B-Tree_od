@@ -91,7 +91,7 @@ int BTree::get_free_node_id(){
     cmb->read(&free_node_id, 0, sizeof(u_int64_t));
     u_int64_t next_node_id = free_node_id + 1;
     cmb->write(0, &next_node_id, sizeof(u_int64_t));
-    
+
     return (int)free_node_id;
 }
 
@@ -250,16 +250,11 @@ void BTree::deletion(int _k){
         if(dup_node_id == 0){
             delete root;
             return;
-        }
-
-        if(root_id != dup_node_id){
-            root_id = dup_node_id;
-            tree_write(file_ptr, this);
-        }            
+        }        
 
         node_read(root_id, root);
         if(root->num_key == 0){
-            rmlist = new removeList(root_id, rmlist);
+            rmlist = new removeList(get_block_id(root_id), rmlist);
             if(root->is_leaf){
                 root_id = 0;             
             }
@@ -435,14 +430,12 @@ int BTreeNode::split(BTree*t, int spt_node_id, int parent_id, removeList** list)
     if(!node->is_leaf)
         new_node->child_id[j] = node->child_id[i];
 
-    int old_block_id = t->get_block_id(node->node_id);
+    *list = new removeList(t->get_block_id(node->node_id), *list);
 
     t->update_node_id(node->node_id, t->get_free_block_id());
     int dup_par_id = parent->direct_insert(t, node->key[min_num], node->value[min_num], list, node->node_id, new_node_id);
     node->num_key = min_num;    
     
-    *list = new removeList(old_block_id, *list);
-
     t->node_write(node->node_id, node);
     t->node_write(new_node_id, new_node);
 
@@ -545,8 +538,8 @@ int BTreeNode::direct_delete(BTree* t, int _k, removeList** list){
     }
     num_key--;
 
-    *list = new removeList(node_id, *list);
-    node_id = t->get_free_block_id();
+    *list = new removeList(t->get_block_id(node_id), *list);
+    t->update_node_id(node_id, t->get_free_block_id());
 
     t->node_write(node_id, this);
 
