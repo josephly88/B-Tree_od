@@ -84,10 +84,15 @@ void BTree::node_write(int node_id, BTreeNode* node){
     file_ptr->write((char*)node->child_id, (node->m + 1) * sizeof(int));
 }
 
+int BTree::get_block_id(int node_id){
+    u_int64_t readval;
+	cmb->read(&readval, node_id * sizeof(u_int64_t), sizeof(u_int64_t));
+    return readval;
+}
+
 void BTree::update_node_id(int node_id, int block_id){
-	off_t offset = node_id * sizeof(u_int64_t);
     u_int64_t writeval = (u_int64_t)block_id;
-	cmb->write(offset, &writeval, sizeof(u_int64_t));
+	cmb->write(node_id * sizeof(u_int64_t), &writeval, sizeof(u_int64_t));
 }
 
 int BTree::get_free_block_id(){
@@ -285,7 +290,7 @@ BTreeNode::~BTreeNode(){
 
 void BTreeNode::traverse(BTree* t, int level){
     for(int j = 0; j < level; j++) cout << '\t';
-        cout << '[' << node_id << ']' << endl;;
+        cout << '[' << node_id << "=>" << t->get_block_id(node_id) << ']' << endl;;
 
     int i = 0;
     for(i = 0; i < num_key; i++){
@@ -400,7 +405,7 @@ int BTreeNode::direct_insert(BTree* t, int _k, char _v, removeList** list, int n
     if(node_id2 != 0) child_id[idx+1] = node_id2;
     num_key++;
 
-    *list = new removeList(node_id, *list);
+    *list = new removeList(t->get_block_id(node_id), *list);
     t->update_node_id(node_id, t->get_free_block_id());
 
     t->node_write(node_id, this);

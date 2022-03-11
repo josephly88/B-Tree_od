@@ -5,7 +5,7 @@
 #include "b_tree.h"
 using namespace std;
 
-#define INS 1
+#define INS 4
 #define DEL 0
 #define RANGE 1000
 
