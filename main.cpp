@@ -5,8 +5,8 @@
 #include "b_tree.h"
 using namespace std;
 
-#define INS 30
-#define DEL 30
+#define INS 1
+#define DEL 0
 #define RANGE 1000
 
 struct S{
@@ -81,7 +81,8 @@ int main(int argc, char** argv){
 
     BTree* t;
     fstream file;
-    off_t cmb_addr = 0xc0000000;
+    //off_t cmb_addr = 0xc0000000;
+    off_t cmb_addr = 0x0;   // fake_cmb
 
     srand(time(0));
 

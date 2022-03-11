@@ -54,7 +54,8 @@ void BTree::stat(){
 
 void BTree::node_read(int node_id, BTreeNode* node){
 
-	u_int64_t block_id = node_id;
+	u_int64_t block_id;
+    cmb->read(&block_id, node_id * sizeof(u_int64_t), sizeof(u_int64_t));
 
     streamoff offset = block_id * block_size;
     
@@ -70,7 +71,8 @@ void BTree::node_read(int node_id, BTreeNode* node){
 void BTree::node_write(int node_id, BTreeNode* node){
     if(node_id == 0) cout << " Error : Attempt to write node id = 0 " << endl;
 
-	u_int64_t block_id = node_id;
+    u_int64_t block_id;
+    cmb->read(&block_id, node_id * sizeof(u_int64_t), sizeof(u_int64_t));
 
     streamoff offset = block_id * block_size;
 
@@ -83,7 +85,7 @@ void BTree::node_write(int node_id, BTreeNode* node){
 }
 
 void BTree::update_node_id(int node_id, int block_id){
-	off_t offset = (off_t)cmb->get_map_base() + node_id * sizeof(u_int64_t);
+	off_t offset = node_id * sizeof(u_int64_t);
     u_int64_t writeval = (u_int64_t)block_id;
 	cmb->write(offset, &writeval, sizeof(u_int64_t));
 }
@@ -130,7 +132,7 @@ void BTree::set_block_id(int block_id, bool bit){
 
 void BTree::print_used_block_id(){
     cout << endl;
-    cout << "Used node : " << endl;
+    cout << "Used block : " << endl;
 
     file_ptr->seekg(sizeof(BTree), ios::beg);
     int id = 0;
@@ -215,7 +217,8 @@ void BTree::insertion(int _k, char _v){
     }
     else{
         root_id = get_free_block_id();
-        tree_write(file_ptr, this);            
+        update_node_id(root_id, root_id);
+        tree_write(file_ptr, this); 
 
         BTreeNode* root = new BTreeNode(m, true, root_id);
         node_write(root_id, root);
@@ -398,7 +401,7 @@ int BTreeNode::direct_insert(BTree* t, int _k, char _v, removeList** list, int n
     num_key++;
 
     *list = new removeList(node_id, *list);
-    node_id = t->get_free_block_id();
+    t->update_node_id(node_id, t->get_free_block_id());
 
     t->node_write(node_id, this);
 
@@ -661,13 +664,15 @@ void removeList::removeNode(BTree* t){
 }
 
 CMB::CMB(off_t bar_addr){
-	if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) == -1) FATAL;
-	printf("/dev/mem opened.\n");
+	//if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) == -1) FATAL;
+	//printf("\n/dev/mem opened.\n");
+    if ((fd = open("fake_cmb", O_RDWR | O_SYNC)) == -1) FATAL;    // fake_cmb
+	printf("\nfake_cmb opened.\n");
 
 	/* Map one page */
 	map_base = mmap(0, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, bar_addr & ~MAP_MASK);
 	if (map_base == (void*)-1) FATAL;
-	printf("Memory mapped at address %p.\n\n", map_base);
+	printf("Memory mapped at address %p.\n", map_base);
 }
 
 CMB::~CMB(){
