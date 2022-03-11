@@ -43,6 +43,8 @@ class BTree{
 		void node_read(int node_id, BTreeNode* node);
 		void node_write(int node_id, BTreeNode* node);
 
+		int get_free_node_id();
+
 		int get_block_id(int node_id);
 		void update_node_id(int node_id, int block_id);
 

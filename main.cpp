@@ -5,7 +5,7 @@
 #include "b_tree.h"
 using namespace std;
 
-#define INS 5
+#define INS 1
 #define DEL 0
 #define RANGE 1000
 
@@ -45,7 +45,12 @@ void loop_insert(BTree* t){
     for(int i = 0; i < INS; i++){
         int k;
         k = i;
-        //do{ k = random_num(0, RANGE);}while(S[k].exist == true);
+        do{ k = random_num(0, RANGE);}while(S[k].exist == true);  // Random Key
+        /*
+        int arr[] = {20,37,36,74,10,40,94,80,78,17,44,66,96,25,58};
+        k = arr[i]; 
+        */
+
         char v = random_char();
         S[k].value = v;
         S[k].exist = true;

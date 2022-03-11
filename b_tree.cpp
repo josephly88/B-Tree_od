@@ -30,6 +30,8 @@ BTree::BTree(string filename, int _block_size, fstream* _file, off_t _cmb_addr){
     free(empty_bytes);
 
     set_block_id(0, true);
+    u_int64_t first_node_id = 1;
+    cmb->write(0, &first_node_id, sizeof(u_int64_t));
 }
 
 BTree::~BTree(){
@@ -45,7 +47,7 @@ void BTree::stat(){
     cout << endl;
     cout << "Block size : " << block_size << endl;
     cout << "Size of BTreeNode : " << sizeof(BTreeNode) << endl;        
-    cout << "Size of K-V : " << sizeof(int) + sizeof(char) + sizeof(streamoff) << "(" << sizeof(streamoff) << ")" << endl;
+    cout << "Size of K-V : " << sizeof(int) + sizeof(char) + sizeof(int) << "(" << sizeof(int) << ")" << endl;
     cout << "Degree : " << m << endl;
     cout << "Node capacity : " << block_cap << endl;
     cout << "Root id : " << root_id << endl;
@@ -82,6 +84,15 @@ void BTree::node_write(int node_id, BTreeNode* node){
     file_ptr->write((char*)node->key, node->m * sizeof(int));
     file_ptr->write((char*)node->value, node->m * sizeof(char));
     file_ptr->write((char*)node->child_id, (node->m + 1) * sizeof(int));
+}
+
+int BTree::get_free_node_id(){
+    u_int64_t free_node_id;
+    cmb->read(&free_node_id, 0, sizeof(u_int64_t));
+    u_int64_t next_node_id = free_node_id + 1;
+    cmb->write(0, &next_node_id, sizeof(u_int64_t));
+    
+    return (int)free_node_id;
 }
 
 int BTree::get_block_id(int node_id){
@@ -194,17 +205,12 @@ void BTree::insertion(int _k, char _v){
         if(dup_node_id == 0){
             delete root;
             return;
-        }
-
-        if(dup_node_id != root_id){
-            root_id = dup_node_id;
-            tree_write(file_ptr, this);
-        }            
+        }        
 
         node_read(root_id, root);
         if(root->num_key >= m){  
-            int new_root_id = get_free_block_id();
-            update_node_id(new_root_id, new_root_id);
+            int new_root_id = get_free_node_id();
+            update_node_id(new_root_id, get_free_block_id());
             BTreeNode* new_root = new BTreeNode(m, false, new_root_id);
             node_write(new_root_id, new_root);
 
@@ -222,8 +228,8 @@ void BTree::insertion(int _k, char _v){
 
     }
     else{
-        root_id = get_free_block_id();
-        update_node_id(root_id, root_id);
+        root_id = get_free_node_id();
+        update_node_id(root_id, get_free_block_id());
         tree_write(file_ptr, this); 
 
         BTreeNode* root = new BTreeNode(m, true, root_id);
@@ -360,13 +366,6 @@ int BTreeNode::traverse_insert(BTree* t, int _k, char _v, removeList** list){
             delete child;
             return 0;
         }
-
-        if(dup_child_id != child_id[i]){
-            child_id[i] = dup_child_id;
-            *list = new removeList(node_id, *list);
-            node_id = t->get_free_block_id();
-            t->node_write(node_id, this);
-        }
                 
         t->node_read(child_id[i], child);
         if(child->num_key >= m)
@@ -421,8 +420,8 @@ int BTreeNode::split(BTree*t, int spt_node_id, int parent_id, removeList** list)
     BTreeNode* parent = (BTreeNode*) calloc(1, sizeof(BTreeNode));
     t->node_read(parent_id, parent);
 
-    int new_node_id = t->get_free_block_id();
-    t->update_node_id(new_node_id, new_node_id);
+    int new_node_id = t->get_free_node_id();
+    t->update_node_id(new_node_id, t->get_free_block_id());
     BTreeNode* new_node = new BTreeNode(m, node->is_leaf, new_node_id);
 
     int i, j;
@@ -521,13 +520,6 @@ int BTreeNode::traverse_delete(BTree *t, int _k, removeList** list){
             if(dup_child_id == 0){
                 delete child;
                 return 0;
-            }
-
-            if(dup_child_id != child_id[i]){
-                child_id[i] = dup_child_id;
-                *list = new removeList(node_id, *list);
-                node_id = t->get_free_block_id();
-                t->node_write(node_id, this);
             }
 
             return rebalance(t, i, list);
