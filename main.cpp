@@ -5,9 +5,9 @@
 #include "b_tree.h"
 using namespace std;
 
-#define INS 22
-#define DEL 1
-#define RANGE 100
+#define INS 10
+#define DEL 5
+#define RANGE 1000
 
 struct S{
     char value;
@@ -44,8 +44,7 @@ void loop_insert(BTree* t){
 
     for(int i = 0; i < INS; i++){
         int k;
-        k = i;
-        //do{ k = random_num(0, RANGE);}while(S[k].exist == true);  // Random Key
+        do{ k = random_num(0, RANGE);}while(S[k].exist == true);  // Random Key
         /*
         int arr[] = {20,37,36,74,10,40,94,80,78,17,44,66,96,25,58};
         k = arr[i]; 
@@ -75,8 +74,12 @@ void loop_delete(BTree* t){
 
     for(int i = 0; i < DEL; i++){
         int k;
-        //do{ k = random_num(0, RANGE);}while(t->search(k) == NULL);
-        k = 16;
+        do{ k = random_num(0, RANGE);}while(t->search(k) == NULL);
+        /*
+        int arr[] = {13, 7, 9, 0, 10, 11, 4, 2, 17, 1, 14, 3, 15, 6, 12, 5};        
+        k = arr[i];
+        */
+
         S[k].exist = false;
 
         delete_n_print(t, k);
@@ -127,6 +130,7 @@ int main(int argc, char** argv){
 
     loop_insert(t);
     loop_delete(t);
+
 
     cout << "Expected result: " << endl;
     for(int i = 0; i < RANGE; i++){

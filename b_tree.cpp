@@ -475,11 +475,13 @@ int BTreeNode::traverse_delete(BTree *t, int _k, removeList** list){
                 // Borrow from succ
                 key[i] = succ->key[0];
                 value[i] = succ->value[0];
+                // Delete the kv from succ
                 child_id[i+1] = node->traverse_delete(t, key[i], list);
-                *list = new removeList(node_id, *list);
-                node_id = t->get_free_block_id();
+
+                *list = new removeList(t->get_block_id(node_id), *list);
+                t->update_node_id(node_id, t->get_free_block_id());
                 t->node_write(node_id, this);
-                i = i+1;
+                i = i + 1;
             }
             else{
                 t->node_read(child_id[i], node);
@@ -491,9 +493,11 @@ int BTreeNode::traverse_delete(BTree *t, int _k, removeList** list){
                 // Borrow from pred
                 key[i] = pred->key[pred->num_key - 1];
                 value[i] = pred->value[pred->num_key - 1];
+                // Delete the kv form pred
                 child_id[i] = node->traverse_delete(t, key[i], list);
-                *list = new removeList(node_id, *list);
-                node_id = t->get_free_block_id();
+
+                *list = new removeList(t->get_block_id(node_id), *list);
+                t->update_node_id(node_id, t->get_free_block_id());
                 t->node_write(node_id, this);
                 
                 delete pred;
