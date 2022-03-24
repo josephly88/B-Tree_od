@@ -28,6 +28,10 @@ BTree::BTree(string filename, int _block_size, fstream* _file){
     set_block_id(0, true);
 }
 
+void BTree::reopen(fstream* file){
+	file_ptr = file;
+}
+
 void BTree::stat(){
     cout << endl;
     cout << "Block size : " << block_size << endl;

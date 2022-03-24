@@ -33,6 +33,8 @@ class BTree{
 
 		BTree(string filename, int _block_size, fstream* file);
 
+		void reopen(fstream* file);
+
 		void stat();
 
 		void node_read(int node_id, BTreeNode* node);
