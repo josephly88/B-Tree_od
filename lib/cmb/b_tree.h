@@ -15,7 +15,7 @@ using namespace std;
 #define FATAL do { fprintf(stderr, "Error at line %d, file %s (%d) [%s]\n", \
   __LINE__, __FILE__, errno, strerror(errno)); exit(1); } while(0)
 
-#define MAP_SIZE 4096UL
+#define PAGE_SIZE 4096UL
 #define MAP_MASK (MAP_SIZE - 1)
 
 class BTree;
@@ -27,16 +27,16 @@ class BTree{
 	public:
 		int m;				// degree
 		int root_id;		// Pointer to root node
-		fstream* file_ptr;
+		int fd;
 		int block_size;
 		int block_cap;
 		CMB* cmb;
 		off_t cmb_addr;
 
-		BTree(string filename, int _block_size, fstream* file, off_t _cmb_addr);
+		BTree(char* filename, off_t _cmb_addr, int degree);
 		~BTree();
 
-		void reopen(fstream* file);
+		void reopen(int _fd);
 
 		void stat();
 
@@ -101,8 +101,8 @@ class removeList{
 		void removeBlock(BTree* t);
 };
 
-void tree_read(fstream* file, BTree* tree);
-void tree_write(fstream* file, BTree* tree);
+void tree_read(int fd, BTree* tree);
+void tree_write(int fd, BTree* tree);
 
 class CMB{
 	int fd;

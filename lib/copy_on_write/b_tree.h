@@ -21,7 +21,6 @@ using namespace std;
 class BTree;
 class BTreeNode;
 class removeList;
-class CMB;
 
 class BTree{
 	public:
@@ -32,6 +31,7 @@ class BTree{
 		int block_cap;
 
 		BTree(char* filename, int degree);
+		~BTree();
 
 		void reopen(int _fd);
 
@@ -97,18 +97,5 @@ class removeList{
 
 void tree_read(int fd, BTree* tree);
 void tree_write(int fd, BTree* tree);
-
-class CMB{
-	int fd;
-	void* map_base;
-
-	public:
-		CMB(off_t bar_addr);
-		~CMB();
-		
-		void read(void* buf, off_t offset, int size);
-		void write(off_t offset, void* buf, int size);
-
-};
 
 #endif /* B_TREE_H */

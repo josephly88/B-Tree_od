@@ -2,11 +2,11 @@
 #include <time.h>
 #include <sys/stat.h>
 #include <chrono>
-#include "../lib/copy_on_write/b_tree.h"
+#include "../../lib/cmb/b_tree.h"
 using namespace std;
 
-#define INS 5
-#define DEL 0
+#define INS 10
+#define DEL 5
 #define RANGE 1000
 
 int random_num(int base, int max){
@@ -80,7 +80,9 @@ void loop_delete(BTree* t){
 int main(int argc, char** argv){
 
     BTree* t;
+    fstream file;
     //off_t cmb_addr = 0xc0000000;
+    off_t cmb_addr = 0x0;   // fake_cmb
 
     srand(time(0));
 
@@ -102,7 +104,7 @@ int main(int argc, char** argv){
         else{
 	// Create a new tree file
             cout << "Create file <" << argv[1] << ">" << endl;
-            t = new BTree(argv[1], 5);
+            t = new BTree(argv[1], cmb_addr, 5);
         }
     }
 

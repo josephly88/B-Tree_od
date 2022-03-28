@@ -6,7 +6,7 @@ void tree_read(int fd, BTree* tree){
     posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
     read(fd, buf, PAGE_SIZE);
     
-    memcpy(tree, buf, sizeof(BTree));
+    memcpy((void*)tree, buf, sizeof(BTree));
     free(buf);
 }
 
@@ -44,6 +44,10 @@ BTree::BTree(char* filename, int degree){
     free(buf);
 
     set_block_id(0, true);
+}
+
+BTree::~BTree(){
+    close(fd);
 }
 
 void BTree::reopen(int _fd){
@@ -712,30 +716,5 @@ void removeList::removeNode(BTree* t){
         delete next;
     }
     t->set_block_id(id, false);  
-}
-
-CMB::CMB(off_t bar_addr){
-	if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) == -1) FATAL;
-	printf("/dev/mem opened.\n");
-
-	/* Map one page */
-	map_base = mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, bar_addr & ~PAGE_SIZE);
-	if (map_base == (void*)-1) FATAL;
-	printf("Memory mapped at address %p.\n\n", map_base);
-}
-
-CMB::~CMB(){
-	if (munmap(map_base, PAGE_SIZE) == -1) FATAL;
-	close(fd);
-}
-
-void CMB::read(void* buf, off_t offset, int size){
-	void* virt_addr = (char*)map_base + offset;	
-	memcpy(buf, virt_addr, size);
-}
-
-void CMB::write(off_t offset, void* buf, int size){
-	void* virt_addr = (char*)map_base + offset;	
-	memcpy(virt_addr, buf, size);
 }
 
