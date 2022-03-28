@@ -33,7 +33,6 @@ class BTree{
 	off_t cmb_addr;
 		
 	public:
-
 		BTree(char* filename, off_t _cmb_addr, int degree);
 		~BTree();
 
@@ -61,17 +60,16 @@ class BTree{
 };
 
 class BTreeNode{
-
-	public:
-		int m;				// degree
-		int min_num; 		// minimun number of node
-		int num_key;		// the number of keys
-		int *key;			// keys array
-		char *value; 		// value array
-		int *child_id;	// array of child pointers
-		bool is_leaf;		// Is leaf or not
-		int node_id;
-	
+	int m;				// degree
+	int min_num; 		// minimun number of node
+	int num_key;		// the number of keys
+	int *key;			// keys array
+	char *value; 		// value array
+	int *child_id;	// array of child pointers
+	bool is_leaf;		// Is leaf or not
+	int node_id;
+		
+	public:	
 		BTreeNode(int _m, bool _is_leaf, int _node_id);
 		~BTreeNode();
 
