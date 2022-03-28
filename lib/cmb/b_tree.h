@@ -2,8 +2,6 @@
 #define B_TREE_H
 
 #include <iostream>
-#include <string>
-#include <fstream>
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -16,11 +14,9 @@ using namespace std;
   __LINE__, __FILE__, errno, strerror(errno)); exit(1); } while(0)
 
 #define PAGE_SIZE 4096UL
-#define MAP_MASK (MAP_SIZE - 1)
 
 class BTree;
 class BTreeNode;
-class removeList;
 class CMB;
 
 class BTree{
@@ -32,7 +28,15 @@ class BTree{
 	CMB* cmb;
 	off_t cmb_addr;
 		
-	public:
+	public:	
+		class removeList{
+			int id;
+			removeList* next;
+
+			public:
+				removeList(int _id, removeList* _next);
+				void removeBlock(BTree* t);
+		};
 
 		BTree(char* filename, off_t _cmb_addr, int degree);
 		~BTree();
@@ -40,6 +44,9 @@ class BTree{
 		void reopen(int _fd);
 
 		void stat();
+
+		void tree_read(int fd, BTree* tree);
+		void tree_write(int fd, BTree* tree);
 
 		void node_read(int node_id, BTreeNode* node);
 		void node_write(int node_id, BTreeNode* node);
@@ -78,46 +85,30 @@ class BTreeNode{
 		void traverse(BTree* t, int level);
 		char* search(BTree* t, int _k);
 
-		int traverse_insert(BTree* t, int _k, char _v, removeList** list);
-		int direct_insert(BTree* t, int _k, char _v, removeList** list, int node_id1 = 0, int node_id2 = 0);
-		int split(BTree* t, int node_id, int parent_id, removeList** list);
+		int traverse_insert(BTree* t, int _k, char _v, BTree::removeList** list);
+		int direct_insert(BTree* t, int _k, char _v, BTree::removeList** list, int node_id1 = 0, int node_id2 = 0);
+		int split(BTree* t, int node_id, int parent_id, BTree::removeList** list);
 
-		int traverse_delete(BTree* t, int _k, removeList** _list);
-		int direct_delete(BTree* t, int _k, removeList** _list);
-		int rebalance(BTree* t, int idx, removeList** _list);
+		int traverse_delete(BTree* t, int _k, BTree::removeList** _list);
+		int direct_delete(BTree* t, int _k, BTree::removeList** _list);
+		int rebalance(BTree* t, int idx, BTree::removeList** _list);
 		int get_pred(BTree* t);
 		int get_succ(BTree* t);	
-		
-	// BTree class can now access the private members of BTreeNode
-	friend class BTree;
 };
 
-class removeList{
-	int id;
-	removeList* next;
+	class CMB{
+		int fd;
+		void* map_base;
 
-	public:
-		removeList(int _id, removeList* _next);
+		public:
+			CMB(off_t bar_addr);
+			~CMB();
 
-		void removeBlock(BTree* t);
-};
+			void* get_map_base();		
 
-void tree_read(int fd, BTree* tree);
-void tree_write(int fd, BTree* tree);
+			void read(void* buf, off_t offset, int size);
+			void write(off_t offset, void* buf, int size);
 
-class CMB{
-	int fd;
-	void* map_base;
-
-	public:
-		CMB(off_t bar_addr);
-		~CMB();
-
-		void* get_map_base();
-		
-		void read(void* buf, off_t offset, int size);
-		void write(off_t offset, void* buf, int size);
-
-};
+	};
 
 #endif /* B_TREE_H */

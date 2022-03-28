@@ -1,6 +1,6 @@
 #include "b_tree.h"
 
-void tree_read(int fd, BTree* tree){ 
+void BTree::tree_read(int fd, BTree* tree){ 
     uint8_t* buf = NULL;
     lseek(fd, 0, SEEK_SET);
     posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
@@ -10,7 +10,7 @@ void tree_read(int fd, BTree* tree){
     free(buf);
 }
 
-void tree_write(int fd, BTree* tree){
+void BTree::tree_write(int fd, BTree* tree){
     uint8_t* buf = NULL;
     lseek(fd, 0, SEEK_SET);
     posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
@@ -398,7 +398,7 @@ char* BTreeNode::search(BTree* t, int _k){
         return NULL;
 }
 
-int BTreeNode::traverse_insert(BTree* t, int _k, char _v, removeList** list){
+int BTreeNode::traverse_insert(BTree* t, int _k, char _v, BTree::removeList** list){
     if(is_leaf){
         return direct_insert(t, _k, _v, list);
     }        
@@ -430,7 +430,7 @@ int BTreeNode::traverse_insert(BTree* t, int _k, char _v, removeList** list){
     }
 }
 
-int BTreeNode::direct_insert(BTree* t, int _k, char _v, removeList** list, int node_id1, int node_id2){
+int BTreeNode::direct_insert(BTree* t, int _k, char _v, BTree::removeList** list, int node_id1, int node_id2){
     /* Assume the list is not full */
     if(num_key >= m) return node_id;
 
@@ -458,7 +458,7 @@ int BTreeNode::direct_insert(BTree* t, int _k, char _v, removeList** list, int n
     if(node_id2 != 0) child_id[idx+1] = node_id2;
     num_key++;
 
-    *list = new removeList(t->get_block_id(node_id), *list);
+    *list = new BTree::removeList(t->get_block_id(node_id), *list);
     t->update_node_id(node_id, t->get_free_block_id());
 
     t->node_write(node_id, this);
@@ -466,7 +466,7 @@ int BTreeNode::direct_insert(BTree* t, int _k, char _v, removeList** list, int n
     return node_id;
 }
 
-int BTreeNode::split(BTree*t, int spt_node_id, int parent_id, removeList** list){
+int BTreeNode::split(BTree*t, int spt_node_id, int parent_id, BTree::removeList** list){
     BTreeNode* node = (BTreeNode*) calloc(1, sizeof(BTreeNode));
     t->node_read(spt_node_id, node);
 
@@ -488,7 +488,7 @@ int BTreeNode::split(BTree*t, int spt_node_id, int parent_id, removeList** list)
     if(!node->is_leaf)
         new_node->child_id[j] = node->child_id[i];
 
-    *list = new removeList(t->get_block_id(node->node_id), *list);
+    *list = new BTree::removeList(t->get_block_id(node->node_id), *list);
 
     t->update_node_id(node->node_id, t->get_free_block_id());
     int dup_par_id = parent->direct_insert(t, node->key[min_num], node->value[min_num], list, node->node_id, new_node_id);
@@ -504,7 +504,7 @@ int BTreeNode::split(BTree*t, int spt_node_id, int parent_id, removeList** list)
     return dup_par_id;
 }
 
-int BTreeNode::traverse_delete(BTree *t, int _k, removeList** list){
+int BTreeNode::traverse_delete(BTree *t, int _k, BTree::removeList** list){
     int i;
     bool found = false;
     for(i = 0; i < num_key; i++){
@@ -536,7 +536,7 @@ int BTreeNode::traverse_delete(BTree *t, int _k, removeList** list){
                 // Delete the kv from succ
                 child_id[i+1] = node->traverse_delete(t, key[i], list);
 
-                *list = new removeList(t->get_block_id(node_id), *list);
+                *list = new BTree::removeList(t->get_block_id(node_id), *list);
                 t->update_node_id(node_id, t->get_free_block_id());
                 t->node_write(node_id, this);
                 i = i + 1;
@@ -554,7 +554,7 @@ int BTreeNode::traverse_delete(BTree *t, int _k, removeList** list){
                 // Delete the kv form pred
                 child_id[i] = node->traverse_delete(t, key[i], list);
 
-                *list = new removeList(t->get_block_id(node_id), *list);
+                *list = new BTree::removeList(t->get_block_id(node_id), *list);
                 t->update_node_id(node_id, t->get_free_block_id());
                 t->node_write(node_id, this);
                 
@@ -582,7 +582,7 @@ int BTreeNode::traverse_delete(BTree *t, int _k, removeList** list){
     }
 }
 
-int BTreeNode::direct_delete(BTree* t, int _k, removeList** list){
+int BTreeNode::direct_delete(BTree* t, int _k, BTree::removeList** list){
     int i;
     for(i = 0; i < num_key; i++){
         if(key[i] == _k) break;
@@ -600,7 +600,7 @@ int BTreeNode::direct_delete(BTree* t, int _k, removeList** list){
     }
     num_key--;
 
-    *list = new removeList(t->get_block_id(node_id), *list);
+    *list = new BTree::removeList(t->get_block_id(node_id), *list);
     t->update_node_id(node_id, t->get_free_block_id());
 
     t->node_write(node_id, this);
@@ -608,7 +608,7 @@ int BTreeNode::direct_delete(BTree* t, int _k, removeList** list){
     return node_id;
 }
 
-int BTreeNode::rebalance(BTree* t, int idx, removeList** list){
+int BTreeNode::rebalance(BTree* t, int idx, BTree::removeList** list){
 
     BTreeNode* node = (BTreeNode*) calloc(1, sizeof(BTreeNode));
     t->node_read(child_id[idx], node);
@@ -639,7 +639,7 @@ int BTreeNode::rebalance(BTree* t, int idx, removeList** list){
             // Delete from left
         child_id[idx-1] = left->direct_delete(t, key[idx-1], list);
 
-        *list = new removeList(t->get_block_id(node_id), *list);
+        *list = new BTree::removeList(t->get_block_id(node_id), *list);
         t->update_node_id(node_id, t->get_free_block_id());
         t->node_write(node_id, this);                
     }
@@ -656,7 +656,7 @@ int BTreeNode::rebalance(BTree* t, int idx, removeList** list){
             // Delete form left
         child_id[idx+1] = right->direct_delete(t, key[idx], list);
 
-        *list = new removeList(t->get_block_id(node_id), *list);
+        *list = new BTree::removeList(t->get_block_id(node_id), *list);
         t->update_node_id(node_id, t->get_free_block_id());
         t->node_write(node_id, this);         
     }   
@@ -679,11 +679,11 @@ int BTreeNode::rebalance(BTree* t, int idx, removeList** list){
         node_id = direct_delete(t, key[idx], list);
         child_id[idx] = left->node_id;
 
-        *list = new removeList(t->get_block_id(node_id), *list);
+        *list = new BTree::removeList(t->get_block_id(node_id), *list);
         t->update_node_id(node_id, t->get_free_block_id());
         t->node_write(node_id, this);
 
-        *list = new removeList(t->get_block_id(right->node_id), *list);
+        *list = new BTree::removeList(t->get_block_id(right->node_id), *list);
     }
 
     delete node;
@@ -717,12 +717,12 @@ int BTreeNode::get_succ(BTree* t){
     }
 }
 
-removeList::removeList(int _id, removeList* _next){
+BTree::removeList::removeList(int _id, removeList* _next){
     id = _id;
     next = _next;
 }
 
-void removeList::removeBlock(BTree* t){
+void BTree::removeList::removeBlock(BTree* t){
     if(next){
         next->removeBlock(t);
         delete next;
