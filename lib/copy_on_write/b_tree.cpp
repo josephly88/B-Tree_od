@@ -1,123 +1,184 @@
 #include "b_tree.h"
 
-void tree_read(fstream* file, BTree* tree){ file->seekg(0, ios::beg); file->read((char*) tree, sizeof(BTree));
+void tree_read(int fd, BTree* tree){ 
+    uint8_t* buf = NULL;
+    lseek(fd, 0, SEEK_SET);
+    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
+    read(fd, buf, PAGE_SIZE);
+    
+    memcpy(tree, buf, sizeof(BTree));
+    free(buf);
 }
 
-void tree_write(fstream* file, BTree* tree){
-    file->seekg(0, ios::beg);
-    file->write((char*) tree, sizeof(BTree));
+void tree_write(int fd, BTree* tree){
+    uint8_t* buf = NULL;
+    lseek(fd, 0, SEEK_SET);
+    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
+    read(fd, buf, PAGE_SIZE);
+    
+    memcpy(buf, tree, sizeof(BTree));
+    lseek(fd, 0, SEEK_SET);
+    write(fd, buf, PAGE_SIZE);
+    free(buf);
 }
 
-BTree::BTree(string filename, int _block_size, fstream* _file){
-    //file.open(filename, ios::in | ios::out | ios::binary);
-    _file->open(filename, ios::in | ios::out | ios::trunc | ios::binary);
-    file_ptr = _file;
-    block_size = _block_size;
-    m = (_block_size - sizeof(BTreeNode) - sizeof(int)) / (sizeof(int) + sizeof(char) + sizeof(int));
-    block_cap = (_block_size - sizeof(BTree)) * 8;
+BTree::BTree(char* filename, int degree){
+    if(degree > (int)((PAGE_SIZE - sizeof(BTreeNode) - sizeof(int)) / (sizeof(int) + sizeof(char))) ){
+        cout << " Error: Degree exceed " << endl;
+        return;
+    }
+
+    fd = open(filename, O_CREAT | O_RDWR | O_DIRECT, S_IRUSR | S_IWUSR);
+    block_size = PAGE_SIZE;
+    m = degree;
+    block_cap = (block_size - sizeof(BTree)) * 8;
     root_id = 0;
+    
+    u_int8_t* buf = NULL;
+    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
+    memset(buf, 0, PAGE_SIZE);
+    
+    memcpy(buf, this, sizeof(BTree));
+    write(fd, buf, PAGE_SIZE);
 
-    tree_write(file_ptr, this);
-
-    // Set the bit map to all 0
-    void* empty_bytes = calloc(1, block_cap / 8);
-    file_ptr->seekp(sizeof(BTree), ios::beg);
-    file_ptr->write((char*)empty_bytes, block_cap / 8);
-    free(empty_bytes);
+    free(buf);
 
     set_block_id(0, true);
 }
 
-void BTree::reopen(fstream* file){
-	file_ptr = file;
+void BTree::reopen(int _fd){
+    fd = _fd;
+    tree_write(fd, this);
 }
 
 void BTree::stat(){
     cout << endl;
-    cout << "Block size : " << block_size << endl;
-    cout << "Size of BTreeNode : " << sizeof(BTreeNode) << endl;        
-    cout << "Size of K-V : " << sizeof(int) + sizeof(char) + sizeof(streamoff) << "(" << sizeof(streamoff) << ")" << endl;
-    cout << "Degree : " << m << endl;
-    cout << "Node capacity : " << block_cap << endl;
-    cout << "Root id : " << root_id << endl;
+    cout << "Degree: " << m << endl;
+    cout << "fd: " << fd << endl;
+    cout << "Block size: " << block_size << endl;
+    cout << "Block Capacity: " << block_cap << endl;
+    cout << "Root Block ID: " << root_id << endl;
+    print_used_block_id();
     cout << endl;
 }
 
-void BTree::node_read(int node_id, BTreeNode* node){
-    streamoff offset = node_id * block_size;
-    
-    file_ptr->seekg(offset, ios::beg);
-    file_ptr->read((char*)node, sizeof(BTreeNode));
-node->key = new int[node->m]; file_ptr->read((char*)node->key, node->m * sizeof(int));
+void BTree::node_read(int block_id, BTreeNode* node){
+    if(block_id == 0){
+        cout << " Error : Attempt to read block id = 0 " << endl;
+        return;
+    }
+
+    uint8_t* buf = NULL;
+    lseek(fd, block_id * PAGE_SIZE, SEEK_SET);
+    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
+    read(fd, buf, PAGE_SIZE);
+
+    uint8_t* ptr = buf;
+    memcpy((void*)node, ptr, sizeof(BTreeNode));
+    ptr += sizeof(BTreeNode);
+
+    node->key = new int[node->m];
+    memcpy(node->key, ptr, node->m * sizeof(int));
+    ptr += node->m * sizeof(int);
+
     node->value = new char[node->m];
-    file_ptr->read((char*)node->value, node->m * sizeof(char));
+    memcpy(node->value, ptr, node->m * sizeof(char));
+    ptr += node->m * sizeof(char);
+
     node->child_id = new int[node->m + 1];
-    file_ptr->read((char*)node->child_id, (node->m + 1) * sizeof(int)); 
+    memcpy(node->child_id, ptr, (node->m + 1) * sizeof(int));
+    ptr += (node->m + 1) * sizeof(int);
+
+    free(buf);
 }
 
-void BTree::node_write(int node_id, BTreeNode* node){
-    if(node_id == 0)
-        cout << " Error : Attempt to write node id = 0 " << endl;
+void BTree::node_write(int block_id, BTreeNode* node){
+    if(block_id == 0){
+        cout << " Error : Attempt to write block id = 0 " << endl;
+        return;
+    }
 
-    streamoff offset = node_id * block_size;
+    uint8_t* buf = NULL;
+    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
 
-    file_ptr->seekp(offset, ios::beg);
-    file_ptr->write((char*)node, sizeof(BTreeNode));
+    uint8_t* ptr = buf;
+    memcpy(ptr, node, sizeof(BTreeNode));
+    ptr += sizeof(BTreeNode);
 
-    file_ptr->write((char*)node->key, node->m * sizeof(int));
-    file_ptr->write((char*)node->value, node->m * sizeof(char));
-    file_ptr->write((char*)node->child_id, (node->m + 1) * sizeof(int));
+    memcpy(ptr, node->key, node->m * sizeof(int));
+    ptr += node->m * sizeof(int);
+
+    memcpy(ptr, node->value, node->m * sizeof(char));
+    ptr += node->m * sizeof(char);
+
+    memcpy(ptr, node->child_id, (node->m + 1) * sizeof(int));
+    ptr += (node->m + 1) * sizeof(int);
+
+    lseek(fd, block_id * PAGE_SIZE, SEEK_SET);
+    write(fd, buf, PAGE_SIZE);
+
+    free(buf);
 }
 
 int BTree::get_free_block_id(){
-    file_ptr->seekg(sizeof(BTree), ios::beg);
+    uint8_t* buf = NULL;
+    lseek(fd, 0, SEEK_SET);
+    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
+    read(fd, buf, PAGE_SIZE);
+
+    uint8_t* byte_ptr =  buf + sizeof(BTree);
     int id = 0;
     while(id < block_cap){
-        uint8_t byte;
-        file_ptr->read((char*) &byte, sizeof(uint8_t));
+        uint8_t byte = *byte_ptr;
         for(int i = 0; i < 8; i++){
             if( !(byte & 1) ){
+                free(buf);
                 set_block_id(id, true);
                 return id;
             }
             byte >>= 1;
             id++;
         }
+        byte_ptr++;
     }
+    free(buf);
     return 0;
 }
 
 void BTree::set_block_id(int block_id, bool bit){
     if(block_id >= block_cap) return;
 
-    int offset = sizeof(BTree) + (block_id / 8);
+    uint8_t* buf = NULL;
+    lseek(fd, 0, SEEK_SET);
+    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
+    read(fd, buf, PAGE_SIZE);
 
-    file_ptr->seekg(offset, ios::beg);
-    uint8_t byte;
-    file_ptr->read((char*)(&byte), sizeof(uint8_t));
+    uint8_t* byte_ptr =  buf + sizeof(BTree) + (block_id / 8);
 
     if(bit)
-        byte |= (1UL << (block_id % 8));
+        *byte_ptr |= (1UL << (block_id % 8));
     else
-        byte &= ~(1UL << (block_id % 8));
+        *byte_ptr &= ~(1UL << (block_id % 8));
 
-    file_ptr->seekp(offset, ios::beg);
-    file_ptr->write((char*)(&byte), sizeof(uint8_t));
+    lseek(fd, 0, SEEK_SET);
+    write(fd, buf, PAGE_SIZE);
 
-    file_ptr->seekg(offset, ios::beg);
-    uint8_t byte1;
-    file_ptr->read((char*)(&byte1), sizeof(uint8_t));
+    free(buf);
 }
 
 void BTree::print_used_block_id(){
     cout << endl;
-    cout << "Used node : " << endl;
+    cout << "Used Block : " << endl;
 
-    file_ptr->seekg(sizeof(BTree), ios::beg);
+    uint8_t* buf = NULL;
+    lseek(fd, 0, SEEK_SET);
+    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
+    read(fd, buf, PAGE_SIZE);
+
+    uint8_t* byte_ptr =  buf + sizeof(BTree);
     int id = 0;
     while(id < block_cap){
-        uint8_t byte;
-        file_ptr->read((char*) &byte, sizeof(uint8_t));
+        uint8_t byte = *byte_ptr;
         for(int i = 0; i < 8; i++){
             if( (byte & 1) ){
                 cout << " " << id;
@@ -125,9 +186,11 @@ void BTree::print_used_block_id(){
             byte >>= 1;
             id++;
         }
+        byte_ptr++;
     }
-
     cout << endl << endl;
+
+    free(buf);
 }
 
 void BTree::traverse(){
@@ -172,8 +235,8 @@ void BTree::insertion(int _k, char _v){
 
         if(dup_node_id != root_id){
             root_id = dup_node_id;
-            tree_write(file_ptr, this);
-        }            
+            tree_write(fd, this);
+        }       
 
         node_read(root_id, root);
         if(root->num_key >= m){            
@@ -183,7 +246,7 @@ void BTree::insertion(int _k, char _v){
 
             root_id = root->split(this, root_id, new_root_id, &rmlist);
 
-            tree_write(file_ptr, this);
+            tree_write(fd, this);
 
             delete new_root;
         }
@@ -196,12 +259,12 @@ void BTree::insertion(int _k, char _v){
     }
     else{
         root_id = get_free_block_id();
-        tree_write(file_ptr, this);            
+        tree_write(fd, this);
 
         BTreeNode* root = new BTreeNode(m, true, root_id);
         node_write(root_id, root);
         delete root;
-        insertion(_k, _v);     
+        insertion(_k, _v);
     }
 }
 
@@ -220,7 +283,7 @@ void BTree::deletion(int _k){
 
         if(root_id != dup_node_id){
             root_id = dup_node_id;
-            tree_write(file_ptr, this);
+            tree_write(fd, this);
         }            
 
         node_read(root_id, root);
@@ -232,7 +295,7 @@ void BTree::deletion(int _k){
             else{
                 root_id = root->child_id[0];
             }
-            tree_write(file_ptr, this);
+            tree_write(fd, this);
         } 
         if(rmlist){
             rmlist->removeNode(this);
@@ -259,6 +322,16 @@ BTreeNode::~BTreeNode(){
     delete key;
     delete value;
     delete child_id;
+}
+
+void BTreeNode::stat(){
+    cout << endl;
+    cout << "Degree: " << m << endl;
+    cout << "Minimun Key: " << min_num << endl;
+    cout << "# keys: " << num_key << endl;
+    cout << "Is leaf? : " << is_leaf << endl;
+    cout << "Node ID: " << node_id << endl;
+    cout << endl;
 }
 
 void BTreeNode::traverse(BTree* t, int level){
@@ -646,13 +719,13 @@ CMB::CMB(off_t bar_addr){
 	printf("/dev/mem opened.\n");
 
 	/* Map one page */
-	map_base = mmap(0, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, bar_addr & ~MAP_MASK);
+	map_base = mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, bar_addr & ~PAGE_SIZE);
 	if (map_base == (void*)-1) FATAL;
 	printf("Memory mapped at address %p.\n\n", map_base);
 }
 
 CMB::~CMB(){
-	if (munmap(map_base, MAP_SIZE) == -1) FATAL;
+	if (munmap(map_base, PAGE_SIZE) == -1) FATAL;
 	close(fd);
 }
 

@@ -5,8 +5,8 @@
 #include "../lib/copy_on_write/b_tree.h"
 using namespace std;
 
-#define INS 10
-#define DEL 5
+#define INS 5
+#define DEL 0
 #define RANGE 1000
 
 int random_num(int base, int max){
@@ -80,7 +80,6 @@ void loop_delete(BTree* t){
 int main(int argc, char** argv){
 
     BTree* t;
-    fstream file;
     //off_t cmb_addr = 0xc0000000;
 
     srand(time(0));
@@ -95,25 +94,16 @@ int main(int argc, char** argv){
 	// Existed tree file
         if(fileExists(argv[1])){
             cout << "Read file <" << argv[1] << ">" << endl;
-            file.open(argv[1], ios::in | ios::out | ios::binary);
+            int fd = open(argv[1], O_DIRECT | O_RDWR);
             t = (BTree*) calloc(1, sizeof(BTree));
-            tree_read(&file, t);
-			t->reopen(&file);
-            tree_write(&file, t);
+            tree_read(fd, t);
+			t->reopen(fd);
         }
         else{
 	// Create a new tree file
             cout << "Create file <" << argv[1] << ">" << endl;
-            cout << "Please input the block size: ";
-            int block_size;
-            cin >> block_size;
-            t = new BTree(argv[1], block_size, &file);
+            t = new BTree(argv[1], 5);
         }
-    }
-    
-    if (!file.is_open()){
-        cout << "Unable to open file" << endl;
-        return 0;
     }
 
     t->stat();
