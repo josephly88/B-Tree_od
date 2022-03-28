@@ -24,14 +24,15 @@ class removeList;
 class CMB;
 
 class BTree{
+	int m;				// degree
+	int root_id;		// Pointer to root node
+	int fd;
+	int block_size;
+	int block_cap;
+	CMB* cmb;
+	off_t cmb_addr;
+		
 	public:
-		int m;				// degree
-		int root_id;		// Pointer to root node
-		int fd;
-		int block_size;
-		int block_cap;
-		CMB* cmb;
-		off_t cmb_addr;
 
 		BTree(char* filename, off_t _cmb_addr, int degree);
 		~BTree();

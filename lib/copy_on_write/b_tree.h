@@ -23,13 +23,13 @@ class BTreeNode;
 class removeList;
 
 class BTree{
+	int m;				// degree
+	int root_id;		// Pointer to root node
+	int fd;
+	int block_size;
+	int block_cap;
+		
 	public:
-		int m;				// degree
-		int root_id;		// Pointer to root node
-		int fd;
-		int block_size;
-		int block_cap;
-
 		BTree(char* filename, int degree);
 		~BTree();
 
