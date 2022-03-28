@@ -6,7 +6,7 @@
 using namespace std;
 
 #define INS 5
-#define DEL 0
+#define DEL 2
 #define RANGE 1000
 
 int random_num(int base, int max){
@@ -96,7 +96,7 @@ int main(int argc, char** argv){
             cout << "Read file <" << argv[1] << ">" << endl;
             int fd = open(argv[1], O_DIRECT | O_RDWR);
             t = (BTree*) calloc(1, sizeof(BTree));
-            tree_read(fd, t);
+            t->tree_read(fd, t);
 			t->reopen(fd);
         }
         else{

@@ -80,7 +80,6 @@ void loop_delete(BTree* t){
 int main(int argc, char** argv){
 
     BTree* t;
-    fstream file;
     //off_t cmb_addr = 0xc0000000;
     off_t cmb_addr = 0x0;   // fake_cmb
 
@@ -98,7 +97,7 @@ int main(int argc, char** argv){
             cout << "Read file <" << argv[1] << ">" << endl;
             int fd = open(argv[1], O_DIRECT | O_RDWR);
             t = (BTree*) calloc(1, sizeof(BTree));
-            tree_read(fd, t);
+            t->tree_read(fd, t);
 			t->reopen(fd);
         }
         else{
