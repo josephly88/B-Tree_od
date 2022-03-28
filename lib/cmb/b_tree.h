@@ -69,7 +69,8 @@ class BTree{
 
 class BTreeNode{
 
-	public:
+		
+	public:	
 		int m;				// degree
 		int min_num; 		// minimun number of node
 		int num_key;		// the number of keys
@@ -78,7 +79,7 @@ class BTreeNode{
 		int *child_id;	// array of child pointers
 		bool is_leaf;		// Is leaf or not
 		int node_id;
-	
+		
 		BTreeNode(int _m, bool _is_leaf, int _node_id);
 		~BTreeNode();
 
