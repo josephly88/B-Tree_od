@@ -7,7 +7,6 @@
 #include <unistd.h>
 #include <sys/mman.h>
 
-#include "b_tree.h"
 using namespace std;
 
 #define FATAL do { fprintf(stderr, "Error at line %d, file %s (%d) [%s]\n", \
