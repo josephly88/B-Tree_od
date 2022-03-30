@@ -88,30 +88,6 @@ class removeList{
 };
 
 template <typename T>
-void BTree<T>::tree_read(int fd, BTree* tree){ 
-    uint8_t* buf = NULL;
-    lseek(fd, 0, SEEK_SET);
-    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
-    read(fd, buf, PAGE_SIZE);
-    
-    memcpy((void*)tree, buf, sizeof(BTree));
-    free(buf);
-}
-
-template <typename T>
-void BTree<T>::tree_write(int fd, BTree* tree){
-    uint8_t* buf = NULL;
-    lseek(fd, 0, SEEK_SET);
-    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
-    read(fd, buf, PAGE_SIZE);
-    
-    memcpy(buf, tree, sizeof(BTree));
-    lseek(fd, 0, SEEK_SET);
-    write(fd, buf, PAGE_SIZE);
-    free(buf);
-}
-
-template <typename T>
 BTree<T>::BTree(char* filename, int degree){
     if(degree > (int)((PAGE_SIZE - sizeof(BTreeNode<T>) - sizeof(int)) / (sizeof(int) + sizeof(char))) ){
         cout << " Error: Degree exceed " << endl;
@@ -157,6 +133,30 @@ void BTree<T>::stat(){
     cout << "Root Block ID: " << root_id << endl;
     print_used_block_id();
     cout << endl;
+}
+
+template <typename T>
+void BTree<T>::tree_read(int fd, BTree* tree){ 
+    uint8_t* buf = NULL;
+    lseek(fd, 0, SEEK_SET);
+    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
+    read(fd, buf, PAGE_SIZE);
+    
+    memcpy((void*)tree, buf, sizeof(BTree));
+    free(buf);
+}
+
+template <typename T>
+void BTree<T>::tree_write(int fd, BTree* tree){
+    uint8_t* buf = NULL;
+    lseek(fd, 0, SEEK_SET);
+    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
+    read(fd, buf, PAGE_SIZE);
+    
+    memcpy(buf, tree, sizeof(BTree));
+    lseek(fd, 0, SEEK_SET);
+    write(fd, buf, PAGE_SIZE);
+    free(buf);
 }
 
 template <typename T>
