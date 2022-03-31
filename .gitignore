@@ -2,5 +2,6 @@
 .vscode
 tree
 playground
-fake_cmb
+*/fake_cmb
+*.dat
 
