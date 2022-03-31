@@ -16,7 +16,7 @@ struct YCSB_DATA{
 };
 
 void print_YCSB_data(YCSB_DATA dat){
-    cout << "> " << dat.key << " " << dat.field0 << endl;
+    cout << dat.key << " " << dat.field0 << endl;
 }
 
 void YCSB_data_file(char* fileIn){
@@ -33,7 +33,6 @@ void YCSB_data_file(char* fileIn){
         YCSB_DATA dat;
 
         getline(ycsb_file, line);
-        cout << line << endl;
 
         // Key
         line.erase(0,21);
