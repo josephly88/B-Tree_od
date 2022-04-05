@@ -45,11 +45,4 @@ void YCSB_data_file(int recordcount, char* fileIn, char* fileOut){
 	processed.close();
 }
 
-int main(int argc, char** argv){
-
-    YCSB_data_file(10, argv[1], argv[2]);
-
-    return 0;
-}
-
 #endif

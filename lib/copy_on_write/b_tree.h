@@ -465,7 +465,7 @@ void BTreeNode<T>::traverse(BTree<T>* t, int level){
             delete node;
         }
         for(int j = 0; j < level; j++) cout << '\t';
-        cout << key[i] << '(' << value[i] << ')' << endl;;
+        cout << key[i] << '(' << value[i].str << ')' << endl;;
     }
     if(!is_leaf){
         BTreeNode<T>* node = (BTreeNode<T>*) calloc(1, sizeof(BTreeNode<T>));
