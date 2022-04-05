@@ -4,53 +4,52 @@
 #include <iostream>
 #include <fstream>
 #include <string.h>
+#include <regex>
 using namespace std;
 
 #define RECORDCOUNT 10
 #define FIELDCOUNT 1
 #define FIELD_LENGTH 110
 
-struct YCSB_DATA{
-    u_int64_t key;
-    char field0[FIELD_LENGTH];
-};
-
-void print_YCSB_data(YCSB_DATA dat){
-    cout << dat.key << " " << dat.field0 << endl;
-}
-
-void YCSB_data_file(char* fileIn){
+void YCSB_data_file(char* fileIn, char* fileOut){
     ifstream ycsb_file;    
-    string line;
-
     ycsb_file.open(fileIn);
 
+	ofstream processed;
+	processed.open(fileOut);
+
+    string line;
+// Skip first 15 lines
     for(int i = 0; i < 15; i++)
         getline(ycsb_file, line);
 
-    for(int i = 0; i < RECORDCOUNT; i++){
-        int th = 1;
-        YCSB_DATA dat;
+// For each record
 
-        getline(ycsb_file, line);
+	for(int i = 0; i < RECORDCOUNT; i++){
 
-        // Key
-        line.erase(0,21);
-        dat.key = atoll((char*)line.c_str());
+		getline(ycsb_file, line);
 
-        // Value
-        line.erase(0,29);
-        memcpy(dat.field0, (char*)line.c_str(), FIELD_LENGTH-1);
+		smatch m;
+		regex regexp_id("user[0-9]+");
+		regex regexp_val("field0=[\\w|\\W]*\\s]");
+		
+		regex_search(line, m, regexp_id);
+		string id(m[0]);
+		processed << id.erase(0,4) << '\t';	// Remove "user"
 
-        print_YCSB_data(dat);
-    }
+		regex_search(line, m, regexp_val);
+		string val(m[0]);
+		processed << val.substr(7, val.length()-2-7) << endl; // Remove "field0=" and " ]"
+
+	}
 
     ycsb_file.close();
+	processed.close();
 }
 
 int main(int argc, char** argv){
 
-    YCSB_data_file(argv[1]);
+    YCSB_data_file(argv[1], argv[2]);
 
     return 0;
 }
