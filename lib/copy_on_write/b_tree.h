@@ -36,7 +36,7 @@ class BTree{
 		void node_read(u_int64_t block_id, BTreeNode<T>* node);
 		void node_write(u_int64_t block_id, BTreeNode<T>* node);
 
-		int get_free_block_id();
+		u_int64_t get_free_block_id();
 		void set_block_id(u_int64_t block_id, bool bit);
 		void print_used_block_id();
 
@@ -68,15 +68,15 @@ class BTreeNode{
 		void traverse(BTree<T>* t, int level);
 		T* search(BTree<T>* t, u_int64_t _k);
 
-		int traverse_insert(BTree<T>* t, u_int64_t _k, T _v, removeList** list);
-		int direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeList** list, u_int64_t node_id1 = 0, u_int64_t node_id2 = 0);
-		int split(BTree<T>* t, u_int64_t node_id, u_int64_t parent_id, removeList** list);
+		u_int64_t traverse_insert(BTree<T>* t, u_int64_t _k, T _v, removeList** list);
+		u_int64_t direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeList** list, u_int64_t node_id1 = 0, u_int64_t node_id2 = 0);
+		u_int64_t split(BTree<T>* t, u_int64_t node_id, u_int64_t parent_id, removeList** list);
 
-		int traverse_delete(BTree<T>* t, u_int64_t _k, removeList** _list);
-		int direct_delete(BTree<T>* t, u_int64_t _k, removeList** _list);
-		int rebalance(BTree<T>* t, u_int64_t idx, removeList** _list);
-		int get_pred(BTree<T>* t);
-		int get_succ(BTree<T>* t);	
+		u_int64_t traverse_delete(BTree<T>* t, u_int64_t _k, removeList** _list);
+		u_int64_t direct_delete(BTree<T>* t, u_int64_t _k, removeList** _list);
+		u_int64_t rebalance(BTree<T>* t, u_int64_t idx, removeList** _list);
+		u_int64_t get_pred(BTree<T>* t);
+		u_int64_t get_succ(BTree<T>* t);	
 };
 
 class removeList{
@@ -89,7 +89,7 @@ class removeList{
 
 template <typename T>
 BTree<T>::BTree(char* filename, int degree){
-    if(degree > (int)((PAGE_SIZE - sizeof(BTreeNode<T>) - sizeof(int)) / (sizeof(int) + sizeof(char))) ){
+    if(degree > (int)((PAGE_SIZE - sizeof(BTreeNode<T>) - sizeof(u_int64_t)) / (sizeof(u_int64_t) + sizeof(T))) ){
         cout << " Error: Degree exceed " << endl;
         return;
     }
@@ -220,14 +220,14 @@ void BTree<T>::node_write(u_int64_t block_id, BTreeNode<T>* node){
 }
 
 template <typename T>
-int BTree<T>::get_free_block_id(){
+u_int64_t BTree<T>::get_free_block_id(){
     uint8_t* buf = NULL;
     lseek(fd, 0, SEEK_SET);
     posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
     read(fd, buf, PAGE_SIZE);
 
     uint8_t* byte_ptr =  buf + sizeof(BTree);
-    int id = 0;
+    u_int64_t id = 0;
     while(id < block_cap){
         uint8_t byte = *byte_ptr;
         for(int i = 0; i < 8; i++){
@@ -504,7 +504,7 @@ T* BTreeNode<T>::search(BTree<T>* t, u_int64_t _k){
 }
 
 template <typename T>
-int BTreeNode<T>::traverse_insert(BTree<T>* t, u_int64_t _k, T _v, removeList** list){
+u_int64_t BTreeNode<T>::traverse_insert(BTree<T>* t, u_int64_t _k, T _v, removeList** list){
     if(is_leaf){
         return direct_insert(t, _k, _v, list);
     }        
@@ -544,7 +544,7 @@ int BTreeNode<T>::traverse_insert(BTree<T>* t, u_int64_t _k, T _v, removeList** 
 }
 
 template <typename T>
-int BTreeNode<T>::direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeList** list, u_int64_t node_id1, u_int64_t node_id2){
+u_int64_t BTreeNode<T>::direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeList** list, u_int64_t node_id1, u_int64_t node_id2){
     /* Assume the list is not full */
     if(num_key >= m) return node_id;
 
@@ -581,7 +581,7 @@ int BTreeNode<T>::direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeList** li
 }
 
 template <typename T>
-int BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t parent_id, removeList** list){
+u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t parent_id, removeList** list){
     BTreeNode<T>* node = (BTreeNode<T>*) calloc(1, sizeof(BTreeNode<T>));
     t->node_read(spt_node_id, node);
 
@@ -620,7 +620,7 @@ int BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t parent_id, 
 }
 
 template <typename T>
-int BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** list){
+u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** list){
     int i;
     bool found = false;
     for(i = 0; i < num_key; i++){
@@ -702,7 +702,7 @@ int BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** list){
 }
 
 template <typename T>
-int BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** list){
+u_int64_t BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** list){
     int i;
     for(i = 0; i < num_key; i++){
         if(key[i] == _k) break;
@@ -729,7 +729,7 @@ int BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** list){
 }
 
 template <typename T>
-int BTreeNode<T>::rebalance(BTree<T>* t, u_int64_t idx, removeList** list){
+u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, u_int64_t idx, removeList** list){
 
     BTreeNode<T>* node = (BTreeNode<T>*) calloc(1, sizeof(BTreeNode<T>));
     t->node_read(child_id[idx], node);
@@ -803,7 +803,7 @@ int BTreeNode<T>::rebalance(BTree<T>* t, u_int64_t idx, removeList** list){
 }
 
 template <typename T>
-int BTreeNode<T>::get_pred(BTree<T>* t){
+u_int64_t BTreeNode<T>::get_pred(BTree<T>* t){
     if(is_leaf)
         return node_id;
     else{
@@ -816,7 +816,7 @@ int BTreeNode<T>::get_pred(BTree<T>* t){
 }
 
 template <typename T>
-int BTreeNode<T>::get_succ(BTree<T>* t){
+u_int64_t BTreeNode<T>::get_succ(BTree<T>* t){
     if(is_leaf)
         return node_id;
     else{
