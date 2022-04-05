@@ -22,7 +22,7 @@ bool fileExists(const char* file) {
     return (stat(file, &buf) == 0);
 }
 
-void insert_n_print(BTree<char>* t, int k, char v){
+void insert_n_print(BTree<int>* t, int k, int v){
     cout << "-Insertion: " << k  << '(' << v << ')' << endl;
     auto start = chrono::system_clock::now();
     t->insertion(k, v);
@@ -35,7 +35,7 @@ void insert_n_print(BTree<char>* t, int k, char v){
     t->print_used_block_id();
 }
 
-void loop_insert(BTree<char>* t){
+void loop_insert(BTree<int>* t){
 
     for(int i = 0; i < INS; i++){
         int k;
@@ -45,13 +45,13 @@ void loop_insert(BTree<char>* t){
         k = arr[i]; 
         */
 
-        char v = random_char();
+        int v = random_num(0,1000);
 
         insert_n_print(t, k, v);
     }
 }
 
-void delete_n_print(BTree<char>* t, int k){
+void delete_n_print(BTree<int>* t, int k){
     cout << "-Deletion: " << k << endl;
     auto start = chrono::system_clock::now();
     t->deletion(k);
@@ -63,7 +63,7 @@ void delete_n_print(BTree<char>* t, int k){
     t->print_used_block_id();
 }
 
-void loop_delete(BTree<char>* t){
+void loop_delete(BTree<int>* t){
 
     for(int i = 0; i < DEL; i++){
         int k;
@@ -79,7 +79,7 @@ void loop_delete(BTree<char>* t){
 
 int main(int argc, char** argv){
 
-    BTree<char>* t;
+    BTree<int>* t;
     //off_t cmb_addr = 0xc0000000;
 
     srand(time(0));
@@ -95,14 +95,14 @@ int main(int argc, char** argv){
         if(fileExists(argv[1])){
             cout << "Read file <" << argv[1] << ">" << endl;
             int fd = open(argv[1], O_DIRECT | O_RDWR);
-            t = (BTree<char>*) calloc(1, sizeof(BTree<char>));
+            t = (BTree<int>*) calloc(1, sizeof(BTree<int>));
             t->tree_read(fd, t);
 			t->reopen(fd);
         }
         else{
 	// Create a new tree file
             cout << "Create file <" << argv[1] << ">" << endl;
-            t = new BTree<char>(argv[1], 5);
+            t = new BTree<int>(argv[1], 5);
         }
     }
 
