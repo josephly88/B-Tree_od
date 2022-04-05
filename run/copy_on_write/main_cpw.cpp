@@ -81,9 +81,9 @@ int main(int argc, char** argv){
             chrono::duration<double> diff = end - start;
 
             // Display tree sturcture
-            cout << "-Duration: " << diff.count() << endl;
             t->display_tree();
             t->print_used_block_id();
+            cout << "-Duration: " << diff.count() << endl;
         }
 
         dataFile.close();
