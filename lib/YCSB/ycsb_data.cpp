@@ -7,11 +7,9 @@
 #include <regex>
 using namespace std;
 
-#define RECORDCOUNT 10
-#define FIELDCOUNT 1
-#define FIELD_LENGTH 110
+// Only support 1 field count
 
-void YCSB_data_file(char* fileIn, char* fileOut){
+void YCSB_data_file(int recordcount, char* fileIn, char* fileOut){
     ifstream ycsb_file;    
     ycsb_file.open(fileIn);
 
@@ -25,7 +23,7 @@ void YCSB_data_file(char* fileIn, char* fileOut){
 
 // For each record
 
-	for(int i = 0; i < RECORDCOUNT; i++){
+	for(int i = 0; i < recordcount; i++){
 
 		getline(ycsb_file, line);
 
@@ -49,7 +47,7 @@ void YCSB_data_file(char* fileIn, char* fileOut){
 
 int main(int argc, char** argv){
 
-    YCSB_data_file(argv[1], argv[2]);
+    YCSB_data_file(10, argv[1], argv[2]);
 
     return 0;
 }
