@@ -6,10 +6,7 @@
 #include "../../lib/YCSB/ycsb_data.h"
 using namespace std;
 
-#define INS 10
-#define DEL 8
-#define RANGE 1000
-#define RECORDCOUNT 10
+#define RECORDCOUNT 1000
 
 typedef struct TYPE{char str[100];} TYPE;
 
@@ -68,31 +65,31 @@ int main(int argc, char** argv){
 
         string line;
         for(int i = 0; i < RECORDCOUNT; i++){
-            // File processing
+            // Extract data
             getline(dataFile, line);
             int tab_pos = line.find('\t');
             u_int64_t key = stoll(line.substr(0, tab_pos));
             TYPE val;
             string val_str = line.substr(tab_pos + 1, line.length());
             strcpy(val.str, (char*) val_str.c_str());
-            // insert
+
+            // Insert data
             cout << "Insert: " << key << " " << val.str << endl;
             auto start = chrono::system_clock::now();
             t->insertion(key, val);
             auto end = std::chrono::system_clock::now();
             chrono::duration<double> diff = end - start;
 
+            // Display tree sturcture
             cout << "-Duration: " << diff.count() << endl;
-            t->traverse();
+            t->display_tree();
             t->print_used_block_id();
         }
 
         dataFile.close();
-        remove((char*)"inter.dat");
     }
 
-    t->traverse();
-    t->print_used_block_id();
+    t->inorder_traversal((char*)"out.dat");
 
     delete t;
 

@@ -2,6 +2,7 @@
 #define B_TREE_H
 
 #include <iostream>
+#include <fstream>
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -40,9 +41,10 @@ class BTree{
 		void set_block_id(u_int64_t block_id, bool bit);
 		void print_used_block_id();
 
-		void traverse();
-		T* search(u_int64_t _k);
+		void display_tree();
+        void inorder_traversal(char* filename);
 
+		T* search(u_int64_t _k);
 		void insertion(u_int64_t _k, T _v);
 		void deletion(u_int64_t _k);		
 };
@@ -65,7 +67,9 @@ class BTreeNode{
 
 		void stat();
 
-		void traverse(BTree<T>* t, int level);
+		void display_tree(BTree<T>* t, int level);
+        void inorder_traversal(BTree<T>* t, ofstream* outFile);
+
 		T* search(BTree<T>* t, u_int64_t _k);
 
 		u_int64_t traverse_insert(BTree<T>* t, u_int64_t _k, T _v, removeList** list);
@@ -296,13 +300,27 @@ void BTree<T>::print_used_block_id(){
 }
 
 template <typename T>
-void BTree<T>::traverse(){
-    cout << endl << "Tree Traversal: " << endl;
-
+void BTree<T>::display_tree(){
     if(root_id){
         BTreeNode<T>* root = (BTreeNode<T>*) calloc(1, sizeof(BTreeNode<T>));
         node_read(root_id, root);
-        root->traverse(this, 0);
+        root->display_tree(this, 0);
+        delete root;
+    }
+    else
+        cout << " The tree is empty! " << endl;
+
+    cout << endl;
+}
+
+template <typename T>
+void BTree<T>::inorder_traversal(char* filename){
+    if(root_id){
+        ofstream outFile("out.dat");
+
+        BTreeNode<T>* root = (BTreeNode<T>*) calloc(1, sizeof(BTreeNode<T>));
+        node_read(root_id, root);
+        root->inorder_traversal(this, &outFile);
         delete root;
     }
     else
@@ -452,7 +470,7 @@ void BTreeNode<T>::stat(){
 }
 
 template <typename T>
-void BTreeNode<T>::traverse(BTree<T>* t, int level){
+void BTreeNode<T>::display_tree(BTree<T>* t, int level){
     for(int j = 0; j < level; j++) cout << '\t';
         cout << '[' << node_id << ']' << endl;;
 
@@ -461,17 +479,37 @@ void BTreeNode<T>::traverse(BTree<T>* t, int level){
         if(!is_leaf){
             BTreeNode<T>* node = (BTreeNode<T>*) calloc(1, sizeof(BTreeNode<T>));
             t->node_read(child_id[i], node);
-            node->traverse(t, level + 1);
+            node->display_tree(t, level + 1);
             delete node;
         }
         for(int j = 0; j < level; j++) cout << '\t';
-        cout << key[i] << '(' << value[i].str << ')' << endl;;
+        cout << key[i] << endl;;
     }
     if(!is_leaf){
         BTreeNode<T>* node = (BTreeNode<T>*) calloc(1, sizeof(BTreeNode<T>));
         t->node_read(child_id[i], node);
-        node->traverse(t, level + 1);
+        node->display_tree(t, level + 1);
         delete node;
+    }
+}
+
+template <typename T>
+void BTreeNode<T>::inorder_traversal(BTree<T>* t, ofstream* outFile){
+    int i = 0;
+    for(i = 0; i < num_key; i++){
+        if(!is_leaf){
+            BTreeNode<T>* node = (BTreeNode<T>*) calloc(1, sizeof(BTreeNode<T>));
+            t->node_read(child_id[i], node);
+            node->inorder_traversal(t, outFile);
+            delete node;
+        }
+        *outFile << key[i] << '\t' << value[i].str << endl;;
+    }
+    if(!is_leaf){
+        BTreeNode<T>* node = (BTreeNode<T>*) calloc(1, sizeof(BTreeNode<T>));
+        t->node_read(child_id[i], node);
+            node->inorder_traversal(t, outFile);
+            delete node;
     }
 }
 

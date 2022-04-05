@@ -10,8 +10,7 @@ using namespace std;
 // Only support 1 field count
 
 void YCSB_data_file(int recordcount, char* fileIn, char* fileOut){
-    ifstream ycsb_file;    
-    ycsb_file.open(fileIn);
+    ifstream ycsb_file(fileIn);    
 
 	ofstream processed;
 	processed.open(fileOut);
