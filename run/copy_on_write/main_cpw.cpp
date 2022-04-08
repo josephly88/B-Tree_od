@@ -6,8 +6,6 @@
 #include "../../lib/YCSB/ycsb_data.h"
 using namespace std;
 
-#define RECORDCOUNT 1000
-
 typedef struct TYPE{char str[100];} TYPE;
 
 int random_num(int base, int max){
@@ -52,12 +50,14 @@ int main(int argc, char** argv){
 
     // Has data file as input
     if(argc == 3){
-        YCSB_data_file(RECORDCOUNT, argv[2], (char*)"inter.dat");
+        cout << "Processing Input Data..." << endl;
+        int recordcount = YCSB_data_file(argv[2], (char*)"inter.dat");
         ifstream dataFile;
         dataFile.open("inter.dat");
 
+        cout << "Operation Start!" << endl;
         string line;
-        for(int i = 0; i < RECORDCOUNT; i++){
+        for(int i = 0; i < recordcount; i++){
             // Extract data
             getline(dataFile, line);
             int tab_pos = line.find('\t');

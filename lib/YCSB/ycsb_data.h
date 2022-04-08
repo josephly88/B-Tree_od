@@ -9,19 +9,31 @@ using namespace std;
 
 // Only support 1 field count
 
-void YCSB_data_file(int recordcount, char* fileIn, char* fileOut){
+int YCSB_data_file(char* fileIn, char* fileOut){
     ifstream ycsb_file(fileIn);    
 
 	ofstream processed;
 	processed.open(fileOut);
 
     string line;
-// Skip first 15 lines
-    for(int i = 0; i < 15; i++)
+	int recordcount;
+
+// Skip first 15 lines, except for recordcount we take the number
+    for(int i = 0; i < 15; i++){
         getline(ycsb_file, line);
 
-// For each record
+		string item(line);
+		item = item.substr(1, 11);
+		if(item == "recordcount"){
+			smatch m;
+			regex regexp_cnt("[0-9]+");
+			regex_search(line, m, regexp_cnt);
+			string value(m[0]);
+			recordcount = stoi(value);
+		}
+	}
 
+// For each record
 	for(int i = 0; i < recordcount; i++){
 
 		getline(ycsb_file, line);
@@ -42,6 +54,8 @@ void YCSB_data_file(int recordcount, char* fileIn, char* fileOut){
 
     ycsb_file.close();
 	processed.close();
+
+	return recordcount;
 }
 
 #endif

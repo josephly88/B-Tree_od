@@ -13,7 +13,7 @@ using namespace std;
 #define FATAL do { fprintf(stderr, "Error at line %d, file %s (%d) [%s]\n", \
   __LINE__, __FILE__, errno, strerror(errno)); exit(1); } while(0)
 
-#define PAGE_SIZE 4096UL
+#define PAGE_SIZE 16384UL
 
 template <typename T> class BTree;
 template <typename T> class BTreeNode;

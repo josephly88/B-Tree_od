@@ -9,7 +9,7 @@
 
 using namespace std;
 
-#define PAGE_SIZE 4096UL
+#define PAGE_SIZE 16384UL
 
 template <typename T> class BTree;
 template <typename T> class BTreeNode;
