@@ -14,10 +14,6 @@ int random_num(int base, int max){
     return rand() % max + base;
 }
 
-char random_char(){
-    return (rand() % 2 == 0) ? char( rand() % 26 + 65 ) : char( rand() % 26 + 97 );
-}
-
 bool fileExists(const char* file) {
     struct stat buf;
     return (stat(file, &buf) == 0);
@@ -54,9 +50,6 @@ int main(int argc, char** argv){
 
     t->stat();
 
-    //loop_insert(t);
-    //loop_delete(t);
-
     // Has data file as input
     if(argc == 3){
         YCSB_data_file(RECORDCOUNT, argv[2], (char*)"inter.dat");
@@ -87,9 +80,9 @@ int main(int argc, char** argv){
         }
 
         dataFile.close();
+        
+        t->inorder_traversal((char*)"out.dat");
     }
-
-    t->inorder_traversal((char*)"out.dat");
 
     delete t;
 

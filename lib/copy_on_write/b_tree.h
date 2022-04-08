@@ -316,7 +316,7 @@ void BTree<T>::display_tree(){
 template <typename T>
 void BTree<T>::inorder_traversal(char* filename){
     if(root_id){
-        ofstream outFile("out.dat");
+        ofstream outFile(filename);
 
         BTreeNode<T>* root = (BTreeNode<T>*) calloc(1, sizeof(BTreeNode<T>));
         node_read(root_id, root);

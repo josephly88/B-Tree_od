@@ -3,18 +3,15 @@
 #include <sys/stat.h>
 #include <chrono>
 #include "../../lib/cmb/b_tree.h"
+#include "../../lib/YCSB/ycsb_data.h"
 using namespace std;
 
-#define INS 10
-#define DEL 8
-#define RANGE 1000
+#define RECORDCOUNT 1000
+
+typedef struct TYPE{char str[100];} TYPE;
 
 int random_num(int base, int max){
     return rand() % max + base;
-}
-
-char random_char(){
-    return (rand() % 2 == 0) ? char( rand() % 26 + 65 ) : char( rand() % 26 + 97 );
 }
 
 bool fileExists(const char* file) {
@@ -22,64 +19,9 @@ bool fileExists(const char* file) {
     return (stat(file, &buf) == 0);
 }
 
-void insert_n_print(BTree<char>* t, int k, char v){
-    cout << "-Insertion: " << k  << '(' << v << ')' << endl;
-    auto start = chrono::system_clock::now();
-    t->insertion(k, v);
-    auto end = std::chrono::system_clock::now();        
-    chrono::duration<double> diff = end - start;
-
-    cout << "-Duration: " << diff.count() << endl;
-    
-    t->traverse();
-    t->print_used_block_id();
-}
-
-void loop_insert(BTree<char>* t){
-
-    for(int i = 0; i < INS; i++){
-        int k;
-        do{ k = random_num(0, RANGE);}while(t->search(k) != NULL);  // Random Key
-        /*
-        int arr[] = {20,37,36,74,10,40,94,80,78,17,44,66,96,25,58};
-        k = arr[i]; 
-        */
-
-        char v = random_char();
-
-        insert_n_print(t, k, v);
-    }
-}
-
-void delete_n_print(BTree<char>* t, int k){
-    cout << "-Deletion: " << k << endl;
-    auto start = chrono::system_clock::now();
-    t->deletion(k);
-    auto end = std::chrono::system_clock::now();
-    chrono::duration<double> diff = end - start;
-
-    cout << "-Duration: " << diff.count() << endl;
-    t->traverse();
-    t->print_used_block_id();
-}
-
-void loop_delete(BTree<char>* t){
-
-    for(int i = 0; i < DEL; i++){
-        int k;
-        do{ k = random_num(0, RANGE);}while(t->search(k) == NULL);
-        /*
-        int arr[] = {13, 7, 9, 0, 10, 11, 4, 2, 17, 1, 14, 3, 15, 6, 12, 5};        
-        k = arr[i];
-        */
-
-        delete_n_print(t, k);
-    }
-}
-
 int main(int argc, char** argv){
 
-    BTree<char>* t;
+    BTree<TYPE>* t;
     //off_t cmb_addr = 0xc0000000;
     off_t cmb_addr = 0x0;   // fake_cmb
 
@@ -96,22 +38,51 @@ int main(int argc, char** argv){
         if(fileExists(argv[1])){
             cout << "Read file <" << argv[1] << ">" << endl;
             int fd = open(argv[1], O_DIRECT | O_RDWR);
-            t = (BTree<char>*) calloc(1, sizeof(BTree<char>));
+            t = (BTree<TYPE>*) calloc(1, sizeof(BTree<TYPE>));
             t->tree_read(fd, t);
 			t->reopen(fd);
         }
         else{
 	// Create a new tree file
             cout << "Create file <" << argv[1] << ">" << endl;
-            t = new BTree<char>(argv[1], cmb_addr, 5);
+            t = new BTree<TYPE>(argv[1], cmb_addr, 5);
         }
     }
 
-    t->stat();
+    // Has data file as input
+    if(argc == 3){
+        YCSB_data_file(RECORDCOUNT, argv[2], (char*)"inter.dat");
+        ifstream dataFile;
+        dataFile.open("inter.dat");
 
-    loop_insert(t);
-    loop_delete(t);
+        string line;
+        for(int i = 0; i < RECORDCOUNT; i++){
+            // Extract data
+            getline(dataFile, line);
+            int tab_pos = line.find('\t');
+            u_int64_t key = stoll(line.substr(0, tab_pos));
+            TYPE val;
+            string val_str = line.substr(tab_pos + 1, line.length());
+            strcpy(val.str, (char*) val_str.c_str());
 
+            // Insert data
+            cout << "Insert: " << key << " " << val.str << endl;
+            auto start = chrono::system_clock::now();
+            t->insertion(key, val);
+            auto end = std::chrono::system_clock::now();
+            chrono::duration<double> diff = end - start;
+
+            // Display tree sturcture
+            t->display_tree();
+            t->print_used_block_id();
+            cout << "-Duration: " << diff.count() << endl;
+        }
+
+        dataFile.close();
+        
+        t->inorder_traversal((char*)"out.dat");
+    }
+    
     delete t;
 
     return 0;
