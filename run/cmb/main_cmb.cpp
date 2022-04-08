@@ -66,15 +66,15 @@ int main(int argc, char** argv){
             strcpy(val.str, (char*) val_str.c_str());
 
             // Insert data
-            cout << "Insert: " << key << " " << val.str << endl;
+            cout << "Insert data " << i + 1 << ": " << key << " " << val.str << endl;
             auto start = chrono::system_clock::now();
             t->insertion(key, val);
             auto end = std::chrono::system_clock::now();
             chrono::duration<double> diff = end - start;
 
-            // Display tree sturcture
-            t->display_tree();
-            t->print_used_block_id();
+            // Display tree sturcture for Debug
+            //t->display_tree();
+            //t->print_used_block_id();
             cout << "-Duration: " << diff.count() << endl;
         }
 

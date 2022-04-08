@@ -14,6 +14,8 @@ using namespace std;
   __LINE__, __FILE__, errno, strerror(errno)); exit(1); } while(0)
 
 #define PAGE_SIZE 16384UL
+#define MAP_SIZE 4096UL
+#define MAP_MASK (MAP_SIZE - 1)
 
 template <typename T> class BTree;
 template <typename T> class BTreeNode;
@@ -98,9 +100,10 @@ class BTreeNode{
 class CMB{
 	int fd;
 	void* map_base;
+    off_t bar_addr;
 
 	public:
-		CMB(off_t bar_addr);
+		CMB(off_t _bar_addr);
 		~CMB();
 
 		void* get_map_base();		
@@ -607,8 +610,9 @@ u_int64_t BTreeNode<T>::traverse_insert(BTree<T>* t, u_int64_t _k, T _v, removeL
         }
                 
         t->node_read(child_id[i], child);
-        if(child->num_key >= m)
+        if(child->num_key >= m){
             node_id = split(t, child_id[i], node_id, list);
+        }
 
         delete child;
 
@@ -681,7 +685,7 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
     t->update_node_id(node->node_id, t->get_free_block_id());
     int dup_par_id = parent->direct_insert(t, node->key[min_num], node->value[min_num], list, node->node_id, new_node_id);
     node->num_key = min_num;    
-    
+
     t->node_write(node->node_id, node);
     t->node_write(new_node_id, new_node);
 
@@ -921,31 +925,45 @@ removeList::~removeList(){
     }
 }
 
-CMB::CMB(off_t bar_addr){
+CMB::CMB(off_t _bar_addr){
 	//if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) == -1) FATAL;
 	//printf("\n/dev/mem opened.\n");
     if ((fd = open("fake_cmb", O_RDWR | O_SYNC)) == -1) FATAL;    // fake_cmb
 	printf("\nfake_cmb opened.\n");
+    bar_addr = _bar_addr;
 
 	/* Map one page */
-	map_base = mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, bar_addr & ~PAGE_SIZE);
+	map_base = mmap(0, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, bar_addr & ~MAP_SIZE);
 	if (map_base == (void*)-1) FATAL;
 	printf("Memory mapped at address %p.\n", map_base);
+
+    if (munmap(map_base, MAP_SIZE) == -1) FATAL;
 }
 
 CMB::~CMB(){
-	if (munmap(map_base, PAGE_SIZE) == -1) FATAL;
 	close(fd);
 }
 
 void CMB::read(void* buf, off_t offset, int size){
-	void* virt_addr = (char*)map_base + offset;	
+    	/* Map one page */
+	map_base = mmap(0, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, (bar_addr + offset) & ~MAP_MASK);
+	if (map_base == (void*)-1) FATAL;
+
+	void* virt_addr = (char*)map_base + ((bar_addr + offset) & MAP_MASK);	
 	memcpy(buf, virt_addr, size);
+
+    if (munmap(map_base, MAP_SIZE) == -1) FATAL;
 }
 
 void CMB::write(off_t offset, void* buf, int size){
-	void* virt_addr = (char*)map_base + offset;	
+    	/* Map one page */
+	map_base = mmap(0, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, (bar_addr + offset) & ~MAP_MASK);
+    if (map_base == (void*)-1) FATAL;
+
+	void* virt_addr = (char*)map_base + ((bar_addr + offset) & MAP_MASK);	
 	memcpy(virt_addr, buf, size);
+
+    if (munmap(map_base, MAP_SIZE) == -1) FATAL;
 }
 
 void* CMB::get_map_base(){

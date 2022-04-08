@@ -18,9 +18,12 @@ int YCSB_data_file(char* fileIn, char* fileOut){
     string line;
 	int recordcount;
 
-// Skip first 15 lines, except for recordcount we take the number
-    for(int i = 0; i < 15; i++){
+// Skip properties, except for recordcount we take the number
+    while(true){
         getline(ycsb_file, line);
+
+		if(line == "**********************************************")
+			break;
 
 		string item(line);
 		item = item.substr(1, 11);
