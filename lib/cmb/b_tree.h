@@ -58,10 +58,10 @@ class BTree{
 		void display_tree();
         void inorder_traversal(char* filename);
 
-		void search(u_int64_t _k, T* buf);
-
 		void insertion(u_int64_t _k, T _v);
-		void deletion(u_int64_t _k);		
+        void search(u_int64_t _k, T* buf);
+        void update(u_int64_t _k, T _v);
+		void deletion(u_int64_t _k);			
 };
 
 template <typename T>
@@ -85,6 +85,7 @@ class BTreeNode{
         void inorder_traversal(BTree<T>* t, ofstream* outFile);
 
 		void search(BTree<T>* t, u_int64_t _k, T* buf);
+        u_int64_t update(BTree<T>* t, u_int64_t _k, T _v, removeList** list);
 
 		u_int64_t traverse_insert(BTree<T>* t, u_int64_t _k, T _v, removeList** list);
 		u_int64_t direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeList** list, u_int64_t node_id1 = 0, u_int64_t node_id2 = 0);
@@ -406,6 +407,32 @@ void BTree<T>::search(u_int64_t _k, T* buf){
 }
 
 template <typename T>
+void BTree<T>::update(u_int64_t _k, T _v){
+    if(root_id){
+        removeList* rmlist = NULL;
+
+        BTreeNode<T>* root = (BTreeNode<T>*) calloc(1, sizeof(BTreeNode<T>));
+        node_read(root_id, root);
+        int dup_node_id = root->update(this, _k, _v, &rmlist);
+
+        if(dup_node_id == 0){
+            delete root;
+            return;
+        }
+
+        if(rmlist){
+            removeList* rmlist_itr = rmlist;
+            while(rmlist_itr != NULL){
+                set_block_id(rmlist_itr->id, false);
+                rmlist_itr = rmlist_itr->next;
+            }
+            delete rmlist;
+        }
+        delete root;
+    }
+}
+
+template <typename T>
 void BTree<T>::insertion(u_int64_t _k, T _v){
 
     if(root_id){
@@ -588,6 +615,41 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf){
     }
     else
         buf = NULL;
+}
+
+template <typename T>
+u_int64_t BTreeNode<T>::update(BTree<T>* t, u_int64_t _k, T _v, removeList** list){
+    int i;
+    for(i = 0; i < num_key; i++){
+        // Key match
+        if(_k == key[i]){
+            value[i] = _v;
+            *list = new removeList(t->get_block_id(node_id), *list);
+            t->update_node_id(node_id, t->get_free_block_id());
+
+            t->node_write(node_id, this);
+            return node_id;
+        }
+        if(_k < key[i])
+            break;        
+    }
+
+    if(is_leaf)
+        return 0; // Not found
+    else{
+        BTreeNode<T>* child = (BTreeNode<T>*) calloc(1, sizeof(BTreeNode<T>));
+        t->node_read(child_id[i], child);
+        int dup_child_id = child->update(t, _k, _v, list);
+
+        if(dup_child_id == 0){
+            delete child;
+            return 0;
+        }
+
+        delete child;
+
+        return node_id;
+    }
 }
 
 template <typename T>

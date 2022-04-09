@@ -50,7 +50,6 @@ int main(int argc, char** argv){
     t->stat();
 
     // Has data file as input
-// Has data file as input
     if(argc == 3){
         cout << "Processing Input Data..." << endl;
         int recordcount = YCSB_data_file(argv[2], (char*)"inter.dat");
@@ -68,22 +67,33 @@ int main(int argc, char** argv){
             getline(dataFile, line);
             ycsb_lexi(line, &op, &key, val.str);
 
-            auto start = chrono::system_clock::now();
-            auto end = std::chrono::system_clock::now();
             if(op == 'i'){
                 // Insert data
-                cout << "OP#" << i+1 << " - Insert : " << key << " " << val.str << endl;
-                start = chrono::system_clock::now();
+                cout << "OP#" << i+1 << " - Insert : " << key << " >> " << val.str << endl;
+                auto start = chrono::system_clock::now();
                 t->insertion(key, val);
-                end = std::chrono::system_clock::now();
+                auto end = std::chrono::system_clock::now();
+                chrono::duration<double> diff = end - start;
+                cout << "-Duration: " << diff.count() << endl;
             }
             else if(op == 'r'){
                 // Read data
                 cout << "OP#" << i+1 << " - Read : " << key;
-                start = chrono::system_clock::now();
+                auto start = chrono::system_clock::now();
                 t->search(key, &val);
-                end = std::chrono::system_clock::now();
+                auto end = std::chrono::system_clock::now();
                 cout << " >> " << val.str << endl;
+                chrono::duration<double> diff = end - start;
+                cout << "-Duration: " << diff.count() << endl;
+            }
+            else if(op == 'u'){
+                // Update data
+                cout << "OP#" << i+1 << " - Update : " << key << " >> " << val.str << endl;
+                auto start = chrono::system_clock::now();
+                t->update(key, val);
+                auto end = std::chrono::system_clock::now();
+                chrono::duration<double> diff = end - start;
+                cout << "-Duration: " << diff.count() << endl;
             }
             else{
                 continue;
@@ -92,12 +102,9 @@ int main(int argc, char** argv){
             // Display tree sturcture for Debug
             //t->display_tree();
             //t->print_used_block_id();
-            auto diff = end - start;
-            cout << "-Duration: " << diff.count() << endl;
         }
 
-        dataFile.close();
-        
+        dataFile.close();        
         t->inorder_traversal((char*)"tree.dat");
     }
     
