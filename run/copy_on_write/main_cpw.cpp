@@ -67,13 +67,20 @@ int main(int argc, char** argv){
 
             auto start = chrono::system_clock::now();
             auto end = std::chrono::system_clock::now();
-            chrono::duration<double> diff;
             if(op == 'i'){
                 // Insert data
-                cout << "Insert data " << i + 1 << ": " << key << " " << val.str << endl;
+                cout << "OP#" << i+1 << " - Insert : " << key << " " << val.str << endl;
                 start = chrono::system_clock::now();
                 t->insertion(key, val);
                 end = std::chrono::system_clock::now();
+            }
+            else if(op == 'r'){
+                // Read data
+                cout << "OP#" << i+1 << " - Read : " << key;
+                start = chrono::system_clock::now();
+                t->search(key, &val);
+                end = std::chrono::system_clock::now();
+                cout << " >> " << val.str << endl;
             }
             else{
                 continue;
@@ -82,13 +89,13 @@ int main(int argc, char** argv){
             // Display tree sturcture for Debug
             //t->display_tree();
             //t->print_used_block_id();
-            diff = end - start;
+            auto diff = end - start;
             cout << "-Duration: " << diff.count() << endl;
         }
 
         dataFile.close();
         
-        t->inorder_traversal((char*)"out.dat");
+        t->inorder_traversal((char*)"tree.dat");
     }
 
     delete t;

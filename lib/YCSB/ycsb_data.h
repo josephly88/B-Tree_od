@@ -44,17 +44,20 @@ int YCSB_data_file(char* fileIn, char* fileOut){
 		processed << (char) tolower(line[0]);	// Op code
 
 		smatch m;
-		regex regexp_id("user[0-9]+");
-		regex regexp_val("field0=[\\w|\\W]*\\s]");
 		
+		regex regexp_id("user[0-9]+");
 		regex_search(line, m, regexp_id);
 		string id(m[0]);
 		processed << id.erase(0,4) << '\t';	// Remove "user"
 
-		regex_search(line, m, regexp_val);
-		string val(m[0]);
-		processed << val.substr(7, val.length()-2-7) << endl; // Remove "field0=" and " ]"
+		if(line[0] != 'R'){
+			regex regexp_val("field0=[\\w|\\W]*\\s]");
+			regex_search(line, m, regexp_val);
+			string val(m[0]);
+			processed << val.substr(7, val.length()-2-7); // Remove "field0=" and " ]"
+		}
 
+		processed << endl;
 	}
 
     ycsb_file.close();

@@ -44,7 +44,7 @@ class BTree{
 		void display_tree();
         void inorder_traversal(char* filename);
 
-		T* search(u_int64_t _k);
+		void search(u_int64_t _k, T* buf);
 		void insertion(u_int64_t _k, T _v);
 		void deletion(u_int64_t _k);		
 };
@@ -70,7 +70,7 @@ class BTreeNode{
 		void display_tree(BTree<T>* t, int level);
         void inorder_traversal(BTree<T>* t, ofstream* outFile);
 
-		T* search(BTree<T>* t, u_int64_t _k);
+		void search(BTree<T>* t, u_int64_t _k, T* buf);
 
 		u_int64_t traverse_insert(BTree<T>* t, u_int64_t _k, T _v, removeList** list);
 		u_int64_t direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeList** list, u_int64_t node_id1 = 0, u_int64_t node_id2 = 0);
@@ -330,15 +330,15 @@ void BTree<T>::inorder_traversal(char* filename){
 }
 
 template <typename T>
-T* BTree<T>::search(u_int64_t _k){
+void BTree<T>::search(u_int64_t _k, T* buf){
     if(root_id){
         BTreeNode<T>* root = (BTreeNode<T>*) calloc(1, sizeof(BTreeNode<T>));
         node_read(root_id, root);
-        return root->search(this, _k);
+        root->search(this, _k, buf);
         delete root;
     }
     else
-        return NULL;
+        buf = NULL;
 }
 
 template <typename T>
@@ -514,31 +514,35 @@ void BTreeNode<T>::inorder_traversal(BTree<T>* t, ofstream* outFile){
 }
 
 template <typename T>
-T* BTreeNode<T>::search(BTree<T>* t, u_int64_t _k){
+void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf){
     int i;
     for(i = 0; i < num_key; i++){
-        if(_k == key[i]) return &value[i];
+        if(_k == key[i]){
+            memcpy(buf, &value[i], sizeof(T));
+            return;
+        }
         if(_k < key[i]){
             if(!is_leaf){
                 BTreeNode<T>* child = (BTreeNode<T>*) calloc(1, sizeof(BTreeNode<T>));
                 t->node_read(child_id[i], child);
-                T* ret = child->search(t, _k);
+                child->search(t, _k, buf);
                 delete child;
-                return ret;
             }
             else
-                return NULL;
+                buf = NULL;
+
+            return;
         }
     }
+
     if(!is_leaf){
         BTreeNode<T>* child = (BTreeNode<T>*) calloc(1, sizeof(BTreeNode<T>));
         t->node_read(child_id[i], child);
-        T* ret = child->search(t, _k);
+        child->search(t, _k, buf);
         delete child;
-        return ret;
     }
     else
-        return NULL;
+        buf = NULL;
 }
 
 template <typename T>
