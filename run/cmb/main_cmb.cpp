@@ -28,7 +28,7 @@ int main(int argc, char** argv){
     if(argc < 2){
         cout << "-- Not enough input arguments. --" << endl;
         cout << "Format:" << endl;
-        cout << "\t./program {filename}" << endl;
+        cout << "\t./program {filename} <data_filename>" << endl;
         return 0;
     }
     else{
@@ -46,6 +46,8 @@ int main(int argc, char** argv){
             t = new BTree<TYPE>(argv[1], cmb_addr, 5);
         }
     }
+
+    t->stat();
 
     // Has data file as input
     if(argc == 3){
@@ -86,6 +88,4 @@ int main(int argc, char** argv){
     delete t;
 
     return 0;
-
-
 }

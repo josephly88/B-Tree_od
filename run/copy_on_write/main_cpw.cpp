@@ -20,7 +20,6 @@ bool fileExists(const char* file) {
 int main(int argc, char** argv){
 
     BTree<TYPE>* t;
-    //off_t cmb_addr = 0xc0000000;
 
     srand(time(0));
 
@@ -87,6 +86,4 @@ int main(int argc, char** argv){
     delete t;
 
     return 0;
-
-
 }
