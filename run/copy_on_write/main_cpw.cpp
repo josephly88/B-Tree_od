@@ -57,24 +57,32 @@ int main(int argc, char** argv){
         cout << "Operation Start!" << endl;
         string line;
         for(int i = 0; i < recordcount; i++){
-            // Extract data
-            getline(dataFile, line);
-            int tab_pos = line.find('\t');
-            u_int64_t key = stoll(line.substr(0, tab_pos));
+            // Extract data            
+            char op;
+            u_int64_t key;
             TYPE val;
-            string val_str = line.substr(tab_pos + 1, line.length());
-            strcpy(val.str, (char*) val_str.c_str());
 
-            // Insert data
-            cout << "Insert data " << i + 1 << ": " << key << " " << val.str << endl;
+            getline(dataFile, line);
+            ycsb_lexi(line, &op, &key, val.str);
+
             auto start = chrono::system_clock::now();
-            t->insertion(key, val);
             auto end = std::chrono::system_clock::now();
-            chrono::duration<double> diff = end - start;
-
+            chrono::duration<double> diff;
+            if(op == 'i'){
+                // Insert data
+                cout << "Insert data " << i + 1 << ": " << key << " " << val.str << endl;
+                start = chrono::system_clock::now();
+                t->insertion(key, val);
+                end = std::chrono::system_clock::now();
+            }
+            else{
+                continue;
+            }            
+                
             // Display tree sturcture for Debug
             //t->display_tree();
             //t->print_used_block_id();
+            diff = end - start;
             cout << "-Duration: " << diff.count() << endl;
         }
 

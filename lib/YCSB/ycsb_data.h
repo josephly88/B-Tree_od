@@ -18,7 +18,7 @@ int YCSB_data_file(char* fileIn, char* fileOut){
     string line;
 	int recordcount;
 
-// Skip properties, except for recordcount we take the number
+	// Skip properties, except for recordcount we take the number
     while(true){
         getline(ycsb_file, line);
 
@@ -36,10 +36,12 @@ int YCSB_data_file(char* fileIn, char* fileOut){
 		}
 	}
 
-// For each record
+	// For each record
 	for(int i = 0; i < recordcount; i++){
 
 		getline(ycsb_file, line);
+
+		processed << (char) tolower(line[0]);	// Op code
 
 		smatch m;
 		regex regexp_id("user[0-9]+");
@@ -60,5 +62,21 @@ int YCSB_data_file(char* fileIn, char* fileOut){
 
 	return recordcount;
 }
+
+void ycsb_lexi(string line, char *op, u_int64_t *key, char *val){
+	// Extract the opreation
+	*op = line[0];
+	
+	// Extract the key
+	int tab_pos = line.find('\t');
+	*key = stoll(line.substr(1, tab_pos));
+
+	if(*op == 'i' || *op == 'u'){
+		// Extract the value
+		string val_str = line.substr(tab_pos + 1, line.length());
+		strcpy(val, (char*) val_str.c_str());
+	}
+}
+
 
 #endif
