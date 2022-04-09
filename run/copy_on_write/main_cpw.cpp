@@ -93,6 +93,15 @@ int main(int argc, char** argv){
                 chrono::duration<double> diff = end - start;
                 cout << "-Duration: " << diff.count() << endl;
             }
+            else if(op == 'd'){
+                // Delete data
+                cout << "OP#" << i+1 << " - Delete : " << key << endl;
+                auto start = chrono::system_clock::now();
+                t->deletion(key);
+                auto end = std::chrono::system_clock::now();
+                chrono::duration<double> diff = end - start;
+                cout << "-Duration: " << diff.count() << endl;
+            }
             else{
                 continue;
             }            

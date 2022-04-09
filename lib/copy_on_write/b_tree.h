@@ -80,7 +80,7 @@ class BTreeNode{
 
 		u_int64_t traverse_delete(BTree<T>* t, u_int64_t _k, removeList** _list);
 		u_int64_t direct_delete(BTree<T>* t, u_int64_t _k, removeList** _list);
-		u_int64_t rebalance(BTree<T>* t, u_int64_t idx, removeList** _list);
+		u_int64_t rebalance(BTree<T>* t, int idx, removeList** _list);
 		u_int64_t get_pred(BTree<T>* t);
 		u_int64_t get_succ(BTree<T>* t);	
 };
@@ -458,6 +458,7 @@ void BTree<T>::deletion(u_int64_t _k){
             }
             tree_write(fd, this);
         } 
+        
         if(rmlist){
             removeList* rmlist_itr = rmlist;
             while(rmlist_itr != NULL){
@@ -846,7 +847,7 @@ u_int64_t BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** li
 }
 
 template <typename T>
-u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, u_int64_t idx, removeList** list){
+u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
 
     BTreeNode<T>* node = (BTreeNode<T>*) calloc(1, sizeof(BTreeNode<T>));
     t->node_read(child_id[idx], node);

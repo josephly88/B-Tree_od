@@ -50,7 +50,7 @@ int YCSB_data_file(char* fileIn, char* fileOut){
 		string id(m[0]);
 		processed << id.erase(0,4) << '\t';	// Remove "user"
 
-		if(line[0] != 'R'){
+		if(line[0] == 'I' || line[0] == 'U'){
 			regex regexp_val("field0=[\\w|\\W]*\\s]");
 			regex_search(line, m, regexp_val);
 			string val(m[0]);
