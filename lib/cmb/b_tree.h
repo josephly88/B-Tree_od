@@ -100,14 +100,16 @@ class BTreeNode{
 
 class CMB{
 	int fd;
-	void* map_base;
     off_t bar_addr;
+	void* map_base;
+    off_t map_idx;
 
 	public:
 		CMB(off_t _bar_addr);
 		~CMB();
 
-		void* get_map_base();		
+		void* get_map_base();	
+        void remap(off_t offset);
 
 		void read(void* buf, off_t offset, int size);
 		void write(off_t offset, void* buf, int size);
@@ -998,38 +1000,43 @@ CMB::CMB(off_t _bar_addr){
 	printf("\nfake_cmb opened.\n");
     bar_addr = _bar_addr;
 
+    map_idx = bar_addr & ~MAP_SIZE;
+
 	/* Map one page */
-	map_base = mmap(0, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, bar_addr & ~MAP_SIZE);
+	map_base = mmap(0, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, map_idx);
 	if (map_base == (void*)-1) FATAL;
 	printf("Memory mapped at address %p.\n", map_base);
-
-    if (munmap(map_base, MAP_SIZE) == -1) FATAL;
 }
 
 CMB::~CMB(){
 	close(fd);
 }
 
+void CMB::remap(off_t offset){
+    if( ((bar_addr + offset) & ~MAP_MASK) != map_idx ){
+        map_idx = (bar_addr + offset) & ~MAP_MASK;
+
+        /* Unmap the previous */
+        if (munmap(map_base, MAP_SIZE) == -1) FATAL;
+
+        /* Rempa a new page */
+        map_base = mmap(0, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, map_idx);
+	    if (map_base == (void*)-1) FATAL;
+    }
+}
+
 void CMB::read(void* buf, off_t offset, int size){
-    	/* Map one page */
-	map_base = mmap(0, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, (bar_addr + offset) & ~MAP_MASK);
-	if (map_base == (void*)-1) FATAL;
+    remap(offset);
 
 	void* virt_addr = (char*)map_base + ((bar_addr + offset) & MAP_MASK);	
 	memcpy(buf, virt_addr, size);
-
-    if (munmap(map_base, MAP_SIZE) == -1) FATAL;
 }
 
 void CMB::write(off_t offset, void* buf, int size){
-    	/* Map one page */
-	map_base = mmap(0, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, (bar_addr + offset) & ~MAP_MASK);
-    if (map_base == (void*)-1) FATAL;
+    remap(offset);
 
 	void* virt_addr = (char*)map_base + ((bar_addr + offset) & MAP_MASK);	
 	memcpy(virt_addr, buf, size);
-
-    if (munmap(map_base, MAP_SIZE) == -1) FATAL;
 }
 
 void* CMB::get_map_base(){

@@ -53,8 +53,11 @@ int main(int argc, char** argv){
     if(argc == 3){
         cout << "Processing Input Data..." << endl;
         int recordcount = YCSB_data_file(argv[2], (char*)"inter.dat");
-        ifstream dataFile;
-        dataFile.open("inter.dat");
+
+        ifstream ycsb_inter_file;
+        ycsb_inter_file.open("inter.dat");
+        ofstream op_file;
+        op_file.open("opr.dat", ios_base::app);
 
         cout << "Operation Start!" << endl;
         string line;
@@ -64,7 +67,7 @@ int main(int argc, char** argv){
             u_int64_t key;
             TYPE val;
 
-            getline(dataFile, line);
+            getline(ycsb_inter_file, line);
             ycsb_lexi(line, &op, &key, val.str);
 
             if(op == 'i'){
@@ -73,8 +76,8 @@ int main(int argc, char** argv){
                 auto start = chrono::system_clock::now();
                 t->insertion(key, val);
                 auto end = std::chrono::system_clock::now();
-                chrono::duration<double> diff = end - start;
-                cout << "-Duration: " << diff.count() << endl;
+                chrono::duration<double, milli> diff = end - start;
+                op_file << "i\t" << key << "\t" << val.str << "\t" << diff.count() << endl;
             }
             else if(op == 'r'){
                 // Read data
@@ -83,8 +86,8 @@ int main(int argc, char** argv){
                 t->search(key, &val);
                 auto end = std::chrono::system_clock::now();
                 cout << " >> " << val.str << endl;
-                chrono::duration<double> diff = end - start;
-                cout << "-Duration: " << diff.count() << endl;
+                chrono::duration<double, milli> diff = end - start;
+                op_file << "r\t" << key << "\t" << val.str << "\t" << diff.count() << endl;
             }
             else if(op == 'u'){
                 // Update data
@@ -92,8 +95,8 @@ int main(int argc, char** argv){
                 auto start = chrono::system_clock::now();
                 t->update(key, val);
                 auto end = std::chrono::system_clock::now();
-                chrono::duration<double> diff = end - start;
-                cout << "-Duration: " << diff.count() << endl;
+                chrono::duration<double, milli> diff = end - start;
+                op_file << "u\t" << key << "\t" << val.str << "\t" << diff.count() << endl;
             }
             else if(op == 'd'){
                 // Delete data
@@ -101,8 +104,8 @@ int main(int argc, char** argv){
                 auto start = chrono::system_clock::now();
                 t->deletion(key);
                 auto end = std::chrono::system_clock::now();
-                chrono::duration<double> diff = end - start;
-                cout << "-Duration: " << diff.count() << endl;
+                chrono::duration<double, milli> diff = end - start;
+                op_file << "d\t" << key << "\t" << diff.count() << endl;
             }
             else{
                 continue;
@@ -113,7 +116,10 @@ int main(int argc, char** argv){
             //t->print_used_block_id();
         }
 
-        dataFile.close();        
+        ycsb_inter_file.close();
+        remove("inter.dat");
+        op_file.close();
+
         t->inorder_traversal((char*)"tree.dat");
     }
     

@@ -56,6 +56,8 @@ int main(int argc, char** argv){
         ycsb_inter_file.open("inter.dat");
         ofstream op_file;
         op_file.open("opr.dat", ios_base::app);
+        ofstream log_file;
+        log_file.open("log.txt");
 
         cout << "Operation Start!" << endl;
         string line;
@@ -74,7 +76,7 @@ int main(int argc, char** argv){
                 auto start = chrono::system_clock::now();
                 t->insertion(key, val);
                 auto end = std::chrono::system_clock::now();
-                chrono::duration<double> diff = end - start;
+                chrono::duration<double, milli> diff = end - start;
                 op_file << "i\t" << key << "\t" << val.str << "\t" << diff.count() << endl;
             }
             else if(op == 'r'){
@@ -84,7 +86,7 @@ int main(int argc, char** argv){
                 t->search(key, &val);
                 auto end = std::chrono::system_clock::now();
                 cout << " >> " << val.str << endl;
-                chrono::duration<double> diff = end - start;
+                chrono::duration<double, milli> diff = end - start;
                 op_file << "r\t" << key << "\t" << val.str << "\t" << diff.count() << endl;
             }
             else if(op == 'u'){
@@ -93,7 +95,7 @@ int main(int argc, char** argv){
                 auto start = chrono::system_clock::now();
                 t->update(key, val);
                 auto end = std::chrono::system_clock::now();
-                chrono::duration<double> diff = end - start;
+                chrono::duration<double, milli> diff = end - start;
                 op_file << "u\t" << key << "\t" << val.str << "\t" << diff.count() << endl;
             }
             else if(op == 'd'){
@@ -102,8 +104,7 @@ int main(int argc, char** argv){
                 auto start = chrono::system_clock::now();
                 t->deletion(key);
                 auto end = std::chrono::system_clock::now();
-                chrono::duration<double> diff = end - start;
-                cout << "-Duration: " << diff.count() << endl;
+                chrono::duration<double, milli> diff = end - start;
                 op_file << "d\t" << key << "\t" << diff.count() << endl;
             }
             else{
