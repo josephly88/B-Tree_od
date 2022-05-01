@@ -85,7 +85,7 @@ int main(int argc, char** argv){
                 auto start = chrono::system_clock::now();
                 t->search(key, &val);
                 auto end = std::chrono::system_clock::now();
-                cout << " >> " << val.str << endl;
+                cout << " >> " << val.str;
                 chrono::duration<double, milli> diff = end - start;
                 op_file << "r\t" << key << "\t" << val.str << "\t" << diff.count() << endl;
             }
