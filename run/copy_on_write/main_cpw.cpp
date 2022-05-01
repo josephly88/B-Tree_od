@@ -56,8 +56,6 @@ int main(int argc, char** argv){
         ycsb_inter_file.open("inter.dat");
         ofstream op_file;
         op_file.open("opr.dat", ios_base::app);
-        ofstream log_file;
-        log_file.open("log.txt");
 
         cout << "Operation Start!" << endl;
         string line;
@@ -72,7 +70,7 @@ int main(int argc, char** argv){
 
             if(op == 'i'){
                 // Insert data
-                cout << "OP#" << i+1 << " - Insert : " << key << " >> " << val.str << endl;
+                cout << '\r' << "OP#" << i+1 << " - Insert : " << key << " >> " << val.str;
                 auto start = chrono::system_clock::now();
                 t->insertion(key, val);
                 auto end = std::chrono::system_clock::now();
@@ -81,7 +79,7 @@ int main(int argc, char** argv){
             }
             else if(op == 'r'){
                 // Read data
-                cout << "OP#" << i+1 << " - Read : " << key;
+                cout << '\r' << "OP#" << i+1 << " - Read : " << key;
                 auto start = chrono::system_clock::now();
                 t->search(key, &val);
                 auto end = std::chrono::system_clock::now();
@@ -91,7 +89,7 @@ int main(int argc, char** argv){
             }
             else if(op == 'u'){
                 // Update data
-                cout << "OP#" << i+1 << " - Update : " << key << " >> " << val.str << endl;
+                cout << '\r' << "OP#" << i+1 << " - Update : " << key << " >> " << val.str;
                 auto start = chrono::system_clock::now();
                 t->update(key, val);
                 auto end = std::chrono::system_clock::now();
@@ -100,7 +98,7 @@ int main(int argc, char** argv){
             }
             else if(op == 'd'){
                 // Delete data
-                cout << "OP#" << i+1 << " - Delete : " << key << endl;
+                cout << '\r' << "OP#" << i+1 << " - Delete : " << key;
                 auto start = chrono::system_clock::now();
                 t->deletion(key);
                 auto end = std::chrono::system_clock::now();
@@ -115,6 +113,7 @@ int main(int argc, char** argv){
             //t->display_tree();
             //t->print_used_block_id();
         }
+	cout << endl;
 
         ycsb_inter_file.close();
         remove("inter.dat");
