@@ -17,40 +17,76 @@ bool fileExists(const char* file) {
     return (stat(file, &buf) == 0);
 }
 
+void usage(){
+    cout << "Format:" << endl;
+    cout << "Usage: ./program [OPTION]... {tree_filename}" << endl << endl;
+    cout << "Options" << endl;
+    cout << "  -d {degree}\t\t\t\tDegree of the B-Tree, only for creating new B-Tree (Default: 128)" << endl;
+    cout << "  -l {log file}\t\t\t\tSave all log to newly created file" << endl;
+    cout << "  -i {input file}\t\t\tRead input opreations from file" << endl;
+}
+
 int main(int argc, char** argv){
 
     BTree<TYPE>* t;
 
     srand(time(0));
 
+    int degree = 128;
+    char* log_file = NULL;
+    char* input_file = NULL;
+    char* tree_file = NULL;
+
     if(argc < 2){
-        cout << "-- Not enough input arguments. --" << endl;
-        cout << "Format:" << endl;
-        cout << "\t./program {tree_filename} <data_filename>" << endl;
+        usage();
         return 0;
     }
     else{
-	// Existed tree file
-        if(fileExists(argv[1])){
-            cout << "Read file <" << argv[1] << ">" << endl;
-            int fd = open(argv[1], O_DIRECT | O_RDWR);
-            t = (BTree<TYPE>*) calloc(1, sizeof(BTree<TYPE>));
-            t->tree_read(fd, t);
-			t->reopen(fd);
+        for(int i = 1; i < argc; i++){          
+            if(strcmp(argv[i], "-d") == 0){
+                degree = stoi(argv[i+1]);
+                i++;
+            }
+            else if(strcmp(argv[i], "-l") == 0){
+                log_file = argv[i+1];
+                i++;
+            }
+            else if(strcmp(argv[i], "-i") == 0){
+                input_file = argv[i+1];
+                i++;
+            }
+            else{
+                tree_file = argv[i];
+                break;
+            }
         }
-        else{
-	// Create a new tree file
-            cout << "Create file <" << argv[1] << ">" << endl;
-            t = new BTree<TYPE>(argv[1], 5);
+
+        if(tree_file == NULL){
+            usage();
+            return 0;
         }
+    }
+
+    // Existed tree file
+    if(fileExists(tree_file)){
+        cout << "Read file from <" << tree_file << ">" << endl;
+        int fd = open(tree_file, O_DIRECT | O_RDWR);
+        t = (BTree<TYPE>*) calloc(1, sizeof(BTree<TYPE>));
+        t->tree_read(fd, t);
+        t->reopen(fd);
+    }
+    else{
+    // Create a new tree file
+        cout << "Create file <" << tree_file << ">" << endl;
+        t = new BTree<TYPE>(tree_file, degree);
     }
 
     t->stat();
 
     // Has data file as input
-    if(argc == 3){
-        cout << "Processing Input Data..." << endl;
-        int recordcount = YCSB_data_file(argv[2], (char*)"inter.dat");
+    if(input_file){
+        cout << "Processing Input Operation from <" << input_file << "> ..." << endl;
+        int recordcount = YCSB_data_file(input_file, (char*)"inter.dat");
 
         ifstream ycsb_inter_file;
         ycsb_inter_file.open("inter.dat");
