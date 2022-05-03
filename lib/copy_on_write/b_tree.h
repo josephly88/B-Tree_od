@@ -14,6 +14,7 @@ using namespace std;
 template <typename T> class BTree;
 template <typename T> class BTreeNode;
 class removeList;
+ofstream mylog;
 
 template <typename T>
 class BTree{
@@ -137,8 +138,15 @@ void BTree<T>::stat(){
     cout << "Block size: " << block_size << endl;
     cout << "Block Capacity: " << block_cap << endl;
     cout << "Root Block ID: " << root_id << endl;
-    print_used_block_id();
     cout << endl;
+
+    mylog << "BTree.stat()" << endl;
+    mylog << "\tDegree: " << m << endl;
+    mylog << "\tfd: " << fd << endl;
+    mylog << "\tBlock size: " << block_size << endl;
+    mylog << "\tBlock Capacity: " << block_cap << endl;
+    mylog << "\tRoot Block ID: " << root_id << endl;
+    print_used_block_id();
 }
 
 template <typename T>
@@ -275,8 +283,8 @@ void BTree<T>::set_block_id(u_int64_t block_id, bool bit){
 
 template <typename T>
 void BTree<T>::print_used_block_id(){
-    cout << endl;
-    cout << "Used Block : " << endl;
+    mylog << "Btree.print_used_block_id()" << endl;
+    mylog << "\tUsed Block : " << endl << "\t";
 
     uint8_t* buf = NULL;
     lseek(fd, 0, SEEK_SET);
@@ -289,14 +297,14 @@ void BTree<T>::print_used_block_id(){
         uint8_t byte = *byte_ptr;
         for(int i = 0; i < 8; i++){
             if( (byte & 1) ){
-                cout << " " << id;
+                mylog << " " << id;
             }
             byte >>= 1;
             id++;
         }
         byte_ptr++;
     }
-    cout << endl << endl;
+    mylog << endl;
 
     free(buf);
 }
@@ -494,13 +502,13 @@ BTreeNode<T>::~BTreeNode(){
 
 template <typename T>
 void BTreeNode<T>::stat(){
-    cout << endl;
-    cout << "Degree: " << m << endl;
-    cout << "Minimun Key: " << min_num << endl;
-    cout << "# keys: " << num_key << endl;
-    cout << "Is leaf? : " << is_leaf << endl;
-    cout << "Node ID: " << node_id << endl;
-    cout << endl;
+    mylog << endl;
+    mylog << "Degree: " << m << endl;
+    mylog << "Minimun Key: " << min_num << endl;
+    mylog << "# keys: " << num_key << endl;
+    mylog << "Is leaf? : " << is_leaf << endl;
+    mylog << "Node ID: " << node_id << endl;
+    mylog << endl;
 }
 
 template <typename T>

@@ -67,9 +67,15 @@ int main(int argc, char** argv){
         }
     }
 
+    if(log_file == NULL)
+        mylog.open("/dev/null");
+    else
+        mylog.open(log_file);
+
     // Existed tree file
     if(fileExists(tree_file)){
         cout << "Read file from <" << tree_file << ">" << endl;
+        mylog << "Read file from <" << tree_file << ">" << endl;
         int fd = open(tree_file, O_DIRECT | O_RDWR);
         t = (BTree<TYPE>*) calloc(1, sizeof(BTree<TYPE>));
         t->tree_read(fd, t);
@@ -78,6 +84,7 @@ int main(int argc, char** argv){
     else{
     // Create a new tree file
         cout << "Create file <" << tree_file << ">" << endl;
+        mylog << "Read file from <" << tree_file << ">" << endl;
         t = new BTree<TYPE>(tree_file, degree);
     }
 
@@ -86,6 +93,7 @@ int main(int argc, char** argv){
     // Has data file as input
     if(input_file){
         cout << "Processing Input Operation from <" << input_file << "> ..." << endl;
+        mylog << "Processing Input Operation from <" << input_file << "> ..." << endl;
         int recordcount = YCSB_data_file(input_file, (char*)"inter.dat");
 
         ifstream ycsb_inter_file;
@@ -94,6 +102,7 @@ int main(int argc, char** argv){
         op_file.open("opr.dat", ios_base::app);
 
         cout << "Operation Start!" << endl;
+        mylog << "Operation Start!" << endl;
         string line;
         for(int i = 0; i < recordcount; i++){
             // Extract data            
@@ -107,6 +116,7 @@ int main(int argc, char** argv){
             if(op == 'i'){
                 // Insert data
                 cout << '\r' << "OP#" << i+1 << " - Insert : " << key << " >> " << val.str;
+                mylog << "OP#" << i+1 << " - Insert : " << key << " >> " << val.str << endl;;
                 auto start = chrono::system_clock::now();
                 t->insertion(key, val);
                 auto end = std::chrono::system_clock::now();
@@ -116,16 +126,19 @@ int main(int argc, char** argv){
             else if(op == 'r'){
                 // Read data
                 cout << '\r' << "OP#" << i+1 << " - Read : " << key;
+                mylog << "OP#" << i+1 << " - Read : " << key;
                 auto start = chrono::system_clock::now();
                 t->search(key, &val);
                 auto end = std::chrono::system_clock::now();
                 cout << " >> " << val.str;
+                mylog << " >> " << val.str << endl;
                 chrono::duration<double, milli> diff = end - start;
                 op_file << "r\t" << key << "\t" << val.str << "\t" << diff.count() << endl;
             }
             else if(op == 'u'){
                 // Update data
                 cout << '\r' << "OP#" << i+1 << " - Update : " << key << " >> " << val.str;
+                mylog << "OP#" << i+1 << " - Update : " << key << " >> " << val.str << endl;
                 auto start = chrono::system_clock::now();
                 t->update(key, val);
                 auto end = std::chrono::system_clock::now();
@@ -135,6 +148,7 @@ int main(int argc, char** argv){
             else if(op == 'd'){
                 // Delete data
                 cout << '\r' << "OP#" << i+1 << " - Delete : " << key;
+                mylog << "OP#" << i+1 << " - Delete : " << key << endl;
                 auto start = chrono::system_clock::now();
                 t->deletion(key);
                 auto end = std::chrono::system_clock::now();
@@ -149,7 +163,7 @@ int main(int argc, char** argv){
             //t->display_tree();
             //t->print_used_block_id();
         }
-	cout << endl;
+	    cout << endl << "Done!" << endl;;
 
         ycsb_inter_file.close();
         remove("inter.dat");
@@ -157,6 +171,8 @@ int main(int argc, char** argv){
 
         t->inorder_traversal((char*)"tree.dat");
     }
+
+    mylog.close();
 
     delete t;
 
