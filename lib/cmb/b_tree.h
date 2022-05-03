@@ -85,7 +85,7 @@ class BTreeNode{
         void stat();
 
 		void display_tree(BTree<T>* t, int level);
-        void inorder_traversal(BTree<T>* t, ofstream* outFile);
+        void inorder_traversal(BTree<T>* t, ofstream &outFile);
 
 		void search(BTree<T>* t, u_int64_t _k, T* buf);
         u_int64_t update(BTree<T>* t, u_int64_t _k, T _v, removeList** list);
@@ -130,6 +130,8 @@ class removeList{
 
 template <typename T>
 BTree<T>::BTree(char* filename, off_t _cmb_addr, int degree){
+    mylog << "BTree()" << endl;
+
     if(degree > (int)((PAGE_SIZE - sizeof(BTreeNode<T>) - sizeof(u_int64_t)) / (sizeof(u_int64_t) + sizeof(T))) ){
         cout << " Error: Degree exceed " << endl;
         return;
@@ -162,12 +164,14 @@ BTree<T>::BTree(char* filename, off_t _cmb_addr, int degree){
 
 template <typename T>
 BTree<T>::~BTree(){
+    mylog << "~BTree()" << endl;
     close(fd);
 	delete cmb;	
 }
 
 template <typename T>
 void BTree<T>::reopen(int _fd){
+    mylog << "reopen()" << endl;
 	fd = _fd;
 	cmb = new CMB(cmb_addr);
 }
@@ -193,6 +197,8 @@ void BTree<T>::stat(){
 
 template <typename T>
 void BTree<T>::tree_read(int fd, BTree* tree){ 
+    mylog << "tree_read()" << endl;
+    
     uint8_t* buf = NULL;
     lseek(fd, 0, SEEK_SET);
     posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
@@ -204,6 +210,8 @@ void BTree<T>::tree_read(int fd, BTree* tree){
 
 template <typename T>
 void BTree<T>::tree_write(int fd, BTree* tree){
+    mylog << "tree_write()" << endl;
+
     uint8_t* buf = NULL;
     lseek(fd, 0, SEEK_SET);
     posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
@@ -217,7 +225,13 @@ void BTree<T>::tree_write(int fd, BTree* tree){
 
 template <typename T>
 void BTree<T>::node_read(u_int64_t node_id, BTreeNode<T>* node){
-    if(node_id == 0) cout << " Error : Attempt to read node id = 0 " << endl;
+    mylog << "node_read() - node_id:" << node_id << endl;
+
+    if(node_id == 0){
+        cout << " Error : Attempt to read node id = 0 " << endl;
+        mylog << " Error : Attempt to read node id = 0 " << endl;
+        return;
+    }
 
 	u_int64_t block_id;
     cmb->read(&block_id, node_id * sizeof(u_int64_t), sizeof(u_int64_t));
@@ -248,7 +262,13 @@ void BTree<T>::node_read(u_int64_t node_id, BTreeNode<T>* node){
 
 template <typename T>
 void BTree<T>::node_write(u_int64_t node_id, BTreeNode<T>* node){
-    if(node_id == 0) cout << " Error : Attempt to write node id = 0 " << endl;
+    mylog << "node_write() - node_id:" << node_id << endl;
+
+    if(node_id == 0){
+        cout << " Error : Attempt to write node id = 0 " << endl;
+        mylog << " Error : Attempt to write node id = 0 " << endl;
+        return;
+    }
 
     u_int64_t block_id;
     cmb->read(&block_id, node_id * sizeof(u_int64_t), sizeof(u_int64_t));
@@ -277,6 +297,8 @@ void BTree<T>::node_write(u_int64_t node_id, BTreeNode<T>* node){
 
 template <typename T>
 u_int64_t BTree<T>::get_free_node_id(){
+    mylog << "get_free_node_id()" << endl;
+
     u_int64_t free_node_id;
     cmb->read(&free_node_id, 0, sizeof(u_int64_t));
     u_int64_t next_node_id = free_node_id + 1;
@@ -287,6 +309,7 @@ u_int64_t BTree<T>::get_free_node_id(){
 
 template <typename T>
 u_int64_t BTree<T>::get_block_id(u_int64_t node_id){
+    mylog << "get_block_id() - node id:" << node_id << endl;
     u_int64_t readval;
 	cmb->read(&readval, node_id * sizeof(u_int64_t), sizeof(u_int64_t));
     return readval;
@@ -294,12 +317,15 @@ u_int64_t BTree<T>::get_block_id(u_int64_t node_id){
 
 template <typename T>
 void BTree<T>::update_node_id(u_int64_t node_id, u_int64_t block_id){
+    mylog << "update_node_id() - node id:" << node_id << " block id:" << block_id << endl;
     u_int64_t writeval = block_id;
 	cmb->write(node_id * sizeof(u_int64_t), &writeval, sizeof(u_int64_t));
 }
 
 template <typename T>
 u_int64_t BTree<T>::get_free_block_id(){
+    mylog << "get_free_block_id()" << endl;
+
     uint8_t* buf = NULL;
     lseek(fd, 0, SEEK_SET);
     posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
@@ -326,6 +352,8 @@ u_int64_t BTree<T>::get_free_block_id(){
 
 template <typename T>
 void BTree<T>::set_block_id(u_int64_t block_id, bool bit){
+    mylog << "set_block_id() - set block id:" << block_id << " as " << bit << endl;
+
     if(block_id >= block_cap) return;
 
     uint8_t* buf = NULL;
@@ -348,7 +376,7 @@ void BTree<T>::set_block_id(u_int64_t block_id, bool bit){
 
 template <typename T>
 void BTree<T>::print_used_block_id(){
-    mylog << "Btree.print_used_block_id()" << endl;
+    mylog << "print_used_block_id()" << endl;
     mylog << "\tUsed Block : " << endl << "\t";
 
     uint8_t* buf = NULL;
@@ -376,7 +404,7 @@ void BTree<T>::print_used_block_id(){
 
 template <typename T>
 void BTree<T>::display_tree(){
-    cout << endl << "Tree Traversal: " << endl;
+    mylog << "display_tree()" << endl;
 
     if(root_id){
         BTreeNode<T>* root = (BTreeNode<T>*) calloc(1, sizeof(BTreeNode<T>));
@@ -385,29 +413,29 @@ void BTree<T>::display_tree(){
         delete root;
     }
     else
-        cout << " The tree is empty! " << endl;
-
-    cout << endl;
+        mylog << " The tree is empty! " << endl;
 }
 
 template <typename T>
 void BTree<T>::inorder_traversal(char* filename){
+    mylog << "inorder_traversal()" << endl;
+
     if(root_id){
         ofstream outFile(filename);
 
         BTreeNode<T>* root = (BTreeNode<T>*) calloc(1, sizeof(BTreeNode<T>));
         node_read(root_id, root);
-        root->inorder_traversal(this, &outFile);
+        root->inorder_traversal(this, outFile);
         delete root;
     }
     else
-        cout << " The tree is empty! " << endl;
-
-    cout << endl;
+        mylog << " The tree is empty! " << endl;
 }
 
 template <typename T>
 void BTree<T>::search(u_int64_t _k, T* buf){
+    mylog << "search() - key:" << _k << endl;
+
     if(root_id){
         BTreeNode<T>* root = (BTreeNode<T>*) calloc(1, sizeof(BTreeNode<T>));
         node_read(root_id, root);
@@ -420,6 +448,8 @@ void BTree<T>::search(u_int64_t _k, T* buf){
 
 template <typename T>
 void BTree<T>::update(u_int64_t _k, T _v){
+    mylog << "update() : update key:" << _k << endl;
+
     if(root_id){
         removeList* rmlist = NULL;
 
@@ -446,6 +476,7 @@ void BTree<T>::update(u_int64_t _k, T _v){
 
 template <typename T>
 void BTree<T>::insertion(u_int64_t _k, T _v){
+    mylog << "insertion() - key:" << _k << endl;
 
     if(root_id){
         removeList* rmlist = NULL;
@@ -497,6 +528,8 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
 
 template <typename T>
 void BTree<T>::deletion(u_int64_t _k){
+    mylog << "deletion() - key:" << _k << endl;
+    
     if(root_id){
         removeList* rmlist = NULL;
 
@@ -536,6 +569,8 @@ void BTree<T>::deletion(u_int64_t _k){
 
 template <typename T>
 BTreeNode<T>::BTreeNode(int _m, bool _is_leaf, u_int64_t _node_id){
+    mylog << "BTreeNode()" << endl;
+
     m = _m;
     min_num = (_m % 2 == 0) ? _m / 2 - 1 : _m / 2;
     num_key = 0;
@@ -548,6 +583,8 @@ BTreeNode<T>::BTreeNode(int _m, bool _is_leaf, u_int64_t _node_id){
 
 template <typename T>
 BTreeNode<T>::~BTreeNode(){
+    mylog << "~BTreeNode()" << endl;
+    
     delete key;
     delete value;
     delete child_id;
@@ -565,8 +602,10 @@ void BTreeNode<T>::stat(){
 
 template <typename T>
 void BTreeNode<T>::display_tree(BTree<T>* t, int level){
-    for(int j = 0; j < level; j++) cout << '\t';
-        cout << '[' << node_id << "=>" << t->get_block_id(node_id) << ']' << endl;;
+    mylog << "display_tree()" << endl;
+
+    for(int j = 0; j < level; j++) mylog << '\t';
+        mylog << '[' << node_id << "=>" << t->get_block_id(node_id) << ']' << endl;;
 
     int i = 0;
     for(i = 0; i < num_key; i++){
@@ -576,8 +615,8 @@ void BTreeNode<T>::display_tree(BTree<T>* t, int level){
             node->display_tree(t, level + 1);
             delete node;
         }
-        for(int j = 0; j < level; j++) cout << '\t';
-        cout << key[i] << endl;;
+        for(int j = 0; j < level; j++) mylog << '\t';
+        mylog << key[i] << endl;;
     }
     if(!is_leaf){
         BTreeNode<T>* node = (BTreeNode<T>*) calloc(1, sizeof(BTreeNode<T>));
@@ -588,7 +627,9 @@ void BTreeNode<T>::display_tree(BTree<T>* t, int level){
 }
 
 template <typename T>
-void BTreeNode<T>::inorder_traversal(BTree<T>* t, ofstream* outFile){
+void BTreeNode<T>::inorder_traversal(BTree<T>* t, ofstream &outFile){
+    mylog << "inorder_traversal()" << endl;
+
     int i = 0;
     for(i = 0; i < num_key; i++){
         if(!is_leaf){
@@ -597,7 +638,7 @@ void BTreeNode<T>::inorder_traversal(BTree<T>* t, ofstream* outFile){
             node->inorder_traversal(t, outFile);
             delete node;
         }
-        *outFile << key[i] << '\t' << value[i].str << endl;;
+        outFile << key[i] << '\t' << value[i].str << endl;;
     }
     if(!is_leaf){
         BTreeNode<T>* node = (BTreeNode<T>*) calloc(1, sizeof(BTreeNode<T>));
@@ -609,6 +650,8 @@ void BTreeNode<T>::inorder_traversal(BTree<T>* t, ofstream* outFile){
 
 template <typename T>
 void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf){
+    mylog << "serach() - key:" << _k << endl;
+
     int i;
     for(i = 0; i < num_key; i++){
         if(_k == key[i]){
@@ -641,6 +684,8 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf){
 
 template <typename T>
 u_int64_t BTreeNode<T>::update(BTree<T>* t, u_int64_t _k, T _v, removeList** list){
+    mylog << "update() - key:" << _k << endl;
+    
     int i;
     for(i = 0; i < num_key; i++){
         // Key match
@@ -676,6 +721,8 @@ u_int64_t BTreeNode<T>::update(BTree<T>* t, u_int64_t _k, T _v, removeList** lis
 
 template <typename T>
 u_int64_t BTreeNode<T>::traverse_insert(BTree<T>* t, u_int64_t _k, T _v, removeList** list){
+    mylog << "traverse_insert() - key:" << _k << endl;
+    
     if(is_leaf){
         return direct_insert(t, _k, _v, list);
     }        
@@ -713,6 +760,8 @@ u_int64_t BTreeNode<T>::direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeLis
     /* Assume the list is not full */
     if(num_key >= m) return node_id;
 
+    mylog << "direct_insert() - key:" << _k << endl;
+
     int idx;
     for(idx = 0; idx < num_key; idx++){
         if(_k == key[idx])
@@ -747,6 +796,8 @@ u_int64_t BTreeNode<T>::direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeLis
 
 template <typename T>
 u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t parent_id, removeList** list){
+    mylog << "split() - node id:" << spt_node_id << " parent node id:" << parent_id << endl;
+    
     BTreeNode<T>* node = (BTreeNode<T>*) calloc(1, sizeof(BTreeNode<T>));
     t->node_read(spt_node_id, node);
 
@@ -786,6 +837,8 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
 
 template <typename T>
 u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** list){
+    mylog << "traverse_delete() - key:" << _k << endl;
+    
     int i;
     bool found = false;
     for(i = 0; i < num_key; i++){
@@ -865,6 +918,8 @@ u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** 
 
 template <typename T>
 u_int64_t BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** list){
+    mylog << "direct_delete() - key:" << _k << endl;
+    
     int i;
     for(i = 0; i < num_key; i++){
         if(key[i] == _k) break;
@@ -900,6 +955,8 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
         delete node;
         return node_id;
     }
+
+    mylog << "rebalance() - node id:" << child_id[idx] << endl;
 
     BTreeNode<T> *left = (BTreeNode<T>*) calloc(1, sizeof(BTreeNode<T>));
     if(idx - 1 >= 0)
@@ -978,6 +1035,8 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
 
 template <typename T>
 u_int64_t BTreeNode<T>::get_pred(BTree<T>* t){
+    mylog << "get_pred() - node id:" << node_id << endl;
+
     if(is_leaf)
         return node_id;
     else{
@@ -991,6 +1050,8 @@ u_int64_t BTreeNode<T>::get_pred(BTree<T>* t){
 
 template <typename T>
 u_int64_t BTreeNode<T>::get_succ(BTree<T>* t){
+    mylog << "get_succ() - node id:" << node_id << endl; 
+
     if(is_leaf)
         return node_id;
     else{
@@ -1014,6 +1075,8 @@ removeList::~removeList(){
 }
 
 CMB::CMB(off_t _bar_addr){
+    mylog << "CMB()" << endl;
+
 	//if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) == -1) FATAL;
 	//printf("\n/dev/mem opened.\n");
     if ((fd = open("fake_cmb", O_RDWR | O_SYNC)) == -1) FATAL;    // fake_cmb
@@ -1029,11 +1092,13 @@ CMB::CMB(off_t _bar_addr){
 }
 
 CMB::~CMB(){
+    mylog << "~CMB()" << endl;
 	close(fd);
 }
 
 void CMB::remap(off_t offset){
     if( ((bar_addr + offset) & ~MAP_MASK) != map_idx ){
+        mylog << "remap() - offset:" << offset << endl;
         map_idx = (bar_addr + offset) & ~MAP_MASK;
 
         /* Unmap the previous */
@@ -1046,6 +1111,7 @@ void CMB::remap(off_t offset){
 }
 
 void CMB::read(void* buf, off_t offset, int size){
+    mylog << "CMB.read() - offset:" << offset << endl;
     remap(offset);
 
 	void* virt_addr = (char*)map_base + ((bar_addr + offset) & MAP_MASK);	
@@ -1053,6 +1119,7 @@ void CMB::read(void* buf, off_t offset, int size){
 }
 
 void CMB::write(off_t offset, void* buf, int size){
+    mylog << "CMB.write() - offset:" << offset << endl;
     remap(offset);
 
 	void* virt_addr = (char*)map_base + ((bar_addr + offset) & MAP_MASK);	
@@ -1060,6 +1127,7 @@ void CMB::write(off_t offset, void* buf, int size){
 }
 
 void* CMB::get_map_base(){
+    mylog << "get_map_base()" << endl;
 	return map_base;
 }
 

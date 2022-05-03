@@ -116,7 +116,7 @@ int main(int argc, char** argv){
             if(op == 'i'){
                 // Insert data
                 cout << '\r' << "OP#" << i+1 << " - Insert : " << key << " >> " << val.str;
-                mylog << "OP#" << i+1 << " - Insert : " << key << " >> " << val.str << endl;;
+                mylog << "\n" << "OP#" << i+1 << " - Insert : " << key << " >> " << val.str << endl;;
                 auto start = chrono::system_clock::now();
                 t->insertion(key, val);
                 auto end = std::chrono::system_clock::now();
@@ -126,7 +126,7 @@ int main(int argc, char** argv){
             else if(op == 'r'){
                 // Read data
                 cout << '\r' << "OP#" << i+1 << " - Read : " << key;
-                mylog << "OP#" << i+1 << " - Read : " << key;
+                mylog << "\n" << "OP#" << i+1 << " - Read : " << key;
                 auto start = chrono::system_clock::now();
                 t->search(key, &val);
                 auto end = std::chrono::system_clock::now();
@@ -138,7 +138,7 @@ int main(int argc, char** argv){
             else if(op == 'u'){
                 // Update data
                 cout << '\r' << "OP#" << i+1 << " - Update : " << key << " >> " << val.str;
-                mylog << "OP#" << i+1 << " - Update : " << key << " >> " << val.str << endl;
+                mylog << "\n" << "OP#" << i+1 << " - Update : " << key << " >> " << val.str << endl;
                 auto start = chrono::system_clock::now();
                 t->update(key, val);
                 auto end = std::chrono::system_clock::now();
@@ -148,7 +148,7 @@ int main(int argc, char** argv){
             else if(op == 'd'){
                 // Delete data
                 cout << '\r' << "OP#" << i+1 << " - Delete : " << key;
-                mylog << "OP#" << i+1 << " - Delete : " << key << endl;
+                mylog << "\n" << "OP#" << i+1 << " - Delete : " << key << endl;
                 auto start = chrono::system_clock::now();
                 t->deletion(key);
                 auto end = std::chrono::system_clock::now();
