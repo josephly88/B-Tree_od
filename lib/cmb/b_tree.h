@@ -21,6 +21,7 @@ template <typename T> class BTree;
 template <typename T> class BTreeNode;
 class CMB;
 class removeList;
+ofstream mylog;
 
 template <typename T>
 class BTree{
@@ -80,6 +81,8 @@ class BTreeNode{
 		
 		BTreeNode(int _m, bool _is_leaf, u_int64_t _node_id);
 		~BTreeNode();
+
+        void stat();
 
 		void display_tree(BTree<T>* t, int level);
         void inorder_traversal(BTree<T>* t, ofstream* outFile);
@@ -177,8 +180,15 @@ void BTree<T>::stat(){
     cout << "Block size: " << block_size << endl;
     cout << "Block Capacity: " << block_cap << endl;
     cout << "Root Block ID: " << root_id << endl;
-    print_used_block_id();
     cout << endl;
+
+    mylog << "BTree.stat()" << endl;
+    mylog << "\tDegree: " << m << endl;
+    mylog << "\tfd: " << fd << endl;
+    mylog << "\tBlock size: " << block_size << endl;
+    mylog << "\tBlock Capacity: " << block_cap << endl;
+    mylog << "\tRoot Block ID: " << root_id << endl;
+    print_used_block_id();
 }
 
 template <typename T>
@@ -338,8 +348,8 @@ void BTree<T>::set_block_id(u_int64_t block_id, bool bit){
 
 template <typename T>
 void BTree<T>::print_used_block_id(){
-    cout << endl;
-    cout << "Used Block : " << endl;
+    mylog << "Btree.print_used_block_id()" << endl;
+    mylog << "\tUsed Block : " << endl << "\t";
 
     uint8_t* buf = NULL;
     lseek(fd, 0, SEEK_SET);
@@ -352,14 +362,14 @@ void BTree<T>::print_used_block_id(){
         uint8_t byte = *byte_ptr;
         for(int i = 0; i < 8; i++){
             if( (byte & 1) ){
-                cout << " " << id;
+                mylog << " " << id;
             }
             byte >>= 1;
             id++;
         }
         byte_ptr++;
     }
-    cout << endl << endl;
+    mylog << endl;
 
     free(buf);
 }
@@ -541,6 +551,16 @@ BTreeNode<T>::~BTreeNode(){
     delete key;
     delete value;
     delete child_id;
+}
+
+template <typename T>
+void BTreeNode<T>::stat(){
+    mylog << "BTreeNode.stat()" << endl;
+    mylog << "\tDegree: " << m << endl;
+    mylog << "\tMinimun Key: " << min_num << endl;
+    mylog << "\t# keys: " << num_key << endl;
+    mylog << "\tIs leaf? : " << is_leaf << endl;
+    mylog << "\tNode ID: " << node_id << endl;
 }
 
 template <typename T>

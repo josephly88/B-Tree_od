@@ -502,13 +502,12 @@ BTreeNode<T>::~BTreeNode(){
 
 template <typename T>
 void BTreeNode<T>::stat(){
-    mylog << endl;
-    mylog << "Degree: " << m << endl;
-    mylog << "Minimun Key: " << min_num << endl;
-    mylog << "# keys: " << num_key << endl;
-    mylog << "Is leaf? : " << is_leaf << endl;
-    mylog << "Node ID: " << node_id << endl;
-    mylog << endl;
+    mylog << "BTreeNode.stat()" << endl;
+    mylog << "\tDegree: " << m << endl;
+    mylog << "\tMinimun Key: " << min_num << endl;
+    mylog << "\t# keys: " << num_key << endl;
+    mylog << "\tIs leaf? : " << is_leaf << endl;
+    mylog << "\tNode ID: " << node_id << endl;
 }
 
 template <typename T>
