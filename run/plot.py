@@ -24,8 +24,13 @@ if len(sys.argv) == 2:
         token_cpr = nstr_cpr.split('\t')
         token_cmb = nstr_cmb.split('\t')
 
-        opr_perf[0].append(float(token_cpr[3]))
-        opr_perf[1].append(float(token_cmb[3]))
+        if(token_cpr[0] == 'd'):
+            opr_perf[0].append(float(token_cpr[2]))
+            opr_perf[1].append(float(token_cmb[2]))
+        else:
+            opr_perf[0].append(float(token_cpr[3]))
+            opr_perf[1].append(float(token_cmb[3]))
+            
     cpw_opr.close()
     cmb_opr.close()
 
@@ -43,6 +48,9 @@ if len(sys.argv) == 2:
     plt.figtext(0.01, 0.96, "Overral latency: ", horizontalalignment='left')
     plt.figtext(0.01, 0.93, "Copy-on-write - " + str(round(sum(opr_perf[0]),2)) + "ms", horizontalalignment='left')
     plt.figtext(0.01, 0.90, "CMB - " + str(round(sum(opr_perf[1]), 2)) + "ms", horizontalalignment='left')
+    plt.figtext(0.70, 0.96, "Average latency: ", horizontalalignment='left')
+    plt.figtext(0.70, 0.93, "Copy-on-write - " + str(round(sum(opr_perf[0]) / len(opr_perf[0]),2)) + "ms", horizontalalignment='left')
+    plt.figtext(0.70, 0.90, "CMB - " + str(round(sum(opr_perf[1]) / len(opr_perf[1]), 2)) + "ms", horizontalalignment='left')
     plt.legend(loc='upper left')
     ax.grid
     
@@ -95,9 +103,12 @@ else:
     ax.set(xlabel='op#', ylabel='response time (ms)', title='Insertion Operation Response time')
     plt.title("Insertion")
     if len(insert_perf[0]) > 0:
-        plt.figtext(0.01, 0.96, "Average latency: ", horizontalalignment='left')
-        plt.figtext(0.01, 0.93, "Copy-on-write - " + str(round(sum(insert_perf[0])/len(insert_perf[0]),2)) + "ms", horizontalalignment='left')
-        plt.figtext(0.01, 0.90, "CMB - " + str(round(sum(insert_perf[1])/len(insert_perf[1]), 2)) + "ms", horizontalalignment='left')
+        plt.figtext(0.01, 0.96, "Overral latency: ", horizontalalignment='left')
+        plt.figtext(0.01, 0.93, "Copy-on-write - " + str(round(sum(insert_perf[0]),2)) + "ms", horizontalalignment='left')
+        plt.figtext(0.01, 0.90, "CMB - " + str(round(sum(insert_perf[1]), 2)) + "ms", horizontalalignment='left')
+        plt.figtext(0.70, 0.96, "Average latency: ", horizontalalignment='left')
+        plt.figtext(0.70, 0.93, "Copy-on-write - " + str(round(sum(insert_perf[0])/len(insert_perf[0]),2)) + "ms", horizontalalignment='left')
+        plt.figtext(0.70, 0.90, "CMB - " + str(round(sum(insert_perf[1])/len(insert_perf[1]), 2)) + "ms", horizontalalignment='left')
     plt.legend(loc='upper left')
     ax.grid
 
@@ -115,9 +126,12 @@ else:
     ax.set(xlabel='op#', ylabel='response time (ms)', title='Read Operation Response time')
     plt.title("Read")
     if len(read_perf[0]) > 0:
-        plt.figtext(0.01, 0.96, "Average latency: ", horizontalalignment='left')
-        plt.figtext(0.01, 0.93, "Copy-on-write - " + str(round(sum(read_perf[0])/len(read_perf[0]),2)) + "ms", horizontalalignment='left')
-        plt.figtext(0.01, 0.90, "CMB - " + str(round(sum(read_perf[1])/len(read_perf[1]), 2)) + "ms", horizontalalignment='left')
+        plt.figtext(0.01, 0.96, "Overral latency: ", horizontalalignment='left')
+        plt.figtext(0.01, 0.93, "Copy-on-write - " + str(round(sum(read_perf[0]),2)) + "ms", horizontalalignment='left')
+        plt.figtext(0.01, 0.90, "CMB - " + str(round(sum(read_perf[1]), 2)) + "ms", horizontalalignment='left')
+        plt.figtext(0.70, 0.96, "Average latency: ", horizontalalignment='left')
+        plt.figtext(0.70, 0.93, "Copy-on-write - " + str(round(sum(read_perf[0])/len(read_perf[0]),2)) + "ms", horizontalalignment='left')
+        plt.figtext(0.70, 0.90, "CMB - " + str(round(sum(read_perf[1])/len(read_perf[1]), 2)) + "ms", horizontalalignment='left')
     plt.legend(loc='upper left')
     ax.grid
 
@@ -135,9 +149,12 @@ else:
     ax.set(xlabel='op#', ylabel='response time (ms)', title='Update Operation Response time')
     plt.title("Update")
     if len(update_perf[0]) > 0:
-        plt.figtext(0.01, 0.96, "Average latency: ", horizontalalignment='left')
-        plt.figtext(0.01, 0.93, "Copy-on-write - " + str(round(sum(update_perf[0])/len(update_perf[0]),2)) + "ms", horizontalalignment='left')
-        plt.figtext(0.01, 0.90, "CMB - " + str(round(sum(update_perf[1])/len(update_perf[1]), 2)) + "ms", horizontalalignment='left')
+        plt.figtext(0.01, 0.96, "Overral latency: ", horizontalalignment='left')
+        plt.figtext(0.01, 0.93, "Copy-on-write - " + str(round(sum(update_perf[0]),2)) + "ms", horizontalalignment='left')
+        plt.figtext(0.01, 0.90, "CMB - " + str(round(sum(update_perf[1]), 2)) + "ms", horizontalalignment='left')
+        plt.figtext(0.70, 0.96, "Average latency: ", horizontalalignment='left')
+        plt.figtext(0.70, 0.93, "Copy-on-write - " + str(round(sum(update_perf[0])/len(update_perf[0]),2)) + "ms", horizontalalignment='left')
+        plt.figtext(0.70, 0.90, "CMB - " + str(round(sum(update_perf[1])/len(update_perf[1]), 2)) + "ms", horizontalalignment='left')
     plt.legend(loc='upper left')
     ax.grid
 
@@ -155,9 +172,12 @@ else:
     ax.set(xlabel='op#', ylabel='response time (ms)', title='Delete Operation Response time')
     plt.title("Deletion")
     if len(delete_perf[0]) > 0:
-        plt.figtext(0.01, 0.96, "Average latency: ", horizontalalignment='left')
-        plt.figtext(0.01, 0.93, "Copy-on-write - " + str(round(sum(delete_perf[0])/len(delete_perf[0]),2)) + "ms", horizontalalignment='left')
-        plt.figtext(0.01, 0.90, "CMB - " + str(round(sum(delete_perf[1])/len(delete_perf[1]), 2)) + "ms", horizontalalignment='left')
+        plt.figtext(0.01, 0.96, "Overral latency: ", horizontalalignment='left')
+        plt.figtext(0.01, 0.93, "Copy-on-write - " + str(round(sum(delete_perf[0]),2)) + "ms", horizontalalignment='left')
+        plt.figtext(0.01, 0.90, "CMB - " + str(round(sum(delete_perf[1]), 2)) + "ms", horizontalalignment='left')
+        plt.figtext(0.70, 0.96, "Average latency: ", horizontalalignment='left')
+        plt.figtext(0.70, 0.93, "Copy-on-write - " + str(round(sum(delete_perf[0])/len(delete_perf[0]),2)) + "ms", horizontalalignment='left')
+        plt.figtext(0.70, 0.90, "CMB - " + str(round(sum(delete_perf[1])/len(delete_perf[1]), 2)) + "ms", horizontalalignment='left')
     plt.legend(loc='upper left')
     ax.grid
 
