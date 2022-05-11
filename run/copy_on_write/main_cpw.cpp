@@ -98,8 +98,16 @@ int main(int argc, char** argv){
 
         ifstream ycsb_inter_file;
         ycsb_inter_file.open("inter.dat");
+
+		// Extract input filename
+		string input_file_str(input_file);
+		regex rgx_opf("(\\w+)\\.txt");
+		smatch match;
+		regex_search(input_file_str, match, rgx_opf);
+		string op_file_name(match[1]);
+
         ofstream op_file;
-        op_file.open("opr.dat", ios_base::app);
+        op_file.open(op_file_name + ".dat", ios_base::app);
 
         cout << "Operation Start!" << endl;
         mylog << "Operation Start!" << endl;

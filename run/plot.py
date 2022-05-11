@@ -1,95 +1,142 @@
 #!/usr/bin/python3
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
 
-insert_perf = [[] for i in range(2)]
-read_perf = [[] for i in range(2)]
-update_perf = [[] for i in range(2)]
-delete_perf = [[] for i in range(2)]
+file_list = sys.argv[1:]
 
-# read opr.dat
-cpw_opr = open("copy_on_write/opr.dat", "r")
-cmb_opr = open("cmb/opr.dat", "r")
-while True:
-    nstr_cpr = cpw_opr.readline()
-    nstr_cmb = cmb_opr.readline()
-    # read until EOF
-    if len(nstr_cpr) == 0:
-        break
-    token_cpr = nstr_cpr.split('\t')
-    token_cmb = nstr_cmb.split('\t')
-    # Insert data
-    if(token_cpr[0] == 'i'):
-        insert_perf[0].append(float(token_cpr[3]))
-        insert_perf[1].append(float(token_cmb[3]))
-    elif(token_cpr[0] == 'r'):
-        read_perf[0].append(float(token_cpr[3]))
-        read_perf[1].append(float(token_cmb[3]))
-    elif(token_cpr[0] == 'u'):
-        update_perf[0].append(float(token_cpr[3]))
-        update_perf[1].append(float(token_cmb[3]))
-    elif(token_cpr[0] == 'd'):
-        delete_perf[0].append(float(token_cpr[2]))
-        delete_perf[1].append(float(token_cmb[2]))
-cpw_opr.close()
-cmb_opr.close()
+# Plot per workload
+if len(sys.argv) == 2:
+	opr_perf = [[] for i in range(2)]
+	filename = sys.argv[1][:-4]
 
-# plot insert
-x = np.arange(0, len(insert_perf[0]), 1)
-cpw = np.array(insert_perf[0])
-cmb = np.array(insert_perf[1])
+	cpw_opr = open("copy_on_write/" + sys.argv[1], "r")
+	cmb_opr = open("cmb/" + sys.argv[1], "r")
+	while True:
+		nstr_cpr = cpw_opr.readline()
+		nstr_cmb = cmb_opr.readline()
+		# read until EOF
+		if len(nstr_cpr) == 0:
+			break
+		token_cpr = nstr_cpr.split('\t')
+		token_cmb = nstr_cmb.split('\t')
 
-fig, ax = plt.subplots()
-ax.scatter(x, cpw, label="copy_on_write", s=1)
-ax.scatter(x, cmb, label="cmb", s=1)
+		opr_perf[0].append(float(token_cpr[3]))
+		opr_perf[1].append(float(token_cmb[3]))
+	cpw_opr.close()
+	cmb_opr.close()
 
-ax.set(xlabel='op#', ylabel='response time (ms)', title='Insertion Operation Response time')
-plt.legend(loc='upper left')
-ax.grid
+	# plot
+	x = np.arange(0, len(opr_perf[0]), 1)
+	cpw = np.array(opr_perf[0])
+	cmb = np.array(opr_perf[1])
 
-fig.savefig('insert.png')
+	fig, ax = plt.subplots()
+	ax.scatter(x, cpw, label="copy_on_write", s=1)
+	ax.scatter(x, cmb, label="cmb", s=1)
 
-# plot read
-x = np.arange(0, len(read_perf[0]), 1)
-cpw = np.array(read_perf[0])
-cmb = np.array(read_perf[1])
+	ax.set(xlabel='op#', ylabel='response time (ms)', title='Operation Response time')
+	plt.title("Workload " + filename)
+	plt.legend(loc='upper left')
+	ax.grid
 
-fig, ax = plt.subplots()
-ax.scatter(x, cpw, label="copy_on_write", s=1)
-ax.scatter(x, cmb, label="cmb", s=1)
+	fig.savefig(filename + '.png')
 
-ax.set(xlabel='op#', ylabel='response time (ms)', title='Read Operation Response time')
-plt.legend(loc='upper left')
-ax.grid
+#Plot per operation
+else:
+	insert_perf = [[] for i in range(2)]
+	read_perf = [[] for i in range(2)]
+	update_perf = [[] for i in range(2)]
+	delete_perf = [[] for i in range(2)]
 
-fig.savefig('read.png')
+	for FILE in file_list:
+		# read opr.dat
+		cpw_opr = open("copy_on_write/" + FILE, "r")
+		cmb_opr = open("cmb/" + FILE, "r")
+		while True:
+			nstr_cpr = cpw_opr.readline()
+			nstr_cmb = cmb_opr.readline()
+			# read until EOF
+			if len(nstr_cpr) == 0:
+				break
+			token_cpr = nstr_cpr.split('\t')
+			token_cmb = nstr_cmb.split('\t')
+			# Insert data
+			if(token_cpr[0] == 'i'):
+				insert_perf[0].append(float(token_cpr[3]))
+				insert_perf[1].append(float(token_cmb[3]))
+			elif(token_cpr[0] == 'r'):
+				read_perf[0].append(float(token_cpr[3]))
+				read_perf[1].append(float(token_cmb[3]))
+			elif(token_cpr[0] == 'u'):
+				update_perf[0].append(float(token_cpr[3]))
+				update_perf[1].append(float(token_cmb[3]))
+			elif(token_cpr[0] == 'd'):
+				delete_perf[0].append(float(token_cpr[2]))
+				delete_perf[1].append(float(token_cmb[2]))
+		cpw_opr.close()
+		cmb_opr.close()
 
-# plot update
-x = np.arange(0, len(update_perf[0]), 1)
-cpw = np.array(update_perf[0])
-cmb = np.array(update_perf[1])
+	# plot insert
+	x = np.arange(0, len(insert_perf[0]), 1)
+	cpw = np.array(insert_perf[0])
+	cmb = np.array(insert_perf[1])
 
-fig, ax = plt.subplots()
-ax.scatter(x, cpw, label="copy_on_write", s=1)
-ax.scatter(x, cmb, label="cmb", s=1)
+	fig, ax = plt.subplots()
+	ax.scatter(x, cpw, label="copy_on_write", s=1)
+	ax.scatter(x, cmb, label="cmb", s=1)
 
-ax.set(xlabel='op#', ylabel='response time (ms)', title='Update Operation Response time')
-plt.legend(loc='upper left')
-ax.grid
+	ax.set(xlabel='op#', ylabel='response time (ms)', title='Insertion Operation Response time')
+	plt.title("Insertion")
+	plt.legend(loc='upper left')
+	ax.grid
 
-fig.savefig('update.png')
+	fig.savefig('insert.png')
 
-# plot delete
-x = np.arange(0, len(delete_perf[0]), 1)
-cpw = np.array(delete_perf[0])
-cmb = np.array(delete_perf[1])
+	# plot read
+	x = np.arange(0, len(read_perf[0]), 1)
+	cpw = np.array(read_perf[0])
+	cmb = np.array(read_perf[1])
 
-fig, ax = plt.subplots()
-ax.scatter(x, cpw, label="copy_on_write", s=1)
-ax.scatter(x, cmb, label="cmb", s=1)
+	fig, ax = plt.subplots()
+	ax.scatter(x, cpw, label="copy_on_write", s=1)
+	ax.scatter(x, cmb, label="cmb", s=1)
 
-ax.set(xlabel='op#', ylabel='response time (ms)', title='Delete Operation Response time')
-plt.legend(loc='upper left')
-ax.grid
+	ax.set(xlabel='op#', ylabel='response time (ms)', title='Read Operation Response time')
+	plt.title("Read")
+	plt.legend(loc='upper left')
+	ax.grid
 
-fig.savefig('delete.png')
+	fig.savefig('read.png')
+
+	# plot update
+	x = np.arange(0, len(update_perf[0]), 1)
+	cpw = np.array(update_perf[0])
+	cmb = np.array(update_perf[1])
+
+	fig, ax = plt.subplots()
+	ax.scatter(x, cpw, label="copy_on_write", s=1)
+	ax.scatter(x, cmb, label="cmb", s=1)
+
+	ax.set(xlabel='op#', ylabel='response time (ms)', title='Update Operation Response time')
+	plt.title("Update")
+	plt.legend(loc='upper left')
+	ax.grid
+
+	fig.savefig('update.png')
+
+	# plot delete
+	x = np.arange(0, len(delete_perf[0]), 1)
+	cpw = np.array(delete_perf[0])
+	cmb = np.array(delete_perf[1])
+
+	fig, ax = plt.subplots()
+	ax.scatter(x, cpw, label="copy_on_write", s=1)
+	ax.scatter(x, cmb, label="cmb", s=1)
+
+	ax.set(xlabel='op#', ylabel='response time (ms)', title='Delete Operation Response time')
+	plt.title("Deletion")
+	plt.legend(loc='upper left')
+	ax.grid
+
+	fig.savefig('delete.png')
