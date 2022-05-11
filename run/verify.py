@@ -5,32 +5,36 @@ import sys
 dataset = []
 op_file_ls = sys.argv[1:]
 
+i = 0
+
 # read opr.dat
 for FILE in op_file_ls:
-	print(" Reading file: " + FILE)
-	op_file = open(FILE, "r")
-	while True:
-		nstr = op_file.readline()
-		# read until EOF
-		if len(nstr) == 0:
-			break
-		token = nstr.split('\t')
-		# Insert data
-		if(token[0] == 'i'):
-			dataset.append([int(token[1]), token[2], 1])
-		elif(token[0] == 'r'):
-			# Find the data with key K in the dataset
-			data = [x for x in dataset if int(token[1]) in x][0]
-			if(token[2] != data[1]):
-				print("Read Key {}: Value Unmatched".format(token[1]))
-		elif(token[0] == 'u'):
-			idx = dataset.index([x for x in dataset if int(token[1]) in x][0])
-			dataset[idx][1] = token[2]
-		elif(token[0] == 'd'):
-			idx = dataset.index([x for x in dataset if int(token[1]) in x][0])
-			# 0 means deleted
-			dataset[idx][2] = 0
-	op_file.close()
+    print(" Reading file: " + FILE)
+    op_file = open(FILE, "r")
+    while True:
+        nstr = op_file.readline()
+        # read until EOF
+        if len(nstr) == 0:
+            break
+        token = nstr.split('\t')
+        # Insert data
+        if(token[0] == 'i'):
+            dataset.append([int(token[1]), token[2], 1])
+        elif(token[0] == 'r'):
+            # Find the data with key K in the dataset
+            data = [x for x in dataset if int(token[1]) in x][0]
+            if(token[2] != data[1]):
+                print("Read Key {}: Value Unmatched".format(token[1]))
+        elif(token[0] == 'u'):
+            idx = dataset.index([x for x in dataset if int(token[1]) in x][0])
+            dataset[idx][1] = token[2]
+        elif(token[0] == 'd'):
+            idx = dataset.index([x for x in dataset if int(token[1]) in x][0])
+            # 0 means deleted
+            dataset[idx][2] = 0
+        print(" #op: " + str(i), end="\r")
+        i = i+1
+    op_file.close()
 
 # Remove the item in dataset with [2] == 0 (deleted)
 print(" Deletion operation ")

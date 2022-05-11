@@ -5,6 +5,9 @@ import sys
 
 file_list = sys.argv[1:]
 
+if len(sys.argv) == 1:
+    sys.exit()
+
 # Plot per workload
 if len(sys.argv) == 2:
     opr_perf = [[] for i in range(2)]
