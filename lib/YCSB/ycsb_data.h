@@ -58,7 +58,10 @@ int YCSB_data_file(char* fileIn, char* fileOut){
 		}
 
 		processed << endl;
+		cout << " Processing OP#: " << i+1 << "\r";
 	}
+	for(int i = 0; i < 25; i++) cout << " ";
+	cout << "\r";
 
     ycsb_file.close();
 	processed.close();
