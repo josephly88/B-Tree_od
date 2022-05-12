@@ -1,6 +1,36 @@
 #!/usr/bin/python3
 
 import sys
+import math
+
+def binary_search(arr, val, min, max):
+    if min >= max:
+        if len(arr) == 0:
+            return 0
+        elif max == len(arr):
+            return len(arr)
+        elif val == str(arr[min][0]):
+            return min
+        elif len(val) < len(str(arr[min][0])):
+            return min
+        elif len(val) == len(str(arr[min][0])) and val < str(arr[min][0]):
+            return min
+        else:
+            return min+1
+
+    mid = math.floor((min + max) / 2)
+
+    if val == str(arr[mid][0]):
+        return mid
+    elif len(val) > len(str(arr[mid][0])):
+        return binary_search(arr, val, mid+1, max)
+    elif len(val) < len(str(arr[mid][0])):
+        return binary_search(arr, val, min, mid-1)
+    else:
+        if val > str(arr[mid][0]):
+            return binary_search(arr, val, mid+1, max)
+        else:
+            return binary_search(arr, val, min, mid-1)
 
 dataset = []
 op_file_ls = sys.argv[1:]
@@ -19,17 +49,19 @@ for FILE in op_file_ls:
         token = nstr.split('\t')
         # Insert data
         if(token[0] == 'i'):
-            dataset.append([int(token[1]), token[2], 1])
+            idx = binary_search(dataset, token[1], 0, len(dataset))
+            dataset.insert(idx, [int(token[1]), token[2], 1])
         elif(token[0] == 'r'):
             # Find the data with key K in the dataset
-            data = [x for x in dataset if int(token[1]) in x][0]
+            idx = binary_search(dataset, token[1], 0, len(dataset))
+            data = dataset[idx]
             if(token[2] != data[1]):
                 print("Read Key {}: Value Unmatched".format(token[1]))
         elif(token[0] == 'u'):
-            idx = dataset.index([x for x in dataset if int(token[1]) in x][0])
+            idx = binary_search(dataset, token[1], 0, len(dataset))
             dataset[idx][1] = token[2]
         elif(token[0] == 'd'):
-            idx = dataset.index([x for x in dataset if int(token[1]) in x][0])
+            idx = binary_search(dataset, token[1], 0, len(dataset))
             # 0 means deleted
             dataset[idx][2] = 0
         print(" #op: " + str(i), end="\r")
