@@ -70,8 +70,11 @@ for FILE in op_file_ls:
 
 # Remove the item in dataset with [2] == 0 (deleted)
 print(" Deletion operation ")
-rm_list = [x for x in dataset if x[2] == 0]
-dataset = [x[0:2] for x in dataset if x not in rm_list]
+new_dataset = []
+for x in dataset:
+    if x[2] != 0:
+        new_dataset.append(x[0:2])
+dataset = new_dataset
 
 # Sort the dataset
 print(" Sorting ")
