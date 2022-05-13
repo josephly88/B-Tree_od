@@ -2,7 +2,7 @@
 
 LIST=('A' 'B' 'C' 'D' 'F' 'delete')
 
-for FILE in $LIST
+for FILE in ${LIST[*]};
 do
     rm insert.dat
     ./cmb_btree.out -i ../../data/insert.txt tree
