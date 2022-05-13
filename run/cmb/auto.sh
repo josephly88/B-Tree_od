@@ -2,12 +2,12 @@
 
 LIST=('A' 'B' 'C' 'D' 'F' 'delete')
 
-for i in {0..5}
+for FILE in $LIST
 do
     rm insert.dat
     ./cmb_btree.out -i ../../data/insert.txt tree
     ../verify.py insert.dat
-    ./cmb_btree.out -i ../../data/${LIST[i]}.txt tree
-    ../verify.py insert.dat ${LIST[i]}.dat
+    ./cmb_btree.out -i ../../data/$FILE.txt tree
+    ../verify.py insert.dat $FILE.dat
     rm -f expected.dat tree.dat tree
 done
