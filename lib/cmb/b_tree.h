@@ -14,7 +14,7 @@ using namespace std;
   __LINE__, __FILE__, errno, strerror(errno)); exit(1); } while(0)
 
 #define PAGE_SIZE 16384UL
-#define MAP_SIZE 4096UL
+#define MAP_SIZE 16384UL
 #define MAP_MASK (MAP_SIZE - 1)
 
 template <typename T> class BTree;
