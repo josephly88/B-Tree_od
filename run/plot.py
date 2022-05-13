@@ -13,8 +13,8 @@ if len(sys.argv) == 2:
     opr_perf = [[] for i in range(2)]
     filename = sys.argv[1][:-4]
 
-    cpw_opr = open("copy_on_write/" + sys.argv[1], "r")
-    cmb_opr = open("cmb/" + sys.argv[1], "r")
+    cpw_opr = open("copy_on_write/" + file_list[0], "r")
+    cmb_opr = open("cmb/" + file_list[0], "r")
     while True:
         nstr_cpr = cpw_opr.readline()
         nstr_cmb = cmb_opr.readline()
