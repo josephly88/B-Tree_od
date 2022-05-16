@@ -2,7 +2,7 @@
 .vscode
 tree
 playground
-run/cmb/fake_cmb
+fake_cmb
 *.dat
 data/*.txt
 *.png
