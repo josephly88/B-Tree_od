@@ -5,53 +5,60 @@ import sys
 import math
 
 percent = 100.0
+dir_list = ["copy_on_write", "cmb", "dram"]
 file_list = ["A.dat", "B.dat", "C.dat", "D.dat", "F.dat", "insert.dat", "delete.dat"]
 
 if len(sys.argv) == 2:
     percent = float(sys.argv[1])
 else:
-    print("Usage: ./program (-p=NUMBER) {file ...}")
+    print("Usage: ./program {Percentage}")
     sys.exit()
 
 # Plot per workload
 for FILE in file_list:
-    opr_perf = [[] for i in range(2)]
+    opr_perf = [[] for i in range(len(dir_list))]
     filename = FILE[:-4]
 
-    cpw_opr = open("copy_on_write/" + FILE, "r")
-    cmb_opr = open("cmb/" + FILE, "r")
+    file_opr = [None] * len(dir_list)
+    for i in range(len(dir_list)):
+        file_opr[i] = open(dir_list[i] + "/" + FILE, "r")
+    
     while True:
-        nstr_cpr = cpw_opr.readline()
-        nstr_cmb = cmb_opr.readline()
+        nstr = [None] * len(dir_list)
+        for i in range(len(dir_list)):
+            nstr[i] = file_opr[i].readline()
         # read until EOF
-        if len(nstr_cpr) == 0:
+        if len(nstr[0]) == 0:
             break
-        token_cpr = nstr_cpr.split('\t')
-        token_cmb = nstr_cmb.split('\t')
 
-        if(token_cpr[0] == 'd'):
-            opr_perf[0].append(float(token_cpr[2]))
-            opr_perf[1].append(float(token_cmb[2]))
+        token = [None] * len(dir_list)
+        for i in range(len(dir_list)):
+            token[i] = nstr[i].split('\t')
+
+        if(token[0][0] == 'd'):
+            for i in range(len(dir_list)):
+                opr_perf[i].append(float(token[i][2]))
         else:
-            opr_perf[0].append(float(token_cpr[3]))
-            opr_perf[1].append(float(token_cmb[3]))
+            for i in range(len(dir_list)):
+                opr_perf[i].append(float(token[i][3]))
 
-    cpw_opr.close()
-    cmb_opr.close()
+    for i in range(len(dir_list)):
+        file_opr[i].close()
 
     rm_cnt = math.floor((100 - percent) / 100 * len(opr_perf[0]))
     for i in range(rm_cnt):
-        for j in range(2):
+        for j in range(len(file_list)):
             opr_perf[j].remove(max(opr_perf[j]))
 
     # plot
     x = np.arange(0, len(opr_perf[0]), 1)
-    cpw = np.array(opr_perf[0])
-    cmb = np.array(opr_perf[1])
+    y = [[] for i in range(len(dir_list))]
+    for i in range(len(dir_list)):
+        y[i] = np.array(opr_perf[i])
 
     fig, ax = plt.subplots()
-    ax.scatter(x, cpw, label="copy_on_write", s=1)
-    ax.scatter(x, cmb, label="cmb", s=1)
+    for i in range(len(dir_list)):
+        ax.scatter(x, y[i], label=dir_list[i], s=0.7)
 
     ax.set(xlabel='op#', ylabel='response time (ms)', title='Operation Response time')
     if FILE[0] == "A" or FILE[0] == "B" or FILE[0] == "C" or FILE[0] == "D" or FILE[0] == "F":
@@ -70,27 +77,34 @@ for FILE in file_list:
     fig.savefig(filename + '.png')
 
 #Plot Update
-update_perf = [[] for i in range(2)]
+update_perf = [[] for i in range(len(dir_list))]
 file_list = ["A.dat", "B.dat", "F.dat"]
 
 for FILE in file_list:
     # read opr.dat
-    cpw_opr = open("copy_on_write/" + FILE, "r")
-    cmb_opr = open("cmb/" + FILE, "r")
+    file_opr = [None] * len(dir_list)
+    for i in range(len(dir_list)):
+        file_opr[i] = open(dir_list[i] + "/" + FILE, "r")
+
     while True:
-        nstr_cpr = cpw_opr.readline()
-        nstr_cmb = cmb_opr.readline()
+        nstr = [None] * len(dir_list)
+        for i in range(len(dir_list)):
+            nstr[i] = file_opr[i].readline()
         # read until EOF
-        if len(nstr_cpr) == 0:
+        if len(nstr[0]) == 0:
             break
-        token_cpr = nstr_cpr.split('\t')
-        token_cmb = nstr_cmb.split('\t')
+
+        token = [None] * len(dir_list)
+        for i in range(len(dir_list)):
+            token[i] = nstr[i].split('\t')
+
         # Insert data
-        if(token_cpr[0] == 'u'):
-            update_perf[0].append(float(token_cpr[3]))
-            update_perf[1].append(float(token_cmb[3]))
-    cpw_opr.close()
-    cmb_opr.close()
+        if(token[0][0] == 'u'):
+            for i in range(len(dir_list)):
+                update_perf[i].append(float(token[i][3]))
+
+    for i in range(len(dir_list)):
+        file_opr[i].close()
 
 rm_cnt = math.floor((100 - percent) / 100 * len(update_perf[0]))
 for i in range(rm_cnt):
@@ -99,12 +113,13 @@ for i in range(rm_cnt):
 
 # plot update
 x = np.arange(0, len(update_perf[0]), 1)
-cpw = np.array(update_perf[0])
-cmb = np.array(update_perf[1])
+y = [[] for i in range(len(dir_list))]
+for i in range(len(dir_list)):
+    y[i] = np.array(update_perf[i])
 
 fig, ax = plt.subplots()
-ax.scatter(x, cpw, label="copy_on_write", s=1)
-ax.scatter(x, cmb, label="cmb", s=1)
+for i in range(len(dir_list)):
+    ax.scatter(x, y[i], label=dir_list[i], s=0.7)
 
 ax.set(xlabel='op#', ylabel='response time (ms)', title='Update Operation Response time')
 plt.title("update - " + str(percent) + "%")
