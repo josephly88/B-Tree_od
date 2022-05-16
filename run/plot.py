@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+from re import I
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
@@ -47,7 +48,7 @@ for FILE in file_list:
 
     rm_cnt = math.floor((100 - percent) / 100 * len(opr_perf[0]))
     for i in range(rm_cnt):
-        for j in range(len(file_list)):
+        for j in range(len(dir_list)):
             opr_perf[j].remove(max(opr_perf[j]))
 
     # plot
@@ -58,7 +59,7 @@ for FILE in file_list:
 
     fig, ax = plt.subplots()
     for i in range(len(dir_list)):
-        ax.scatter(x, y[i], label=dir_list[i], s=0.7)
+        ax.scatter(x, y[i], label=dir_list[i], s=0.5)
 
     ax.set(xlabel='op#', ylabel='response time (ms)', title='Operation Response time')
     if FILE[0] == "A" or FILE[0] == "B" or FILE[0] == "C" or FILE[0] == "D" or FILE[0] == "F":
@@ -66,11 +67,11 @@ for FILE in file_list:
     else:
         plt.title(FILE[:-4] + " - " + str(percent) + "%")
     plt.figtext(0.01, 0.96, "Overral latency: ", horizontalalignment='left')
-    plt.figtext(0.01, 0.93, "Copy-on-write - " + str(round(sum(opr_perf[0]),2)) + "ms", horizontalalignment='left')
-    plt.figtext(0.01, 0.90, "CMB - " + str(round(sum(opr_perf[1]), 2)) + "ms", horizontalalignment='left')
+    for i in range(len(dir_list)):
+        plt.figtext(0.01, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(opr_perf[i]),2)) + "ms", horizontalalignment='left')
     plt.figtext(0.70, 0.96, "Average latency: ", horizontalalignment='left')
-    plt.figtext(0.70, 0.93, "Copy-on-write - " + str(round(sum(opr_perf[0]) / len(opr_perf[0]),2)) + "ms", horizontalalignment='left')
-    plt.figtext(0.70, 0.90, "CMB - " + str(round(sum(opr_perf[1]) / len(opr_perf[1]), 2)) + "ms", horizontalalignment='left')
+    for i in range(len(dir_list)):
+        plt.figtext(0.70, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(opr_perf[i]),2)) + "ms", horizontalalignment='left')
     plt.legend(loc='upper left')
     ax.grid
     
@@ -108,7 +109,7 @@ for FILE in file_list:
 
 rm_cnt = math.floor((100 - percent) / 100 * len(update_perf[0]))
 for i in range(rm_cnt):
-    for j in range(2):
+    for j in range(len(dir_list)):
         update_perf[j].remove(max(update_perf[j]))
 
 # plot update
@@ -119,17 +120,17 @@ for i in range(len(dir_list)):
 
 fig, ax = plt.subplots()
 for i in range(len(dir_list)):
-    ax.scatter(x, y[i], label=dir_list[i], s=0.7)
+    ax.scatter(x, y[i], label=dir_list[i], s=0.5)
 
 ax.set(xlabel='op#', ylabel='response time (ms)', title='Update Operation Response time')
 plt.title("update - " + str(percent) + "%")
 if len(update_perf[0]) > 0:
     plt.figtext(0.01, 0.96, "Overral latency: ", horizontalalignment='left')
-    plt.figtext(0.01, 0.93, "Copy-on-write - " + str(round(sum(update_perf[0]),2)) + "ms", horizontalalignment='left')
-    plt.figtext(0.01, 0.90, "CMB - " + str(round(sum(update_perf[1]), 2)) + "ms", horizontalalignment='left')
+    for i in range(len(dir_list)):
+        plt.figtext(0.01, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(opr_perf[i]),2)) + "ms", horizontalalignment='left')
     plt.figtext(0.70, 0.96, "Average latency: ", horizontalalignment='left')
-    plt.figtext(0.70, 0.93, "Copy-on-write - " + str(round(sum(update_perf[0])/len(update_perf[0]),2)) + "ms", horizontalalignment='left')
-    plt.figtext(0.70, 0.90, "CMB - " + str(round(sum(update_perf[1])/len(update_perf[1]), 2)) + "ms", horizontalalignment='left')
+    for i in range(len(dir_list)):
+        plt.figtext(0.70, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(opr_perf[i]),2)) + "ms", horizontalalignment='left')
 plt.legend(loc='upper left')
 ax.grid
 
