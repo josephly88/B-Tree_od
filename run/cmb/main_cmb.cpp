@@ -31,9 +31,7 @@ int main(int argc, char** argv){
     BTree<TYPE>* t;
 
     srand(time(0));
-
-    //off_t cmb_addr = 0xc0000000;
-    off_t cmb_addr = 0x0;   // fake_cmb
+    
     int degree = 128;
     char* log_file = NULL;
     char* input_file = NULL;
@@ -85,7 +83,7 @@ int main(int argc, char** argv){
     else{
     // Create a new tree file
         cout << "Create file <" << tree_file << ">" << endl;
-        t = new BTree<TYPE>(tree_file, cmb_addr, degree);
+        t = new BTree<TYPE>(tree_file, degree);
     }
 
     t->stat();

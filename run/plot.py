@@ -2,19 +2,24 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
+import math
 
-file_list = sys.argv[1:]
+percent = 100.0
+file_list = ["A.dat", "B.dat", "C.dat", "D.dat", "F.dat", "insert.dat", "delete.dat"]
 
-if len(sys.argv) == 1:
+if len(sys.argv) == 2:
+    percent = float(sys.argv[1])
+else:
+    print("Usage: ./program (-p=NUMBER) {file ...}")
     sys.exit()
 
 # Plot per workload
-if len(sys.argv) == 2:
+for FILE in file_list:
     opr_perf = [[] for i in range(2)]
-    filename = sys.argv[1][:-4]
+    filename = FILE[:-4]
 
-    cpw_opr = open("copy_on_write/" + file_list[0], "r")
-    cmb_opr = open("cmb/" + file_list[0], "r")
+    cpw_opr = open("copy_on_write/" + FILE, "r")
+    cmb_opr = open("cmb/" + FILE, "r")
     while True:
         nstr_cpr = cpw_opr.readline()
         nstr_cmb = cmb_opr.readline()
@@ -30,9 +35,14 @@ if len(sys.argv) == 2:
         else:
             opr_perf[0].append(float(token_cpr[3]))
             opr_perf[1].append(float(token_cmb[3]))
-            
+
     cpw_opr.close()
     cmb_opr.close()
+
+    rm_cnt = math.floor((100 - percent) / 100 * len(opr_perf[0]))
+    for i in range(rm_cnt):
+        for j in range(2):
+            opr_perf[j].remove(max(opr_perf[j]))
 
     # plot
     x = np.arange(0, len(opr_perf[0]), 1)
@@ -44,7 +54,10 @@ if len(sys.argv) == 2:
     ax.scatter(x, cmb, label="cmb", s=1)
 
     ax.set(xlabel='op#', ylabel='response time (ms)', title='Operation Response time')
-    plt.title("Workload " + filename)
+    if FILE[0] == "A" or FILE[0] == "B" or FILE[0] == "C" or FILE[0] == "D" or FILE[0] == "F":
+        plt.title("Workload " + FILE[0] + " - " + str(percent) + "%")
+    else:
+        plt.title(FILE[:-4] + " - " + str(percent) + "%")
     plt.figtext(0.01, 0.96, "Overral latency: ", horizontalalignment='left')
     plt.figtext(0.01, 0.93, "Copy-on-write - " + str(round(sum(opr_perf[0]),2)) + "ms", horizontalalignment='left')
     plt.figtext(0.01, 0.90, "CMB - " + str(round(sum(opr_perf[1]), 2)) + "ms", horizontalalignment='left')
@@ -56,129 +69,53 @@ if len(sys.argv) == 2:
     
     fig.savefig(filename + '.png')
 
-#Plot per operation
-else:
-    insert_perf = [[] for i in range(2)]
-    read_perf = [[] for i in range(2)]
-    update_perf = [[] for i in range(2)]
-    delete_perf = [[] for i in range(2)]
+#Plot Update
+update_perf = [[] for i in range(2)]
+file_list = ["A.dat", "B.dat", "F.dat"]
 
-    for FILE in file_list:
-        # read opr.dat
-        cpw_opr = open("copy_on_write/" + FILE, "r")
-        cmb_opr = open("cmb/" + FILE, "r")
-        while True:
-            nstr_cpr = cpw_opr.readline()
-            nstr_cmb = cmb_opr.readline()
-            # read until EOF
-            if len(nstr_cpr) == 0:
-                break
-            token_cpr = nstr_cpr.split('\t')
-            token_cmb = nstr_cmb.split('\t')
-            # Insert data
-            if(token_cpr[0] == 'i'):
-                insert_perf[0].append(float(token_cpr[3]))
-                insert_perf[1].append(float(token_cmb[3]))
-            elif(token_cpr[0] == 'r'):
-                read_perf[0].append(float(token_cpr[3]))
-                read_perf[1].append(float(token_cmb[3]))
-            elif(token_cpr[0] == 'u'):
-                update_perf[0].append(float(token_cpr[3]))
-                update_perf[1].append(float(token_cmb[3]))
-            elif(token_cpr[0] == 'd'):
-                delete_perf[0].append(float(token_cpr[2]))
-                delete_perf[1].append(float(token_cmb[2]))
-        cpw_opr.close()
-        cmb_opr.close()
+for FILE in file_list:
+    # read opr.dat
+    cpw_opr = open("copy_on_write/" + FILE, "r")
+    cmb_opr = open("cmb/" + FILE, "r")
+    while True:
+        nstr_cpr = cpw_opr.readline()
+        nstr_cmb = cmb_opr.readline()
+        # read until EOF
+        if len(nstr_cpr) == 0:
+            break
+        token_cpr = nstr_cpr.split('\t')
+        token_cmb = nstr_cmb.split('\t')
+        # Insert data
+        if(token_cpr[0] == 'u'):
+            update_perf[0].append(float(token_cpr[3]))
+            update_perf[1].append(float(token_cmb[3]))
+    cpw_opr.close()
+    cmb_opr.close()
 
-    # plot insert
-    x = np.arange(0, len(insert_perf[0]), 1)
-    cpw = np.array(insert_perf[0])
-    cmb = np.array(insert_perf[1])
+rm_cnt = math.floor((100 - percent) / 100 * len(update_perf[0]))
+for i in range(rm_cnt):
+    for j in range(2):
+        update_perf[j].remove(max(update_perf[j]))
 
-    fig, ax = plt.subplots()
-    ax.scatter(x, cpw, label="copy_on_write", s=1)
-    ax.scatter(x, cmb, label="cmb", s=1)
+# plot update
+x = np.arange(0, len(update_perf[0]), 1)
+cpw = np.array(update_perf[0])
+cmb = np.array(update_perf[1])
 
-    ax.set(xlabel='op#', ylabel='response time (ms)', title='Insertion Operation Response time')
-    plt.title("Insertion")
-    if len(insert_perf[0]) > 0:
-        plt.figtext(0.01, 0.96, "Overral latency: ", horizontalalignment='left')
-        plt.figtext(0.01, 0.93, "Copy-on-write - " + str(round(sum(insert_perf[0]),2)) + "ms", horizontalalignment='left')
-        plt.figtext(0.01, 0.90, "CMB - " + str(round(sum(insert_perf[1]), 2)) + "ms", horizontalalignment='left')
-        plt.figtext(0.70, 0.96, "Average latency: ", horizontalalignment='left')
-        plt.figtext(0.70, 0.93, "Copy-on-write - " + str(round(sum(insert_perf[0])/len(insert_perf[0]),2)) + "ms", horizontalalignment='left')
-        plt.figtext(0.70, 0.90, "CMB - " + str(round(sum(insert_perf[1])/len(insert_perf[1]), 2)) + "ms", horizontalalignment='left')
-    plt.legend(loc='upper left')
-    ax.grid
+fig, ax = plt.subplots()
+ax.scatter(x, cpw, label="copy_on_write", s=1)
+ax.scatter(x, cmb, label="cmb", s=1)
 
-    fig.savefig('insert.png')
+ax.set(xlabel='op#', ylabel='response time (ms)', title='Update Operation Response time')
+plt.title("update - " + str(percent) + "%")
+if len(update_perf[0]) > 0:
+    plt.figtext(0.01, 0.96, "Overral latency: ", horizontalalignment='left')
+    plt.figtext(0.01, 0.93, "Copy-on-write - " + str(round(sum(update_perf[0]),2)) + "ms", horizontalalignment='left')
+    plt.figtext(0.01, 0.90, "CMB - " + str(round(sum(update_perf[1]), 2)) + "ms", horizontalalignment='left')
+    plt.figtext(0.70, 0.96, "Average latency: ", horizontalalignment='left')
+    plt.figtext(0.70, 0.93, "Copy-on-write - " + str(round(sum(update_perf[0])/len(update_perf[0]),2)) + "ms", horizontalalignment='left')
+    plt.figtext(0.70, 0.90, "CMB - " + str(round(sum(update_perf[1])/len(update_perf[1]), 2)) + "ms", horizontalalignment='left')
+plt.legend(loc='upper left')
+ax.grid
 
-    # plot read
-    x = np.arange(0, len(read_perf[0]), 1)
-    cpw = np.array(read_perf[0])
-    cmb = np.array(read_perf[1])
-
-    fig, ax = plt.subplots()
-    ax.scatter(x, cpw, label="copy_on_write", s=1)
-    ax.scatter(x, cmb, label="cmb", s=1)
-
-    ax.set(xlabel='op#', ylabel='response time (ms)', title='Read Operation Response time')
-    plt.title("Read")
-    if len(read_perf[0]) > 0:
-        plt.figtext(0.01, 0.96, "Overral latency: ", horizontalalignment='left')
-        plt.figtext(0.01, 0.93, "Copy-on-write - " + str(round(sum(read_perf[0]),2)) + "ms", horizontalalignment='left')
-        plt.figtext(0.01, 0.90, "CMB - " + str(round(sum(read_perf[1]), 2)) + "ms", horizontalalignment='left')
-        plt.figtext(0.70, 0.96, "Average latency: ", horizontalalignment='left')
-        plt.figtext(0.70, 0.93, "Copy-on-write - " + str(round(sum(read_perf[0])/len(read_perf[0]),2)) + "ms", horizontalalignment='left')
-        plt.figtext(0.70, 0.90, "CMB - " + str(round(sum(read_perf[1])/len(read_perf[1]), 2)) + "ms", horizontalalignment='left')
-    plt.legend(loc='upper left')
-    ax.grid
-
-    fig.savefig('read.png')
-
-    # plot update
-    x = np.arange(0, len(update_perf[0]), 1)
-    cpw = np.array(update_perf[0])
-    cmb = np.array(update_perf[1])
-
-    fig, ax = plt.subplots()
-    ax.scatter(x, cpw, label="copy_on_write", s=1)
-    ax.scatter(x, cmb, label="cmb", s=1)
-
-    ax.set(xlabel='op#', ylabel='response time (ms)', title='Update Operation Response time')
-    plt.title("Update")
-    if len(update_perf[0]) > 0:
-        plt.figtext(0.01, 0.96, "Overral latency: ", horizontalalignment='left')
-        plt.figtext(0.01, 0.93, "Copy-on-write - " + str(round(sum(update_perf[0]),2)) + "ms", horizontalalignment='left')
-        plt.figtext(0.01, 0.90, "CMB - " + str(round(sum(update_perf[1]), 2)) + "ms", horizontalalignment='left')
-        plt.figtext(0.70, 0.96, "Average latency: ", horizontalalignment='left')
-        plt.figtext(0.70, 0.93, "Copy-on-write - " + str(round(sum(update_perf[0])/len(update_perf[0]),2)) + "ms", horizontalalignment='left')
-        plt.figtext(0.70, 0.90, "CMB - " + str(round(sum(update_perf[1])/len(update_perf[1]), 2)) + "ms", horizontalalignment='left')
-    plt.legend(loc='upper left')
-    ax.grid
-
-    fig.savefig('update.png')
-
-    # plot delete
-    x = np.arange(0, len(delete_perf[0]), 1)
-    cpw = np.array(delete_perf[0])
-    cmb = np.array(delete_perf[1])
-
-    fig, ax = plt.subplots()
-    ax.scatter(x, cpw, label="copy_on_write", s=1)
-    ax.scatter(x, cmb, label="cmb", s=1)
-
-    ax.set(xlabel='op#', ylabel='response time (ms)', title='Delete Operation Response time')
-    plt.title("Deletion")
-    if len(delete_perf[0]) > 0:
-        plt.figtext(0.01, 0.96, "Overral latency: ", horizontalalignment='left')
-        plt.figtext(0.01, 0.93, "Copy-on-write - " + str(round(sum(delete_perf[0]),2)) + "ms", horizontalalignment='left')
-        plt.figtext(0.01, 0.90, "CMB - " + str(round(sum(delete_perf[1]), 2)) + "ms", horizontalalignment='left')
-        plt.figtext(0.70, 0.96, "Average latency: ", horizontalalignment='left')
-        plt.figtext(0.70, 0.93, "Copy-on-write - " + str(round(sum(delete_perf[0])/len(delete_perf[0]),2)) + "ms", horizontalalignment='left')
-        plt.figtext(0.70, 0.90, "CMB - " + str(round(sum(delete_perf[1])/len(delete_perf[1]), 2)) + "ms", horizontalalignment='left')
-    plt.legend(loc='upper left')
-    ax.grid
-
-    fig.savefig('delete.png')
+fig.savefig('update.png')
