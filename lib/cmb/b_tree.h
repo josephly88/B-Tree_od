@@ -17,6 +17,11 @@ using namespace std;
 #define MAP_SIZE 16384UL
 #define MAP_MASK (MAP_SIZE - 1)
 
+#define CMB_ADDR 0xC0000000
+
+enum mode {REAL_CMB, FAKE_CMB, DRAM};
+#define CUR_MODE DRAM
+
 template <typename T> class BTree;
 template <typename T> class BTreeNode;
 class CMB;
@@ -31,10 +36,9 @@ class BTree{
 	int block_size;
 	int block_cap;
 	CMB* cmb;
-	off_t cmb_addr;
 		
 	public:	
-		BTree(char* filename, off_t _cmb_addr, int degree);
+		BTree(char* filename, int degree);
 		~BTree();
 
 		void reopen(int _fd);
@@ -109,10 +113,9 @@ class CMB{
     void* cache_base;
 
 	public:
-		CMB(off_t _bar_addr);
+		CMB();
 		~CMB();
 
-		void* get_map_base();	
         void remap(off_t offset);
 
 		void read(void* buf, off_t offset, int size);
@@ -130,7 +133,7 @@ class removeList{
 };
 
 template <typename T>
-BTree<T>::BTree(char* filename, off_t _cmb_addr, int degree){
+BTree<T>::BTree(char* filename, int degree){
     mylog << "BTree()" << endl;
 
     if(degree > (int)((PAGE_SIZE - sizeof(BTreeNode<T>) - sizeof(u_int64_t)) / (sizeof(u_int64_t) + sizeof(T))) ){
@@ -144,7 +147,6 @@ BTree<T>::BTree(char* filename, off_t _cmb_addr, int degree){
     m = degree;
     block_cap = (block_size - sizeof(BTree)) * 8;
     root_id = 0;
-	cmb_addr = _cmb_addr;
 
     u_int8_t* buf = NULL;
     posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
@@ -158,7 +160,7 @@ BTree<T>::BTree(char* filename, off_t _cmb_addr, int degree){
     set_block_id(0, true);
     
 	// Map CMB
-	cmb = new CMB(cmb_addr);    
+	cmb = new CMB();    
     u_int64_t first_node_id = 1;
     cmb->write(0, &first_node_id, sizeof(u_int64_t));    
 }
@@ -174,7 +176,7 @@ template <typename T>
 void BTree<T>::reopen(int _fd){
     mylog << "reopen()" << endl;
 	fd = _fd;
-	cmb = new CMB(cmb_addr);
+	cmb = new CMB();
 }
 
 template <typename T>
@@ -1075,21 +1077,26 @@ removeList::~removeList(){
     }
 }
 
-CMB::CMB(off_t _bar_addr){
+CMB::CMB(){
     mylog << "CMB()" << endl;
 
-	//if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) == -1) FATAL;
-	//printf("\n/dev/mem opened.\n");
-    if ((fd = open("fake_cmb", O_RDWR | O_SYNC)) == -1) FATAL;    // fake_cmb
-	printf("\nfake_cmb opened.\n");
-    bar_addr = _bar_addr;
-
+    if (CUR_MODE == REAL_CMB){
+        if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) == -1) FATAL;
+        printf("\n/dev/mem opened.\n");
+        bar_addr = CMB_ADDR;
+    }
+    else if (CUR_MODE == FAKE_CMB || CUR_MODE == DRAM){
+        if ((fd = open("fake_cmb", O_RDWR | O_SYNC)) == -1) FATAL; 
+        printf("\nfake_cmb opened.\n");
+        bar_addr = 0;
+    }
+    
     map_idx = bar_addr & ~MAP_SIZE;
 
-	/* Map one page */
-	map_base = mmap(0, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, map_idx);
-	if (map_base == (void*)-1) FATAL;
-	printf("Memory mapped at address %p.\n", map_base);
+        /* Map one page */  
+    map_base = mmap(0, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, map_idx);
+    if (map_base == (void*)-1) FATAL;
+    printf("Memory mapped at address %p.\n", map_base);
 
     cache_base = malloc(MAP_SIZE);
     memcpy(cache_base, map_base, MAP_SIZE);
@@ -1097,7 +1104,10 @@ CMB::CMB(off_t _bar_addr){
 
 CMB::~CMB(){
     mylog << "~CMB()" << endl;
-    /* Unmap the previous */
+
+    if(CUR_MODE == DRAM)
+        memcpy(map_base, cache_base, MAP_SIZE);    
+
     if (munmap(map_base, MAP_SIZE) == -1) FATAL;
     free(cache_base);
 	close(fd);
@@ -1106,6 +1116,9 @@ CMB::~CMB(){
 void CMB::remap(off_t offset){
     if( ((bar_addr + offset) & ~MAP_MASK) != map_idx ){
         mylog << "remap() - offset:" << offset << endl;
+        if(CUR_MODE == DRAM)
+            memcpy(map_base, cache_base, MAP_SIZE);  
+
         map_idx = (bar_addr + offset) & ~MAP_MASK;
 
         /* Unmap the previous */
@@ -1131,16 +1144,14 @@ void CMB::write(off_t offset, void* buf, int size){
     mylog << "CMB.write() - offset:" << offset << endl;
     remap(offset);
 
-	void* virt_addr = (char*)map_base + ((bar_addr + offset) & MAP_MASK);	
-	memcpy(virt_addr, buf, size);
+    void* virt_addr;
+    if(CUR_MODE == REAL_CMB || CUR_MODE == FAKE_CMB){
+        virt_addr = (char*)map_base + ((bar_addr + offset) & MAP_MASK);	
+        memcpy(virt_addr, buf, size);
+    }
 
 	virt_addr = (char*)cache_base + ((offset) & MAP_MASK);	
 	memcpy(virt_addr, buf, size);
-}
-
-void* CMB::get_map_base(){
-    mylog << "get_map_base()" << endl;
-	return map_base;
 }
 
 #endif /* B_TREE_H */
