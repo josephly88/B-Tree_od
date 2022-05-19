@@ -309,6 +309,7 @@ void BTree<T>::print_used_block_id(){
     posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
     read(fd, buf, PAGE_SIZE);
 
+    int num_bk = 0;
     uint8_t* byte_ptr =  buf + sizeof(BTree);
     int id = 0;
     while(id < block_cap){
@@ -316,13 +317,14 @@ void BTree<T>::print_used_block_id(){
         for(int i = 0; i < 8; i++){
             if( (byte & 1) ){
                 mylog << " " << id;
+                num_bk++;
             }
             byte >>= 1;
             id++;
         }
         byte_ptr++;
     }
-    mylog << endl;
+    mylog << endl << "#Number of Used Block = " << num_bk << endl;
 
     free(buf);
 }
