@@ -92,12 +92,7 @@ int main(int argc, char** argv){
 
     // Has data file as input
     if(input_file){
-        cout << "Processing Input Operation from <" << input_file << "> ..." << endl;
-        mylog << "Processing Input Operation from <" << input_file << "> ..." << endl;
-        int recordcount = YCSB_data_file(input_file, (char*)"inter.dat");
-
-        ifstream ycsb_inter_file;
-        ycsb_inter_file.open("inter.dat");
+        YCSB_file *ycsb_file = new YCSB_file(input_file);
 
 		// Extract input filename
 		string input_file_str(input_file);
@@ -111,15 +106,15 @@ int main(int argc, char** argv){
 
         cout << "Operation Start!" << endl;
         mylog << "Operation Start!" << endl;
-        string line;
-        for(int i = 0; i < recordcount; i++){
-            // Extract data            
+        for(int i = 0; i < ycsb_file->get_recordcount(); i++){
+            // Extract data           
+            string line; 
             char op;
             u_int64_t key;
             TYPE val;
 
-            getline(ycsb_inter_file, line);
-            ycsb_lexi(line, &op, &key, val.str);
+            line = ycsb_file->readline();
+            ycsb_file->lexi(line, &op, &key, val.str);
 
             if(op == 'i'){
                 // Insert data
@@ -173,8 +168,7 @@ int main(int argc, char** argv){
         }
 	    cout << endl << "Done!" << endl;;
 
-        ycsb_inter_file.close();
-        remove("inter.dat");
+        delete ycsb_file;
         op_file.close();
 
         t->inorder_traversal((char*)"tree.dat");

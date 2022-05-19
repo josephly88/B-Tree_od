@@ -7,20 +7,25 @@
 #include <regex>
 using namespace std;
 
-// Only support 1 field count
+class YCSB_file{
 
-int YCSB_data_file(char* fileIn, char* fileOut){
-    ifstream ycsb_file(fileIn);    
-
-	ofstream processed;
-	processed.open(fileOut);
-
-    string line;
+	ifstream ycsb_file;
 	int recordcount;
 
-	// Skip properties, except for recordcount we take the number
-    while(true){
-        getline(ycsb_file, line);
+	public:
+		YCSB_file(char* fileIn);
+		~YCSB_file();
+		int get_recordcount();
+		string readline();
+		void lexi(string line, char *op, u_int64_t *key, char *val);
+};
+
+YCSB_file::YCSB_file(char* fileIn){
+	ycsb_file.open(fileIn);
+
+	string line;
+	while(true){
+		getline(ycsb_file, line);
 
 		if(line == "**********************************************")
 			break;
@@ -32,44 +37,44 @@ int YCSB_data_file(char* fileIn, char* fileOut){
 			regex regexp_cnt("[0-9]+");
 			regex_search(line, m, regexp_cnt);
 			string value(m[0]);
-			recordcount = stoi(value);
+			recordcount = stoi(value);	
 		}
 	}
+}
 
-	// For each record
-	for(int i = 0; i < recordcount; i++){
+YCSB_file::~YCSB_file(){
+	ycsb_file.close();
+}
 
-		getline(ycsb_file, line);
-
-		processed << (char) tolower(line[0]);	// Op code
-
-		smatch m;
-		
-		regex regexp_id("user[0-9]+");
-		regex_search(line, m, regexp_id);
-		string id(m[0]);
-		processed << id.erase(0,4) << '\t';	// Remove "user"
-
-		if(line[0] == 'I' || line[0] == 'U'){
-			regex regexp_val("field0=[\\w|\\W]*\\s]");
-			regex_search(line, m, regexp_val);
-			string val(m[0]);
-			processed << val.substr(7, val.length()-2-7); // Remove "field0=" and " ]"
-		}
-
-		processed << endl;
-		cout << " Processing OP#: " << i+1 << "\r";
-	}
-	for(int i = 0; i < 25; i++) cout << " ";
-	cout << "\r";
-
-    ycsb_file.close();
-	processed.close();
-
+int YCSB_file::get_recordcount(){
 	return recordcount;
 }
 
-void ycsb_lexi(string line, char *op, u_int64_t *key, char *val){
+string YCSB_file::readline(){
+	string line;
+	getline(ycsb_file, line);
+
+	string processed = "";
+	processed += (char) tolower(line[0]);
+	
+	smatch m;
+	regex regexp_id("user[0-9]+");
+	regex_search(line, m, regexp_id);
+	string id(m[0]);
+	processed += id.erase(0,4); 	// Remove "user"
+	processed += '\t';
+
+	if(line[0] == 'I' || line[0] == 'U'){
+		regex regexp_val("field0=[\\w|\\W]*\\s]");
+		regex_search(line, m, regexp_val);
+		string val(m[0]);
+		processed += val.substr(7, val.length()-2-7); // Remove "field0=" and " ]"
+	}
+
+	return processed;
+}
+
+void YCSB_file::lexi(string line, char *op, u_int64_t *key, char *val){
 	// Extract the opreation
 	*op = line[0];
 	
@@ -83,6 +88,5 @@ void ycsb_lexi(string line, char *op, u_int64_t *key, char *val){
 		strcpy(val, (char*) val_str.c_str());
 	}
 }
-
 
 #endif
