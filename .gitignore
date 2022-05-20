@@ -6,3 +6,4 @@ fake_cmb
 *.dat
 data/*.txt
 *.png
+run/cmb/fake_cmb

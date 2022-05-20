@@ -795,9 +795,9 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
     mylog << "split() - node id:" << spt_node_id << " parent node id:" << parent_id << endl;
     
     BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
-        delete [] node->key;
-        delete [] node->value;
-        delete [] node->child_id;
+    delete [] node->key;
+    delete [] node->value;
+    delete [] node->child_id;
     t->node_read(spt_node_id, node);
 
     BTreeNode<T>* parent = new BTreeNode<T>(0, 0, 0);
