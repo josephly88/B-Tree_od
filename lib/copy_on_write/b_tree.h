@@ -526,9 +526,9 @@ template <typename T>
 BTreeNode<T>::~BTreeNode(){
     mylog << "~BTreeNode()" << endl;
 
-    delete key;
-    delete value;
-    delete child_id;
+    delete [] key;
+    delete [] value;
+    delete [] child_id;
 }
 
 template <typename T>
