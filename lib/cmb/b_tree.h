@@ -148,8 +148,7 @@ BTree<T>::BTree(char* filename, int degree){
     block_cap = (block_size - sizeof(BTree)) * 8;
     root_id = 0;
 
-    u_int8_t* buf = NULL;
-    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
+    char* buf = (char*) malloc(PAGE_SIZE);
     memset(buf, 0, PAGE_SIZE);
     
     memcpy(buf, this, sizeof(BTree));
@@ -201,10 +200,11 @@ void BTree<T>::stat(){
 template <typename T>
 void BTree<T>::tree_read(int fd, BTree* tree){ 
     mylog << "tree_read()" << endl;
-    
-    uint8_t* buf = NULL;
+
     lseek(fd, 0, SEEK_SET);
-    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
+
+    char* buf = (char*) malloc(PAGE_SIZE);
+    memset(buf, 0, PAGE_SIZE);
     read(fd, buf, PAGE_SIZE);
     
     memcpy((void*)tree, buf, sizeof(BTree));
@@ -215,13 +215,14 @@ template <typename T>
 void BTree<T>::tree_write(int fd, BTree* tree){
     mylog << "tree_write()" << endl;
 
-    uint8_t* buf = NULL;
     lseek(fd, 0, SEEK_SET);
-    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
+
+    char* buf = (char*) malloc(PAGE_SIZE);
+    memset(buf, 0, PAGE_SIZE);
     read(fd, buf, PAGE_SIZE);
     
-    memcpy(buf, tree, sizeof(BTree));
     lseek(fd, 0, SEEK_SET);
+    memcpy(buf, tree, sizeof(BTree));
     write(fd, buf, PAGE_SIZE);
     free(buf);
 }
@@ -238,13 +239,14 @@ void BTree<T>::node_read(u_int64_t node_id, BTreeNode<T>* node){
 
 	u_int64_t block_id;
     cmb->read(&block_id, node_id * sizeof(u_int64_t), sizeof(u_int64_t));
-    
-    uint8_t* buf = NULL;
+
     lseek(fd, block_id * PAGE_SIZE, SEEK_SET);
-    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
+
+    char* buf = (char*) malloc(PAGE_SIZE);
+    memset(buf, 0, PAGE_SIZE);
     read(fd, buf, PAGE_SIZE);
 
-    uint8_t* ptr = buf;
+    char* ptr = buf;
     memcpy((void*)node, ptr, sizeof(BTreeNode<T>));
     ptr += sizeof(BTreeNode<T>);
 
@@ -276,10 +278,10 @@ void BTree<T>::node_write(u_int64_t node_id, BTreeNode<T>* node){
     u_int64_t block_id;
     cmb->read(&block_id, node_id * sizeof(u_int64_t), sizeof(u_int64_t));
 
-    uint8_t* buf = NULL;
-    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
+    char* buf = (char*) malloc(PAGE_SIZE);
+    memset(buf, 0, PAGE_SIZE);
 
-    uint8_t* ptr = buf;
+    char* ptr = buf;
     memcpy(ptr, node, sizeof(BTreeNode<T>));
     ptr += sizeof(BTreeNode<T>);
 
@@ -329,15 +331,16 @@ template <typename T>
 u_int64_t BTree<T>::get_free_block_id(){
     mylog << "get_free_block_id()" << endl;
 
-    uint8_t* buf = NULL;
     lseek(fd, 0, SEEK_SET);
-    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
+
+    char* buf = (char*) malloc(PAGE_SIZE);
+    memset(buf, 0, PAGE_SIZE);
     read(fd, buf, PAGE_SIZE);
 
-    uint8_t* byte_ptr =  buf + sizeof(BTree);
+    char* byte_ptr =  buf + sizeof(BTree);
     u_int64_t id = 0;
     while(id < block_cap){
-        uint8_t byte = *byte_ptr;
+        char byte = *byte_ptr;
         for(int i = 0; i < 8; i++){
             if( !(byte & 1) ){
                 free(buf);
@@ -359,12 +362,13 @@ void BTree<T>::set_block_id(u_int64_t block_id, bool bit){
 
     if(block_id >= block_cap) return;
 
-    uint8_t* buf = NULL;
     lseek(fd, 0, SEEK_SET);
-    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
+
+    char* buf = (char*) malloc(PAGE_SIZE);
+    memset(buf, 0, PAGE_SIZE);
     read(fd, buf, PAGE_SIZE);
 
-    uint8_t* byte_ptr =  buf + sizeof(BTree) + (block_id / 8);
+    char* byte_ptr =  buf + sizeof(BTree) + (block_id / 8);
 
     if(bit)
         *byte_ptr |= (1UL << (block_id % 8));
@@ -382,15 +386,16 @@ void BTree<T>::print_used_block_id(){
     mylog << "print_used_block_id()" << endl;
     mylog << "\tUsed Block : " << endl << "\t";
 
-    uint8_t* buf = NULL;
     lseek(fd, 0, SEEK_SET);
-    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
+
+    char* buf = (char*) malloc(PAGE_SIZE);
+    memset(buf, 0, PAGE_SIZE);
     read(fd, buf, PAGE_SIZE);
 
-    uint8_t* byte_ptr =  buf + sizeof(BTree);
+    char* byte_ptr =  buf + sizeof(BTree);
     int id = 0;
     while(id < block_cap){
-        uint8_t byte = *byte_ptr;
+        char byte = *byte_ptr;
         for(int i = 0; i < 8; i++){
             if( (byte & 1) ){
                 mylog << " " << id;
