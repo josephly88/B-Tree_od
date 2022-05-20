@@ -1,13 +1,14 @@
 #!/bin/bash
 
-LIST=('A' 'B' 'C' 'D' 'F' 'delete')
+INSERT='t_insert'
+LIST=('t_A' 't_B' 't_C' 't_D' 't_F' 't_delete')
 
 for FILE in ${LIST[*]};
 do
-    rm insert.dat
-    ./cmb_btree.out -i ../../data/insert.txt tree
-    ../verify.py insert.dat
+    rm $INSERT.dat
+    ./cmb_btree.out -i ../../data/$INSERT.txt tree
+    ../verify.py $INSERT.dat
     ./cmb_btree.out -i ../../data/$FILE.txt tree
-    ../verify.py insert.dat $FILE.dat
+    ../verify.py $INSERT.dat $FILE.dat
     rm -f expected.dat tree.dat tree
 done
