@@ -233,6 +233,10 @@ void BTree<T>::node_read(u_int64_t node_id, BTreeNode<T>* node){
         return;
     }
 
+    delete [] node->key;
+    delete [] node->value;
+    delete [] node->child_id;
+
 	u_int64_t block_id;
     cmb->read(&block_id, node_id * sizeof(u_int64_t), sizeof(u_int64_t));
 
@@ -608,9 +612,9 @@ template <typename T>
 BTreeNode<T>::~BTreeNode(){
     mylog << "~BTreeNode()" << endl;
     
-    delete key;
-    delete value;
-    delete child_id;
+    delete [] key;
+    delete [] value;
+    delete [] child_id;
 }
 
 template <typename T>
@@ -634,9 +638,6 @@ void BTreeNode<T>::display_tree(BTree<T>* t, int level){
     for(i = 0; i < num_key; i++){
         if(!is_leaf){
             BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
-            delete [] node->key;
-            delete [] node->value;
-            delete [] node->child_id;
             t->node_read(child_id[i], node);
             node->display_tree(t, level + 1);
             delete node;
@@ -646,9 +647,6 @@ void BTreeNode<T>::display_tree(BTree<T>* t, int level){
     }
     if(!is_leaf){
         BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
-        delete [] node->key;
-        delete [] node->value;
-        delete [] node->child_id;
         t->node_read(child_id[i], node);
         node->display_tree(t, level + 1);
         delete node;
@@ -663,9 +661,6 @@ void BTreeNode<T>::inorder_traversal(BTree<T>* t, ofstream &outFile){
     for(i = 0; i < num_key; i++){
         if(!is_leaf){
             BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
-            delete [] node->key;
-            delete [] node->value;
-            delete [] node->child_id;
             t->node_read(child_id[i], node);
             node->inorder_traversal(t, outFile);
             delete node;
@@ -674,9 +669,6 @@ void BTreeNode<T>::inorder_traversal(BTree<T>* t, ofstream &outFile){
     }
     if(!is_leaf){
         BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
-        delete [] node->key;
-        delete [] node->value;
-        delete [] node->child_id;
         t->node_read(child_id[i], node);
             node->inorder_traversal(t, outFile);
             delete node;
@@ -846,15 +838,9 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
     mylog << "split() - node id:" << spt_node_id << " parent node id:" << parent_id << endl;
     
     BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
-    delete [] node->key;
-    delete [] node->value;
-    delete [] node->child_id;
     t->node_read(spt_node_id, node);
 
     BTreeNode<T>* parent = new BTreeNode<T>(0, 0, 0);
-    delete [] parent->key;
-    delete [] parent->value;
-    delete [] parent->child_id;
     t->node_read(parent_id, parent);
 
     int new_node_id = t->get_free_node_id();
@@ -910,16 +896,10 @@ u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** 
     else{
         if(found){
             BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
-            delete [] node->key;
-            delete [] node->value;
-            delete [] node->child_id;
             t->node_read(child_id[i+1], node);
 
             int succ_id = node->get_succ(t);
-            BTreeNode<T>* succ = new BTreeNode<T>(0, 0, 0);
-            delete [] succ->key;
-            delete [] succ->value;
-            delete [] succ->child_id;             
+            BTreeNode<T>* succ = new BTreeNode<T>(0, 0, 0);  
             t->node_read(succ_id, succ);
 
             if(succ->num_key > min_num){
@@ -1112,9 +1092,6 @@ u_int64_t BTreeNode<T>::get_pred(BTree<T>* t){
         return node_id;
     else{
         BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
-        delete [] node->key;
-        delete [] node->value;
-        delete [] node->child_id;
         t->node_read(child_id[num_key], node);
         int ret = node->get_pred(t);
         delete node;
@@ -1130,9 +1107,6 @@ u_int64_t BTreeNode<T>::get_succ(BTree<T>* t){
         return node_id;
     else{
         BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
-        delete [] node->key;
-        delete [] node->value;
-        delete [] node->child_id;
         t->node_read(child_id[0], node);
         int ret = node->get_succ(t);
         delete node;
