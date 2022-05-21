@@ -411,9 +411,6 @@ void BTree<T>::display_tree(){
 
     if(root_id){
         BTreeNode<T>* root = new BTreeNode<T>(0, 0, 0);
-        delete [] root->key;
-        delete [] root->value;
-        delete [] root->child_id;
         node_read(root_id, root);
         root->display_tree(this, 0);
         delete root;
@@ -430,9 +427,6 @@ void BTree<T>::inorder_traversal(char* filename){
         ofstream outFile(filename);
 
         BTreeNode<T>* root = new BTreeNode<T>(0, 0, 0);
-        delete [] root->key;
-        delete [] root->value;
-        delete [] root->child_id;
         node_read(root_id, root);
         root->inorder_traversal(this, outFile);
         delete root;
@@ -447,9 +441,6 @@ void BTree<T>::search(u_int64_t _k, T* buf){
 
     if(root_id){
         BTreeNode<T>* root = new BTreeNode<T>(0, 0, 0);
-        delete [] root->key;
-        delete [] root->value;
-        delete [] root->child_id;
         node_read(root_id, root);
         root->search(this, _k, buf);
         delete root;
@@ -466,9 +457,6 @@ void BTree<T>::update(u_int64_t _k, T _v){
         removeList* rmlist = NULL;
 
         BTreeNode<T>* root = new BTreeNode<T>(0, 0, 0);
-        delete [] root->key;
-        delete [] root->value;
-        delete [] root->child_id;
         node_read(root_id, root);
         int dup_node_id = root->update(this, _k, _v, &rmlist);
 
@@ -499,9 +487,6 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
         removeList* rmlist = NULL;
 
         BTreeNode<T>* root = new BTreeNode<T>(0, 0, 0);
-        delete [] root->key;
-        delete [] root->value;
-        delete [] root->child_id;
         node_read(root_id, root);
         int dup_node_id = root->traverse_insert(this, _k, _v, &rmlist);
 
@@ -556,9 +541,6 @@ void BTree<T>::deletion(u_int64_t _k){
         removeList* rmlist = NULL;
 
         BTreeNode<T>* root = new BTreeNode<T>(0, 0, 0);
-        delete [] root->key;
-        delete [] root->value;
-        delete [] root->child_id;
         node_read(root_id, root);
         int dup_node_id = root->traverse_delete(this, _k, &rmlist);
 
@@ -688,9 +670,6 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf){
         if(_k < key[i]){
             if(!is_leaf){
                 BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
-                delete [] child->key;
-                delete [] child->value;
-                delete [] child->child_id;
                 t->node_read(child_id[i], child);
                 child->search(t, _k, buf);
                 delete child;
@@ -704,9 +683,6 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf){
 
     if(!is_leaf){
         BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
-        delete [] child->key;
-        delete [] child->value;
-        delete [] child->child_id;
         t->node_read(child_id[i], child);
         child->search(t, _k, buf);
         delete child;
@@ -738,9 +714,6 @@ u_int64_t BTreeNode<T>::update(BTree<T>* t, u_int64_t _k, T _v, removeList** lis
         return 0; // Not found
     else{
         BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
-        delete [] child->key;
-        delete [] child->value;
-        delete [] child->child_id;
         t->node_read(child_id[i], child);
         int dup_child_id = child->update(t, _k, _v, list);
 
@@ -772,9 +745,6 @@ u_int64_t BTreeNode<T>::traverse_insert(BTree<T>* t, u_int64_t _k, T _v, removeL
         }
         
         BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
-        delete [] child->key;
-        delete [] child->value;
-        delete [] child->child_id;
         t->node_read(child_id[i], child);
         int dup_child_id = child->traverse_insert(t, _k, _v, list);
 
@@ -918,10 +888,7 @@ u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** 
                 t->node_read(child_id[i], node);
 
                 int pred_id = node->get_pred(t);
-                BTreeNode<T>* pred = new BTreeNode<T>(0, 0, 0);
-                delete [] pred->key;
-                delete [] pred->value;
-                delete [] pred->child_id;          
+                BTreeNode<T>* pred = new BTreeNode<T>(0, 0, 0);    
                 t->node_read(pred_id, pred);
 
                 // Borrow from pred
@@ -944,9 +911,6 @@ u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** 
         }
         else{
             BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
-            delete [] child->key;
-            delete [] child->value;
-            delete [] child->child_id;  
             t->node_read(child_id[i], child);
 
             int dup_child_id = child->traverse_delete(t, _k, list);
@@ -1004,15 +968,9 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
     mylog << "rebalance() - node id:" << child_id[idx] << endl;
 
     BTreeNode<T>* left = new BTreeNode<T>(0, 0, 0);
-    delete [] left->key;
-    delete [] left->value;
-    delete [] left->child_id;
     if(idx - 1 >= 0)
         t->node_read(child_id[idx - 1], left);
     BTreeNode<T>* right = new BTreeNode<T>(0, 0, 0);
-    delete [] right->key;
-    delete [] right->value;
-    delete [] right->child_id;
     if(idx + 1 <= num_key)
         t->node_read(child_id[idx + 1], right);
     int trans_node_id;
