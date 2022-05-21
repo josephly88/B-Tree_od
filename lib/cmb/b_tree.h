@@ -129,7 +129,6 @@ class removeList{
 		removeList* next;
 
 		removeList(int _id, removeList* _next);
-		~removeList();
 };
 
 template <typename T>
@@ -475,12 +474,14 @@ void BTree<T>::update(u_int64_t _k, T _v){
         }
 
         if(rmlist){
-            removeList* rmlist_itr = rmlist;
-            while(rmlist_itr != NULL){
-                set_block_id(rmlist_itr->id, false);
-                rmlist_itr = rmlist_itr->next;
+            removeList* cur = rmlist;
+            removeList* next = NULL;
+            while(cur != NULL){
+                next = cur->next;
+                set_block_id(cur->id, false);
+                delete cur;
+                cur = next;
             }
-            delete rmlist;
         }
         delete root;
     }
@@ -519,12 +520,14 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
             delete new_root;
         }
         if(rmlist){
-            removeList* rmlist_itr = rmlist;
-            while(rmlist_itr != NULL){
-                set_block_id(rmlist_itr->id, false);
-                rmlist_itr = rmlist_itr->next;
+            removeList* cur = rmlist;
+            removeList* next = NULL;
+            while(cur != NULL){
+                next = cur->next;
+                set_block_id(cur->id, false);
+                delete cur;
+                cur = next;
             }
-            delete rmlist;
         }
         delete root;
 
@@ -572,12 +575,14 @@ void BTree<T>::deletion(u_int64_t _k){
             tree_write(fd, this);
         } 
         if(rmlist){
-            removeList* rmlist_itr = rmlist;
-            while(rmlist_itr != NULL){
-                set_block_id(rmlist_itr->id, false);
-                rmlist_itr = rmlist_itr->next;
+            removeList* cur = rmlist;
+            removeList* next = NULL;
+            while(cur != NULL){
+                next = cur->next;
+                set_block_id(cur->id, false);
+                delete cur;
+                cur = next;
             }
-            delete rmlist;
         }
         delete root;          
     }
@@ -1138,12 +1143,6 @@ u_int64_t BTreeNode<T>::get_succ(BTree<T>* t){
 removeList::removeList(int _id, removeList* _next){
     id = _id;
     next = _next;
-}
-
-removeList::~removeList(){
-    if(next){
-        delete next;
-    }
 }
 
 CMB::CMB(){
