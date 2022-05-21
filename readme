@@ -1,0 +1,21 @@
+auto_run.sh
+- Modify $num
+- Modify $YCSB_PATH
+- Modify $RESULT_PATH
+
+data/property_ycsb
+- Modify recordcount
+- Modify opreationcount
+
+run/copy_on_write/auto_cpw.sh
+- Modify $num
+- Modify $SSD_PATH
+- Modify $RESULT_PATH
+
+run/copy_on_write/auto_cmb.sh
+- Modify $num
+- Modify $SSD_PATH
+- Modify $RESULT_PATH
+
+plot.py
+- Modify num

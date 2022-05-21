@@ -5,9 +5,11 @@ import matplotlib.pyplot as plt
 import sys
 import math
 
+num = "_1k"
+
 percent = 100.0
-dir_list = ["copy_on_write", "cmb", "dram"]
-file_list = ["A.dat", "B.dat", "C.dat", "D.dat", "F.dat", "insert.dat", "delete.dat"]
+dir_list = ["copy_on_write", "cmb"]
+file_list = ["A"+num+".dat", "B"+num+".dat", "C"+num+".dat", "D"+num+".dat", "F"+num+".dat", "insert"+num+".dat", "delete"+num+".dat"]
 
 if len(sys.argv) == 2:
     percent = float(sys.argv[1])
@@ -79,7 +81,7 @@ for FILE in file_list:
 
 #Plot Update
 update_perf = [[] for i in range(len(dir_list))]
-file_list = ["A.dat", "B.dat", "F.dat"]
+file_list = ["A"+num+".dat", "B"+num+".dat", "F"+num+".dat"]
 
 for FILE in file_list:
     # read opr.dat
