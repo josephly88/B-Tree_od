@@ -108,7 +108,8 @@ BTree<T>::BTree(char* filename, int degree){
     block_cap = (block_size - sizeof(BTree)) * 8;
     root_id = 0;
     
-    char* buf = (char*) calloc(1, PAGE_SIZE);
+    char* buf;
+    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
     
     memcpy(buf, this, sizeof(BTree));
     write(fd, buf, PAGE_SIZE);
@@ -156,7 +157,8 @@ void BTree<T>::tree_read(int fd, BTree* tree){
 
     lseek(fd, 0, SEEK_SET);
 
-    char* buf = (char*) calloc(1, PAGE_SIZE);
+    char* buf;
+    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
     read(fd, buf, PAGE_SIZE);
     
     memcpy((void*)tree, buf, sizeof(BTree));
@@ -168,7 +170,8 @@ void BTree<T>::tree_write(int fd, BTree* tree){
     mylog << "tree_write()" << endl;
 
     lseek(fd, 0, SEEK_SET);
-    char* buf = (char*) calloc(1, PAGE_SIZE);
+    char* buf;
+    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
     read(fd, buf, PAGE_SIZE);
     
     lseek(fd, 0, SEEK_SET);
@@ -193,7 +196,8 @@ void BTree<T>::node_read(u_int64_t block_id, BTreeNode<T>* node){
 
     lseek(fd, block_id * PAGE_SIZE, SEEK_SET);
 
-    char* buf = (char*) calloc(1, PAGE_SIZE);
+    char* buf;
+    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
     read(fd, buf, PAGE_SIZE);
 
     char* ptr = buf;
@@ -225,7 +229,8 @@ void BTree<T>::node_write(u_int64_t block_id, BTreeNode<T>* node){
         return;
     }
 
-    char* buf = (char*) calloc(1, PAGE_SIZE);
+    char* buf;
+    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
 
     char* ptr = buf;
     memcpy(ptr, node, sizeof(BTreeNode<T>));
@@ -252,7 +257,8 @@ u_int64_t BTree<T>::get_free_block_id(){
 
     lseek(fd, 0, SEEK_SET);
 
-    char* buf = (char*) calloc(1, PAGE_SIZE);
+    char* buf;
+    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
     read(fd, buf, PAGE_SIZE);
 
     char* byte_ptr =  buf + sizeof(BTree);
@@ -282,7 +288,8 @@ void BTree<T>::set_block_id(u_int64_t block_id, bool bit){
 
     lseek(fd, 0, SEEK_SET);
 
-    char* buf = (char*) calloc(1, PAGE_SIZE);
+    char* buf;
+    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
     read(fd, buf, PAGE_SIZE);
 
     char* byte_ptr =  buf + sizeof(BTree) + (block_id / 8);
@@ -305,7 +312,8 @@ void BTree<T>::print_used_block_id(){
 
     lseek(fd, 0, SEEK_SET);
 
-    char* buf = (char*) calloc(1, PAGE_SIZE);
+    char* buf;
+    posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
     read(fd, buf, PAGE_SIZE);
 
     int num_bk = 0;
