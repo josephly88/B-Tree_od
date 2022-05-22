@@ -70,10 +70,10 @@ int main(int argc, char **argv) {
 
     file_map_idx = file_target & ~MAP_MASK;
 
-
-	for(int i = 0; i < BAR_SIZE / sizeof(u_int64_t); i+=sizeof(u_int64_t)){
-		target += i;
-		file_target += i;
+    printf("\n");
+	for(int i = 0; i < BAR_SIZE / sizeof(u_int64_t); i++){
+		target = addr + i * sizeof(u_int64_t);
+		file_target = i * sizeof(u_int64_t);
        
         if(target & ~MAP_MASK != map_idx){
             /* Map one page */
@@ -97,14 +97,22 @@ int main(int argc, char **argv) {
 
         if(argv[2][0] == 'c'){
            *((u_int64_t *) file_virt_addr) = *((u_int64_t *) virt_addr);  
+           printf("\rCopying cmb to file: %f%%", (double)i / (BAR_SIZE / sizeof(u_int64_t)) * 100);
         }
         
         if(argv[2][0] == 'p'){
            *((u_int64_t *) virt_addr) = *((u_int64_t *) file_virt_addr);  
+           printf("\rCopying file to cmb: %f%%", (double)i / (BAR_SIZE / sizeof(u_int64_t)) * 100);
         }
-
-
 	}
+
+    if(argv[2][0] == 'c'){
+       printf("\rCopying cmb to file: %f%%\n", (double)1 / 1 * 100);
+    }
+    if(argv[2][0] == 'p'){
+       printf("\rCopying file to cmb: %f%%\n", (double)1 / 1 * 100);
+    }
+
 	if(munmap(map_base, MAP_SIZE) == -1) FATAL;
 	if(munmap(file_map_base, MAP_SIZE) == -1) FATAL;
 	
