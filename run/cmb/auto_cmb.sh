@@ -1,11 +1,11 @@
 #!/bin/bash
 
-num="_1k"   # MODIFT
+num="_10M"   # MODIFT
 SSD_PATH="/media/nvme"  # MODIFT
 RESULT_PATH="/home/meteor/Documents/Result/10M/copy_on_write"  # MODIFT
 
 INSERT='insert'$num
-LIST=('A'$num 'B'$num 'C'$num 'D'$num 'F'$num 'delete'$num)
+LIST=('read_and_update'$num 'delete'$num)
 
 rm -f $SSD_PATH/tree
 
@@ -27,3 +27,4 @@ do
 done
 
 rm *.dat inst_tree
+rm $SSD_PATH/tree

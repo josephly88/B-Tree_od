@@ -31,8 +31,8 @@ YCSB_file::YCSB_file(char* fileIn){
 			break;
 
 		string item(line);
-		item = item.substr(1, 11);
-		if(item == "recordcount"){
+		item = item.substr(1, 14);
+		if(item == "operationcount"){
 			smatch m;
 			regex regexp_cnt("[0-9]+");
 			regex_search(line, m, regexp_cnt);

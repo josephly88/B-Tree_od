@@ -1,11 +1,11 @@
 #!/bin/bash
 
-num="_1k"   # MODIFT
-SSD_PATH="/mnt/c/Users/s1155095176/Documents/GitHub/fake_SSD"  # MODIFT
-RESULT_PATH="/home/meteor/GitHub/Result/fake_phase/copy_on_write"  # MODIFT
+num="_10M"   # MODIFT
+SSD_PATH="/media/nvme"  # MODIFT
+RESULT_PATH="/home/meteor/Documents/Result/10M/copy_on_write"  # MODIFT
 
 INSERT='insert'$num
-LIST=('A'$num 'B'$num 'C'$num 'D'$num 'F'$num 'delete'$num)
+LIST=('read_and_update'$num 'delete'$num)
 
 rm -f $SSD_PATH/tree
 
@@ -24,4 +24,6 @@ do
     rm -f expected.dat tree.dat
 done
 
-rm *.dat inst_tree
+mv inst_tree $RESULT_PATH/..
+rm *.dat
+rm $SSD_PATH/tree

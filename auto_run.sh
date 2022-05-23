@@ -1,31 +1,35 @@
 #!/bin/bash
 
-num="_1k"   # MODIFT
+num="_10M"   # MODIFT
 
 DIR=`pwd`
-YCSB_PATH="/home/meteor/YCSB/"  # MODIFY
-RESULT_PATH="/home/meteor/GitHub/Result/fake_phase/" # MODIFY
+YCSB_PATH="/home/meteor/Documents/YCSB/"  # MODIFY
+RESULT_PATH="/home/meteor/Documents/Result/10M/" # MODIFY
 
-cd $YCSB_PATH
-./bin/ycsb load basic -P workloads/workloada -P $DIR/data/property_ycsb > $DIR/data/insert$num.txt
-./bin/ycsb run basic -P workloads/workloada -P $DIR/data/property_ycsb > $DIR/data/A$num.txt
-./bin/ycsb run basic -P workloads/workloadb -P $DIR/data/property_ycsb > $DIR/data/B$num.txt
-./bin/ycsb run basic -P workloads/workloadc -P $DIR/data/property_ycsb > $DIR/data/C$num.txt
-./bin/ycsb run basic -P workloads/workloadd -P $DIR/data/property_ycsb > $DIR/data/D$num.txt
-./bin/ycsb run basic -P workloads/workloadf -P $DIR/data/property_ycsb > $DIR/data/F$num.txt
-cd $DIR
+YCSB() {
+    cd $YCSB_PATH
+    ./bin/ycsb load basic -P $DIR/data/workloadc > $DIR/data/insert$num.txt
+    ./bin/ycsb run basic -P $DIR/data/workloadc > $DIR/data/C$num.txt
+    ./bin/ycsb run basic -P $DIR/data/workload_read_update > $DIR/data/read_and_update$num.txt
+    cd $DIR
 
-./data/delete_gen.sh ./data/C$num.txt > ./data/delete$num.txt
+    ./data/delete_gen.sh ./data/C$num.txt > ./data/delete$num.txt
+}
 
-cd run/copy_on_write
-./auto_cpw.sh
+copy_on_write_run() {
+    cd $DIR
+    cd run/copy_on_write
+    make
+    ./auto_cpw.sh
+}
 
-cd ../cmb
-./auto_cmb.sh
+cmb_run() {
+    cd $DIR
+    cd run/cmb
+    make
+    ./auto_cmb.sh
+}
 
-cd $DIR
-cp plot.py $RESULT_PATH
-cd $RESULT_PATH
-./plot.py 100
-rm plot.py
-cd $DIR
+#YCSB
+copy_on_write_run
+cmb_run
