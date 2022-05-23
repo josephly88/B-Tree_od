@@ -36,6 +36,8 @@ int main(int argc, char** argv){
     char* log_file = NULL;
     char* input_file = NULL;
     char* tree_file = NULL;
+    int start = 0;
+    int end = 0;
 
     if(argc < 2){
         usage();
@@ -54,6 +56,11 @@ int main(int argc, char** argv){
             else if(strcmp(argv[i], "-i") == 0){
                 input_file = argv[i+1];
                 i++;
+            }
+            else if(strcmp(argv[i], "-r") == 0){
+                start = atoi(argv[i+1]);
+                end = atoi(argv[i+2]);
+                i += 2;
             }
             else{
                 tree_file = argv[i];
@@ -104,6 +111,11 @@ int main(int argc, char** argv){
         ofstream op_file;
         op_file.open(op_file_name + ".dat", ios_base::app);
 
+        if(start == 0 && end == 0){
+            start = 0;
+            end = ycsb_file->get_recordcount();
+        }
+
         cout << "Operation Start!" << endl;
         mylog << "Operation Start!" << endl;
         for(int i = 0; i < ycsb_file->get_recordcount(); i++){
@@ -115,6 +127,11 @@ int main(int argc, char** argv){
 
             line = ycsb_file->readline();
             ycsb_file->lexi(line, &op, &key, val.str);
+
+            if(i < start)
+                continue;
+            if(i >= end)
+                break;
 
             if(op == 'i'){
                 // Insert data
