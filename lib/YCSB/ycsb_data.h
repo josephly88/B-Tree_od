@@ -17,6 +17,7 @@ class YCSB_file{
 		~YCSB_file();
 		int get_recordcount();
 		string readline();
+        void skipline();
 		void lexi(string line, char *op, u_int64_t *key, char *val);
 };
 
@@ -48,6 +49,11 @@ YCSB_file::~YCSB_file(){
 
 int YCSB_file::get_recordcount(){
 	return recordcount;
+}
+
+void YCSB_file::skipline(){
+    string line;
+    getline(ycsb_file, line);
 }
 
 string YCSB_file::readline(){

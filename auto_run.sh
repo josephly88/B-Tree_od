@@ -1,6 +1,6 @@
 #!/bin/bash
 
-num="_10M"   # MODIFT
+num="_200K"   # MODIFT
 
 DIR=`pwd`
 YCSB_PATH="/home/meteor/Documents/YCSB/"  # MODIFY
@@ -16,20 +16,4 @@ YCSB() {
     ./data/delete_gen.sh ./data/C$num.txt > ./data/delete$num.txt
 }
 
-copy_on_write_run() {
-    cd $DIR
-    cd run/copy_on_write
-    make
-    ./auto_cpw.sh
-}
-
-cmb_run() {
-    cd $DIR
-    cd run/cmb
-    make
-    ./auto_cmb.sh
-}
-
-#YCSB
-copy_on_write_run
-cmb_run
+YCSB
