@@ -189,8 +189,9 @@ int main(int argc, char** argv){
         delete ycsb_file;
         op_file.close();
 
-        t->inorder_traversal((char*)"tree.dat");
     }
+
+    t->inorder_traversal((char*)"tree.dat");
 
     mylog.close();
 
