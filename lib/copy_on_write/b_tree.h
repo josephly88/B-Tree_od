@@ -785,12 +785,13 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
     if(!node->is_leaf)
         new_node->child_id[j] = node->child_id[i];
 
-    node->node_id = t->get_free_block_id();            
+    *list = new removeList(node->node_id, *list);
+    node->node_id = t->get_free_block_id();     
+
     int dup_par_id = parent->direct_insert(t, node->key[min_num], node->value[min_num], list, node->node_id, new_node_id);
-    node->num_key = min_num;    
-    
-    *list = new removeList(spt_node_id, *list);
-    *list = new removeList(parent_id, *list);
+    node->num_key = min_num;
+
+    //*list = new removeList(parent_id, *list);
 
     t->node_write(node->node_id, node);
     t->node_write(new_node_id, new_node);

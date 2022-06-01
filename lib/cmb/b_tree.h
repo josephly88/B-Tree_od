@@ -20,7 +20,7 @@ using namespace std;
 #define CMB_ADDR 0xC0000000
 
 enum mode {REAL_CMB, FAKE_CMB, DRAM};
-#define CUR_MODE REAL_CMB
+#define CUR_MODE FAKE_CMB
 
 template <typename T> class BTree;
 template <typename T> class BTreeNode;
@@ -51,7 +51,7 @@ class BTree{
 		void node_read(u_int64_t node_id, BTreeNode<T>* node);
 		void node_write(u_int64_t node_id, BTreeNode<T>* node);
 
-		u_int64_t get_free_node_id();
+		u_int64_t get_new_node_id();
 
 		u_int64_t get_block_id(u_int64_t node_id);
 		void update_node_id(u_int64_t node_id, u_int64_t block_id);
@@ -175,6 +175,7 @@ template <typename T>
 void BTree<T>::reopen(int _fd){
     mylog << "reopen()" << endl;
 	fd = _fd;
+    tree_write(fd, this);
 	cmb = new CMB();
 }
 
@@ -305,15 +306,15 @@ void BTree<T>::node_write(u_int64_t node_id, BTreeNode<T>* node){
 }
 
 template <typename T>
-u_int64_t BTree<T>::get_free_node_id(){
-    mylog << "get_free_node_id()" << endl;
+u_int64_t BTree<T>::get_new_node_id(){
+    mylog << "get_new_node_id()" << endl;
 
-    u_int64_t free_node_id;
-    cmb->read(&free_node_id, 0, sizeof(u_int64_t));
-    u_int64_t next_node_id = free_node_id + 1;
+    u_int64_t new_node_id;
+    cmb->read(&new_node_id, 0, sizeof(u_int64_t));
+    u_int64_t next_node_id = new_node_id + 1;
     cmb->write(0, &next_node_id, sizeof(u_int64_t));
 
-    return free_node_id;
+    return new_node_id;
 }
 
 template <typename T>
@@ -396,6 +397,7 @@ void BTree<T>::print_used_block_id(){
     posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
     read(fd, buf, PAGE_SIZE);
 
+    int num_bk = 0;
     char* byte_ptr =  buf + sizeof(BTree);
     int id = 0;
     while(id < block_cap){
@@ -403,20 +405,21 @@ void BTree<T>::print_used_block_id(){
         for(int i = 0; i < 8; i++){
             if( (byte & 1) ){
                 mylog << " " << id;
+                num_bk++;
             }
             byte >>= 1;
             id++;
         }
         byte_ptr++;
     }
-    mylog << endl;
+    mylog << endl << "#Number of Used Block = " << num_bk << endl;
 
     free(buf);
 }
 
 template <typename T>
 void BTree<T>::display_tree(){
-    mylog << "display_tree()" << endl;
+    cout << "display_tree()" << endl;
 
     if(root_id){
         BTreeNode<T>* root = new BTreeNode<T>(0, 0, 0);
@@ -425,12 +428,12 @@ void BTree<T>::display_tree(){
         delete root;
     }
     else
-        mylog << " The tree is empty! " << endl;
+        cout << " The tree is empty! " << endl;
 }
 
 template <typename T>
 void BTree<T>::inorder_traversal(char* filename){
-    mylog << "inorder_traversal()" << endl;
+    mylog << endl << "inorder_traversal()" << endl;
 
     if(root_id){
         ofstream outFile(filename);
@@ -506,7 +509,7 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
 
         node_read(root_id, root);
         if(root->num_key >= m){  
-            int new_root_id = get_free_node_id();
+            int new_root_id = get_new_node_id();
             update_node_id(new_root_id, get_free_block_id());
             BTreeNode<T>* new_root = new BTreeNode<T>(m, false, new_root_id);
             node_write(new_root_id, new_root);
@@ -531,7 +534,7 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
 
     }
     else{
-        root_id = get_free_node_id();
+        root_id = get_new_node_id();
         update_node_id(root_id, get_free_block_id());
         tree_write(fd, this); 
 
@@ -620,10 +623,10 @@ void BTreeNode<T>::stat(){
 
 template <typename T>
 void BTreeNode<T>::display_tree(BTree<T>* t, int level){
-    mylog << "display_tree()" << endl;
+    cout << "display_tree()" << endl;
 
-    for(int j = 0; j < level; j++) mylog << '\t';
-        mylog << '[' << node_id << "=>" << t->get_block_id(node_id) << ']' << endl;;
+    for(int j = 0; j < level; j++) cout << '\t';
+        cout << '[' << node_id << "=>" << t->get_block_id(node_id) << ']' << endl;
 
     int i = 0;
     for(i = 0; i < num_key; i++){
@@ -633,8 +636,8 @@ void BTreeNode<T>::display_tree(BTree<T>* t, int level){
             node->display_tree(t, level + 1);
             delete node;
         }
-        for(int j = 0; j < level; j++) mylog << '\t';
-        mylog << key[i] << endl;;
+        for(int j = 0; j < level; j++) cout << '\t';
+        cout << key[i] << endl;;
     }
     if(!is_leaf){
         BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
@@ -763,9 +766,8 @@ u_int64_t BTreeNode<T>::traverse_insert(BTree<T>* t, u_int64_t _k, T _v, removeL
         }
                 
         t->node_read(child_id[i], child);
-        if(child->num_key >= m){
+        if(child->num_key >= m)
             node_id = split(t, child_id[i], node_id, list);
-        }
 
         delete child;
 
@@ -822,7 +824,7 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
     BTreeNode<T>* parent = new BTreeNode<T>(0, 0, 0);
     t->node_read(parent_id, parent);
 
-    int new_node_id = t->get_free_node_id();
+    int new_node_id = t->get_new_node_id();
     t->update_node_id(new_node_id, t->get_free_block_id());
     BTreeNode<T>* new_node = new BTreeNode<T>(m, node->is_leaf, new_node_id);
 
@@ -838,10 +840,10 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
         new_node->child_id[j] = node->child_id[i];
 
     *list = new removeList(t->get_block_id(node->node_id), *list);
-
     t->update_node_id(node->node_id, t->get_free_block_id());
+
     int dup_par_id = parent->direct_insert(t, node->key[min_num], node->value[min_num], list, node->node_id, new_node_id);
-    node->num_key = min_num;    
+    node->num_key = min_num;
 
     t->node_write(node->node_id, node);
     t->node_write(new_node_id, new_node);
@@ -878,7 +880,7 @@ u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** 
             t->node_read(child_id[i+1], node);
 
             int succ_id = node->get_succ(t);
-            BTreeNode<T>* succ = new BTreeNode<T>(0, 0, 0);  
+            BTreeNode<T>* succ = new BTreeNode<T>(0, 0, 0);
             t->node_read(succ_id, succ);
 
             if(succ->num_key > min_num){
@@ -897,7 +899,7 @@ u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** 
                 t->node_read(child_id[i], node);
 
                 int pred_id = node->get_pred(t);
-                BTreeNode<T>* pred = new BTreeNode<T>(0, 0, 0);    
+                BTreeNode<T>* pred = new BTreeNode<T>(0, 0, 0);
                 t->node_read(pred_id, pred);
 
                 // Borrow from pred
@@ -1014,7 +1016,7 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             // Borrow from right
         key[idx] = right->key[0];
         value[idx] = right->value[0];
-            // Delete form left
+            // Delete from left
         child_id[idx+1] = right->direct_delete(t, key[idx], list);
 
         *list = new removeList(t->get_block_id(node_id), *list);
