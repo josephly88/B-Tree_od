@@ -125,6 +125,14 @@ int main(int argc, char** argv){
             u_int64_t key;
             TYPE val;
 
+            if(i < start){
+                cout << '\r' << "OP#" << i+1 << " - Skip";
+                ycsb_file->skipline();
+                continue;
+            }
+            if(i >= end)
+                break;
+
             line = ycsb_file->readline();
             ycsb_file->lexi(line, &op, &key, val.str);
 
@@ -188,8 +196,9 @@ int main(int argc, char** argv){
         delete ycsb_file;
         op_file.close();
 
-        t->inorder_traversal((char*)"tree.dat");
     }
+
+    t->inorder_traversal((char*)"tree.dat");
 
     mylog.close();
 

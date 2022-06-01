@@ -116,6 +116,7 @@ class CMB{
 		CMB();
 		~CMB();
 
+        void cmb_memcpy(void* dest, void* src, size_t len);
         void remap(off_t offset);
 
 		void read(void* buf, off_t offset, int size);
@@ -1108,7 +1109,11 @@ CMB::CMB(){
     printf("Memory mapped at address %p.\n", map_base);
 
     cache_base = malloc(MAP_SIZE);
-    memcpy(cache_base, map_base, MAP_SIZE);
+
+    u_int64_t* dest = (u_int64_t*) cache_base;
+    u_int64_t* src = (u_int64_t*) map_base;
+    for(int i = 0; i < MAP_SIZE / sizeof(u_int64_t); i++)
+        *dest++ = *src++;
 }
 
 CMB::~CMB(){
@@ -1120,6 +1125,14 @@ CMB::~CMB(){
     if (munmap(map_base, MAP_SIZE) == -1) FATAL;
     free(cache_base);
 	close(fd);
+}
+
+void CMB::cmb_memcpy(void* dest, void* src, size_t len){
+
+    u_int64_t* d = (u_int64_t*) dest;
+    u_int64_t* s = (u_int64_t*) src;
+    for(int i = 0; i < len / sizeof(u_int64_t); i++)
+        *d++ = *s++;
 }
 
 void CMB::remap(off_t offset){
@@ -1137,7 +1150,7 @@ void CMB::remap(off_t offset){
         map_base = mmap(0, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, map_idx);
 	    if (map_base == (void*)-1) FATAL;
 
-        memcpy(cache_base, map_base, MAP_SIZE);
+        cmb_memcpy(cache_base, map_base, MAP_SIZE);
     }
 }
 
@@ -1146,7 +1159,7 @@ void CMB::read(void* buf, off_t offset, int size){
     remap(offset);
 
 	void* virt_addr = (char*)cache_base + ((offset) & MAP_MASK);	
-	memcpy(buf, virt_addr, size);
+	cmb_memcpy(buf, virt_addr, size);
 }
 
 void CMB::write(off_t offset, void* buf, int size){
@@ -1156,11 +1169,11 @@ void CMB::write(off_t offset, void* buf, int size){
     void* virt_addr;
     if(CUR_MODE == REAL_CMB || CUR_MODE == FAKE_CMB){
         virt_addr = (char*)map_base + ((bar_addr + offset) & MAP_MASK);	
-        memcpy(virt_addr, buf, size);
+        cmb_memcpy(virt_addr, buf, size);
     }
 
 	virt_addr = (char*)cache_base + ((offset) & MAP_MASK);	
-	memcpy(virt_addr, buf, size);
+	cmb_memcpy(virt_addr, buf, size);
 }
 
 #endif /* B_TREE_H */

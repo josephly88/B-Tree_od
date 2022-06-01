@@ -18,9 +18,7 @@ bool fileExists(const char* file) {
 }
 
 void usage(){
-    cout << "Format:" << endl;
-    cout << "Usage: ./program [OPTION]... {tree_filename}" << endl << endl;
-    cout << "Options" << endl;
+    cout << "Format:" << endl; cout << "Usage: ./program [OPTION]... {tree_filename}" << endl << endl; cout << "Options" << endl;
     cout << "  -d {degree}\t\t\t\tDegree of the B-Tree, only for creating new B-Tree (Default: 128)" << endl;
     cout << "  -l {log file}\t\t\t\tSave all log to newly created file" << endl;
     cout << "  -i {input file}\t\t\tRead input opreations from file" << endl;
@@ -96,7 +94,6 @@ int main(int argc, char** argv){
     t->stat();
 
     // Has data file as input
-    // Has data file as input
     if(input_file){
         YCSB_file *ycsb_file = new YCSB_file(input_file);
 
@@ -123,6 +120,13 @@ int main(int argc, char** argv){
             char op;
             u_int64_t key;
             TYPE val;
+
+            if(i < start){
+                ycsb_file->skipline();
+                continue;
+            }
+            if(i >= end)
+                break;
 
             line = ycsb_file->readline();
             ycsb_file->lexi(line, &op, &key, val.str);
@@ -186,9 +190,8 @@ int main(int argc, char** argv){
 
         delete ycsb_file;
         op_file.close();
-
-        t->inorder_traversal((char*)"tree.dat");
     }
+    t->inorder_traversal((char*)"tree.dat");
 
     mylog.close();
     
