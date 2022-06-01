@@ -929,6 +929,8 @@ u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** 
                 return 0;
             }
 
+            delete child;
+
             return rebalance(t, i, list);
         }
     }
