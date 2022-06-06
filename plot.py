@@ -5,11 +5,12 @@ import matplotlib.pyplot as plt
 import sys
 import math
 
-num = "_10M"
+num = "_5M"
 
 percent = 100.0
 dir_list = ["copy_on_write", "cmb"]
-file_list = ["insert"+num+".dat", "delete"+num+".dat"]
+#file_list = ["insert"+num+".dat", "delete"+num+".dat"]
+file_list = ["insert"+num+".dat"]
 
 if len(sys.argv) == 2:
     percent = float(sys.argv[1])
@@ -52,6 +53,7 @@ for FILE in file_list:
     for i in range(rm_cnt):
         for j in range(len(dir_list)):
             opr_perf[j].remove(max(opr_perf[j]))
+        print("{:.2f}%".format(i / rm_cnt * 100), end="\r")
 
     # plot
     x = np.arange(0, len(opr_perf[0]), 1)
@@ -73,11 +75,13 @@ for FILE in file_list:
         plt.figtext(0.01, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(opr_perf[i]),2)) + "ms", horizontalalignment='left')
     plt.figtext(0.70, 0.96, "Average latency: ", horizontalalignment='left')
     for i in range(len(dir_list)):
-        plt.figtext(0.70, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(opr_perf[i]),2)) + "ms", horizontalalignment='left')
+        plt.figtext(0.70, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(opr_perf[i])/len(opr_perf[i]),2)) + "ms", horizontalalignment='left')
     plt.legend(loc='upper left')
     ax.grid
     
     fig.savefig(filename + '.png')
+
+sys.exit()
 
 #Plot Read and Update
 update_perf = [[] for i in range(len(dir_list))]
@@ -138,7 +142,7 @@ if len(update_perf[0]) > 0:
         plt.figtext(0.01, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(opr_perf[i]),2)) + "ms", horizontalalignment='left')
     plt.figtext(0.70, 0.96, "Average latency: ", horizontalalignment='left')
     for i in range(len(dir_list)):
-        plt.figtext(0.70, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(opr_perf[i]),2)) + "ms", horizontalalignment='left')
+        plt.figtext(0.70, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(opr_perf[i])/len(opr_perf[i]),2)) + "ms", horizontalalignment='left')
 plt.legend(loc='upper left')
 ax.grid
 
@@ -168,7 +172,7 @@ if len(read_perf[0]) > 0:
         plt.figtext(0.01, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(opr_perf[i]),2)) + "ms", horizontalalignment='left')
     plt.figtext(0.70, 0.96, "Average latency: ", horizontalalignment='left')
     for i in range(len(dir_list)):
-        plt.figtext(0.70, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(opr_perf[i]),2)) + "ms", horizontalalignment='left')
+        plt.figtext(0.70, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(opr_perf[i])/len(opr_perf[i]),2)) + "ms", horizontalalignment='left')
 plt.legend(loc='upper left')
 ax.grid
 
