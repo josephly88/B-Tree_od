@@ -33,13 +33,33 @@ def binary_search(arr, val, min, max):
             return binary_search(arr, val, min, mid-1)
 
 dataset = []
-op_file_ls = sys.argv[1:]
+op_file_ls = []
+if(sys.argv[1] == "-i"):
+    op_file_ls = sys.argv[3:-1]
+else:
+    op_file_ls = sys.argv[1:-1]
 
 i = 0
+# read tree.dat
+if(sys.argv[1] == "-i"):
+    FILE = sys.argv[2]
+    print(" Reading tree file: " + FILE)
+    tree_file = open(FILE, "r")
+    while True:
+        nstr = tree_file.readline()
+        # read until EOF
+        if len(nstr) == 0:
+            break
+        token = nstr.split('\t')
+        dataset.append([int(token[0]), token[1], 1])
+        print(" #tree: " + str(i), end="\r")
+        i = i+1
+    tree_file.close()
 
+i = 0
 # read opr.dat
 for FILE in op_file_ls:
-    print(" Reading file: " + FILE)
+    print(" Reading opr file: " + FILE)
     op_file = open(FILE, "r")
     while True:
         nstr = op_file.readline()
@@ -55,7 +75,7 @@ for FILE in op_file_ls:
             # Find the data with key K in the dataset
             idx = binary_search(dataset, token[1], 0, len(dataset))
             data = dataset[idx]
-            if(token[2] != data[1]):
+            if(token[2].strip() != data[1].strip()):
                 print("Read Key {}: Value Unmatched".format(token[1]))
         elif(token[0] == 'u'):
             idx = binary_search(dataset, token[1], 0, len(dataset))
@@ -87,9 +107,9 @@ for x in dataset:
     w_file.write(str(x[0])+"\t"+x[1]+'\n')
 w_file.close()
 
-# diff with tree.dat
+# diff with last file
 print(" Comparing ")
-tree_file = open("tree.dat", "r")
+tree_file = open(sys.argv[-1], "r")
 idx = 0
 while True:
     nstr = tree_file.readline()
