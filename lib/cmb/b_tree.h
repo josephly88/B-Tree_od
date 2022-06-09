@@ -14,13 +14,13 @@ using namespace std;
   __LINE__, __FILE__, errno, strerror(errno)); exit(1); } while(0)
 
 #define PAGE_SIZE 16384UL
-#define MAP_SIZE 16384UL
+#define MAP_SIZE (1 << 29) // 512 MB
 #define MAP_MASK (MAP_SIZE - 1)
 
 #define CMB_ADDR 0xC0000000
 
 enum mode {REAL_CMB, FAKE_CMB, DRAM};
-#define CUR_MODE FAKE_CMB
+#define CUR_MODE REAL_CMB
 
 template <typename T> class BTree;
 template <typename T> class BTreeNode;
@@ -38,10 +38,10 @@ class BTree{
 	CMB* cmb;
 		
 	public:	
-		BTree(char* filename, int degree);
+		BTree(char* filename, int degree, bool cache);
 		~BTree();
 
-		void reopen(int _fd);
+		void reopen(int _fd, bool cache);
 
 		void stat();
 
@@ -113,7 +113,7 @@ class CMB{
     void* cache_base;
 
 	public:
-		CMB();
+		CMB(bool cache);
 		~CMB();
 
         void cmb_memcpy(void* dest, void* src, size_t len);
@@ -133,7 +133,7 @@ class removeList{
 };
 
 template <typename T>
-BTree<T>::BTree(char* filename, int degree){
+BTree<T>::BTree(char* filename, int degree, bool cache){
     mylog << "BTree()" << endl;
 
     if(degree > (int)((PAGE_SIZE - sizeof(BTreeNode<T>) - sizeof(u_int64_t)) / (sizeof(u_int64_t) + sizeof(T))) ){
@@ -159,7 +159,7 @@ BTree<T>::BTree(char* filename, int degree){
     set_block_id(0, true);
     
 	// Map CMB
-	cmb = new CMB();    
+	cmb = new CMB(cache);    
     u_int64_t first_node_id = 1;
     cmb->write(0, &first_node_id, sizeof(u_int64_t));    
 }
@@ -172,11 +172,11 @@ BTree<T>::~BTree(){
 }
 
 template <typename T>
-void BTree<T>::reopen(int _fd){
+void BTree<T>::reopen(int _fd, bool cache){
     mylog << "reopen()" << endl;
 	fd = _fd;
     tree_write(fd, this);
-	cmb = new CMB();
+	cmb = new CMB(cache);
 }
 
 template <typename T>
@@ -1091,7 +1091,7 @@ removeList::removeList(int _id, removeList* _next){
     next = _next;
 }
 
-CMB::CMB(){
+CMB::CMB(bool cache){
     mylog << "CMB()" << endl;
 
     if (CUR_MODE == REAL_CMB){
@@ -1112,12 +1112,21 @@ CMB::CMB(){
     if (map_base == (void*)-1) FATAL;
     printf("Memory mapped at address %p.\n", map_base);
 
-    cache_base = malloc(MAP_SIZE);
+    if(cache)
+        cache_base = malloc(MAP_SIZE);
+    else
+        cache_base = NULL;
 
-    u_int64_t* dest = (u_int64_t*) cache_base;
-    u_int64_t* src = (u_int64_t*) map_base;
-    for(int i = 0; i < MAP_SIZE / sizeof(u_int64_t); i++)
-        *dest++ = *src++;
+    if(cache_base){
+        u_int64_t* dest = (u_int64_t*) cache_base;
+        u_int64_t* src = (u_int64_t*) map_base;
+        cout << " Cache CMB " << endl;
+        int i = MAP_SIZE / sizeof(u_int64_t);
+        while(i--){
+            *dest++ = *src++;
+            cout << "--" << (1 - ((double)i / (MAP_SIZE / sizeof(u_int64_t)))) * 100 << "%--\r";
+        }
+    }
 }
 
 CMB::~CMB(){
@@ -1127,7 +1136,8 @@ CMB::~CMB(){
         memcpy(map_base, cache_base, MAP_SIZE);    
 
     if (munmap(map_base, MAP_SIZE) == -1) FATAL;
-    free(cache_base);
+    if(cache_base)
+        free(cache_base);
 	close(fd);
 }
 
@@ -1135,8 +1145,9 @@ void CMB::cmb_memcpy(void* dest, void* src, size_t len){
 
     u_int64_t* d = (u_int64_t*) dest;
     u_int64_t* s = (u_int64_t*) src;
-    for(int i = 0; i < len / sizeof(u_int64_t); i++)
+    for(int i = 0; i < len / sizeof(u_int64_t); i++){
         *d++ = *s++;
+    }
 }
 
 void CMB::remap(off_t offset){
@@ -1162,7 +1173,11 @@ void CMB::read(void* buf, off_t offset, int size){
     mylog << "CMB.read() - offset:" << offset << endl;
     remap(offset);
 
-	void* virt_addr = (char*)cache_base + ((offset) & MAP_MASK);	
+    void* virt_addr;
+    if(cache_base)
+	    virt_addr = (char*)cache_base + ((offset) & MAP_MASK);	
+    else
+        virt_addr = (char*)map_base + ((offset) & MAP_MASK);
 	cmb_memcpy(buf, virt_addr, size);
 }
 
@@ -1176,8 +1191,10 @@ void CMB::write(off_t offset, void* buf, int size){
         cmb_memcpy(virt_addr, buf, size);
     }
 
-	virt_addr = (char*)cache_base + ((offset) & MAP_MASK);	
-	cmb_memcpy(virt_addr, buf, size);
+    if(cache_base){
+        virt_addr = (char*)cache_base + ((offset) & MAP_MASK);	
+        cmb_memcpy(virt_addr, buf, size);
+    }
 }
 
 #endif /* B_TREE_H */

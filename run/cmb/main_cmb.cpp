@@ -36,6 +36,7 @@ int main(int argc, char** argv){
     char* tree_file = NULL;
     int start = 0;
     int end = 0;
+    bool cache = false;
 
     if(argc < 2){
         usage();
@@ -60,6 +61,9 @@ int main(int argc, char** argv){
                 end = atoi(argv[i+2]);
                 i += 2;
             }
+            else if(strcmp(argv[i], "-c") == 0){
+                cache = true;
+            }
             else{
                 tree_file = argv[i];
                 break;
@@ -83,12 +87,12 @@ int main(int argc, char** argv){
         int fd = open(tree_file, O_DIRECT | O_RDWR);
         t = (BTree<TYPE>*) calloc(1, sizeof(BTree<TYPE>));
         t->tree_read(fd, t);
-        t->reopen(fd);
+        t->reopen(fd, cache);
     }
     else{
     // Create a new tree file
         cout << "Create file <" << tree_file << ">" << endl;
-        t = new BTree<TYPE>(tree_file, degree);
+        t = new BTree<TYPE>(tree_file, degree, cache);
     }
 
     t->stat();
