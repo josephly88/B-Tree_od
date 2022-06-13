@@ -1,13 +1,13 @@
 #!/bin/bash
 
-portion=9_2
-start=9500000
-end=10000000
+portion=5_2
+start=4500000
+end=5000000
 
 num="_5M"   # MODIFT
 SSD_PATH="/media/nvme"  # MODIFT
 
-workload="read_and_update"
+workload="delete"
 
 ./cpw_btree.out -i ../../data/$workload$num.txt -r $start $end $SSD_PATH/tree
 cp $SSD_PATH/tree checkpoint/tree_$portion

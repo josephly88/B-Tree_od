@@ -20,7 +20,7 @@ using namespace std;
 #define CMB_ADDR 0xC0000000
 
 enum mode {REAL_CMB, FAKE_CMB, DRAM};
-#define CUR_MODE REAL_CMB
+#define CUR_MODE DRAM
 
 template <typename T> class BTree;
 template <typename T> class BTreeNode;
@@ -1112,7 +1112,7 @@ CMB::CMB(bool cache){
     if (map_base == (void*)-1) FATAL;
     printf("Memory mapped at address %p.\n", map_base);
 
-    if(cache)
+    if(cache || CUR_MODE == DRAM)
         cache_base = malloc(MAP_SIZE);
     else
         cache_base = NULL;
