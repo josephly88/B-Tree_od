@@ -20,7 +20,7 @@ using namespace std;
 #define CMB_ADDR 0xC0000000
 
 enum mode {COPY_ON_WRITE, REAL_CMB, FAKE_CMB, DRAM};
-#define CUR_MODE REAL_CMB
+#define CUR_MODE COPY_ON_WRITE
 
 template <typename T> class BTree;
 template <typename T> class BTreeNode;
@@ -140,7 +140,7 @@ BTree<T>::BTree(char* filename, int degree, bool cache){
         return;
     }
 
-    fd = open(filename, O_CREAT | O_RDWR | O_DIRECT, S_IRUSR | S_IWUSR);
+    fd = open(filename, O_RDWR | O_DIRECT);
     block_size = PAGE_SIZE;
     m = degree;
     block_cap = (block_size - sizeof(BTree)) * 8;
@@ -150,11 +150,12 @@ BTree<T>::BTree(char* filename, int degree, bool cache){
     posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
     
     memcpy(buf, this, sizeof(BTree));
-    write(fd, buf, PAGE_SIZE);
+    pwrite(fd, buf, PAGE_SIZE, 1 * PAGE_SIZE);
 
     free(buf);
 
-    set_block_id(0, true);
+    set_block_id(0, true); // block 0 is reserved
+    set_block_id(1, true);
 
     if(CUR_MODE == REAL_CMB || CUR_MODE == FAKE_CMB || CUR_MODE == DRAM){
         // Map CMB
@@ -207,11 +208,9 @@ template <typename T>
 void BTree<T>::tree_read(int fd, BTree* tree){ 
     mylog << "tree_read()" << endl;
 
-    lseek(fd, 0, SEEK_SET);
-
     char* buf;
     posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
-    read(fd, buf, PAGE_SIZE);
+    pread(fd, buf, PAGE_SIZE, 1 * PAGE_SIZE);
     
     memcpy((void*)tree, buf, sizeof(BTree));
     free(buf);
@@ -221,14 +220,14 @@ template <typename T>
 void BTree<T>::tree_write(int fd, BTree* tree){
     mylog << "tree_write()" << endl;
 
-    lseek(fd, 0, SEEK_SET);
+    // Read before write to maintain the same block bitmap
+
     char* buf;
     posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
-    read(fd, buf, PAGE_SIZE);
+    pread(fd, buf, PAGE_SIZE, 1 * PAGE_SIZE);
     
-    lseek(fd, 0, SEEK_SET);
     memcpy(buf, tree, sizeof(BTree));
-    write(fd, buf, PAGE_SIZE);
+    pwrite(fd, buf, PAGE_SIZE, 1 * PAGE_SIZE);
     free(buf);
 }
 
@@ -237,8 +236,8 @@ void BTree<T>::node_read(u_int64_t node_id, BTreeNode<T>* node){
     mylog << "node_read() - node_id:" << node_id << endl;
 
     if(node_id == 0){
-        cout << " Error : Attempt to read node id = 0 " << endl;
-        mylog << " Error : Attempt to read node id = 0 " << endl;
+        cout << " error : attempt to read node id = 0 " << endl;
+        mylog << " error : attempt to read node id = 0 " << endl;
         return;
     }
 
@@ -252,11 +251,15 @@ void BTree<T>::node_read(u_int64_t node_id, BTreeNode<T>* node){
     else
         block_id = node_id;
 
-    lseek(fd, block_id * PAGE_SIZE, SEEK_SET);
+    if(block_id < 2){
+        cout << " error : attempt to read block id = " << block_id << endl;
+        mylog << " error : attempt to read block id = " << block_id << endl;
+        return;
+    }
 
     char* buf;
     posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
-    read(fd, buf, PAGE_SIZE);
+    pread(fd, buf, PAGE_SIZE, block_id * PAGE_SIZE);
 
     char* ptr = buf;
     memcpy((void*)node, ptr, sizeof(BTreeNode<T>));
@@ -293,6 +296,12 @@ void BTree<T>::node_write(u_int64_t node_id, BTreeNode<T>* node){
     else
         block_id = node_id;
 
+    if(block_id < 2){
+        cout << " error : attempt to write block id = " << block_id << endl;
+        mylog << " error : attempt to write block id = " << block_id << endl;
+        return;
+    }
+
     char* buf;
     posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
 
@@ -309,8 +318,7 @@ void BTree<T>::node_write(u_int64_t node_id, BTreeNode<T>* node){
     memcpy(ptr, node->child_id, (node->m + 1) * sizeof(u_int64_t));
     ptr += (node->m + 1) * sizeof(u_int64_t);
 
-    lseek(fd, block_id * PAGE_SIZE, SEEK_SET);
-    write(fd, buf, PAGE_SIZE);
+    pwrite(fd, buf, PAGE_SIZE, block_id * PAGE_SIZE);
 
     free(buf);
 }
@@ -319,11 +327,9 @@ template <typename T>
 u_int64_t BTree<T>::get_free_block_id(){
     mylog << "get_free_block_id()" << endl;
 
-    lseek(fd, 0, SEEK_SET);
-
     char* buf;
     posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
-    read(fd, buf, PAGE_SIZE);
+    pread(fd, buf, PAGE_SIZE, 1 * PAGE_SIZE);
 
     char* byte_ptr =  buf + sizeof(BTree);
     u_int64_t id = 0;
@@ -350,11 +356,9 @@ void BTree<T>::set_block_id(u_int64_t block_id, bool bit){
 
     if(block_id >= block_cap) return;
 
-    lseek(fd, 0, SEEK_SET);
-
     char* buf;
     posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
-    read(fd, buf, PAGE_SIZE);
+    pread(fd, buf, PAGE_SIZE, 1 * PAGE_SIZE);
 
     char* byte_ptr =  buf + sizeof(BTree) + (block_id / 8);
 
@@ -363,8 +367,7 @@ void BTree<T>::set_block_id(u_int64_t block_id, bool bit){
     else
         *byte_ptr &= ~(1UL << (block_id % 8));
 
-    lseek(fd, 0, SEEK_SET);
-    write(fd, buf, PAGE_SIZE);
+    pwrite(fd, buf, PAGE_SIZE, 1 * PAGE_SIZE);
 
     free(buf);
 }
@@ -374,11 +377,9 @@ void BTree<T>::print_used_block_id(){
     mylog << "print_used_block_id()" << endl;
     mylog << "\tUsed Block : " << endl << "\t";
 
-    lseek(fd, 0, SEEK_SET);
-
     char* buf;
     posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
-    read(fd, buf, PAGE_SIZE);
+    pread(fd, buf, PAGE_SIZE, 1 * PAGE_SIZE);
 
     int num_bk = 0;
     char* byte_ptr =  buf + sizeof(BTree);
@@ -1249,6 +1250,8 @@ CMB::CMB(bool cache){
         cache_base = NULL;
 
     if(cache_base){
+        cout << " Cache base = %p\n" << endl;
+        mylog << " Cache base = %p\n" << endl;
         u_int64_t* dest = (u_int64_t*) cache_base;
         u_int64_t* src = (u_int64_t*) map_base;
         cout << " Cache CMB " << endl;

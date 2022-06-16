@@ -39,6 +39,7 @@ int main(int argc, char** argv){
     int start = 0;
     int end = 0;
     bool cache = false;
+    bool create = false;
 
     if(argc < 2){
         usage();
@@ -46,25 +47,28 @@ int main(int argc, char** argv){
     }
     else{
         for(int i = 1; i < argc; i++){          
-            if(strcmp(argv[i], "-d") == 0){
+            if(strcmp(argv[i], "-d") == 0){ // Degree
                 degree = stoi(argv[i+1]);
                 i++;
             }
-            else if(strcmp(argv[i], "-l") == 0){
+            else if(strcmp(argv[i], "-l") == 0){ // log-file output
                 log_file = argv[i+1];
                 i++;
             }
-            else if(strcmp(argv[i], "-i") == 0){
+            else if(strcmp(argv[i], "-i") == 0){ // input-file
                 input_file = argv[i+1];
                 i++;
             }
-            else if(strcmp(argv[i], "-r") == 0){
+            else if(strcmp(argv[i], "-r") == 0){ // range
                 start = atoi(argv[i+1]);
                 end = atoi(argv[i+2]);
                 i += 2;
             }
-            else if(strcmp(argv[i], "-c") == 0){
+            else if(strcmp(argv[i], "-cache") == 0){ // cache CMB
                 cache = true;
+            }
+            else if(strcmp(argv[i], "-new") == 0){ // Create a new tree
+                create = true; 
             }
             else{
                 tree_file = argv[i];
@@ -83,20 +87,20 @@ int main(int argc, char** argv){
     else
         mylog.open(log_file);
 
+    if(create){
+    // Create a new tree file
+        cout << "Create tree <" << tree_file << ">" << endl;
+        mylog << "Create tree <" << tree_file << ">" << endl;
+        t = new BTree<TYPE>(tree_file, degree, cache);
+    }
+    else{
     // Existed tree file
-    if(fileExists(tree_file)){
-        cout << "Read file from <" << tree_file << ">" << endl;
-        mylog << "Read file from <" << tree_file << ">" << endl;
-        int fd = open(tree_file, O_DIRECT | O_RDWR);
+        cout << "Read tree from <" << tree_file << ">" << endl;
+        mylog << "Read tree from <" << tree_file << ">" << endl;
+        int fd = open(tree_file, O_RDWR | O_DIRECT);
         t = (BTree<TYPE>*) calloc(1, sizeof(BTree<TYPE>));
         t->tree_read(fd, t);
         t->reopen(fd, cache);
-    }
-    else{
-    // Create a new tree file
-        cout << "Create file <" << tree_file << ">" << endl;
-        mylog << "Read file from <" << tree_file << ">" << endl;
-        t = new BTree<TYPE>(tree_file, degree, cache);
     }
 
     t->stat();

@@ -24,7 +24,7 @@ int main(int argc, char** argv){
 
     if((fd = open("/dev/mem", O_RDWR | O_SYNC)) == -1) FATAL;
     if((tfd = open(argv[1], O_RDWR|O_CREAT, 0644)) == -1) FATAL;
-    ftruncate(tfd, CP_SIZE);
+    ftruncate(tfd, 2*CP_SIZE);
 
     u_int64_t* mem;
     u_int64_t* tmem;
