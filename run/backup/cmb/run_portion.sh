@@ -1,13 +1,13 @@
 #!/bin/bash
 
-portion=1_1
+portion=1_1_no_cache
 start=0000000
-end=5000000
+end=10000000
 
 num="_5M"   # MODIFT
 SSD_PATH="/media/nvme"  # MODIFT
 
-workload="insert"
+workload="read_and_update"
 
 ./cmb_btree.out -i ../../data/$workload$num.txt -r $start $end $SSD_PATH/tree
 cp $SSD_PATH/tree checkpoint/tree_$portion

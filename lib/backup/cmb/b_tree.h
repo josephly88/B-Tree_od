@@ -20,7 +20,7 @@ using namespace std;
 #define CMB_ADDR 0xC0000000
 
 enum mode {REAL_CMB, FAKE_CMB, DRAM};
-#define CUR_MODE DRAM
+#define CUR_MODE REAL_CMB
 
 template <typename T> class BTree;
 template <typename T> class BTreeNode;
