@@ -140,10 +140,10 @@ plt.title("update - " + str(percent) + "%")
 if len(update_perf[0]) > 0:
     plt.figtext(0.01, 0.96, "Overral latency: ", horizontalalignment='left')
     for i in range(len(dir_list)):
-        plt.figtext(0.01, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(opr_perf[i]),2)) + "ms", horizontalalignment='left')
+        plt.figtext(0.01, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(update_perf[i]),2)) + "ms", horizontalalignment='left')
     plt.figtext(0.70, 0.96, "Average latency: ", horizontalalignment='left')
     for i in range(len(dir_list)):
-        plt.figtext(0.70, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(opr_perf[i])/len(opr_perf[i]),2)) + "ms", horizontalalignment='left')
+        plt.figtext(0.70, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(update_perf[i])/len(update_perf[i]),2)) + "ms", horizontalalignment='left')
 plt.legend(loc='upper left')
 ax.grid
 
@@ -170,10 +170,10 @@ plt.title("read - " + str(percent) + "%")
 if len(read_perf[0]) > 0:
     plt.figtext(0.01, 0.96, "Overral latency: ", horizontalalignment='left')
     for i in range(len(dir_list)):
-        plt.figtext(0.01, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(opr_perf[i]),2)) + "ms", horizontalalignment='left')
+        plt.figtext(0.01, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(read_perf[i]),2)) + "ms", horizontalalignment='left')
     plt.figtext(0.70, 0.96, "Average latency: ", horizontalalignment='left')
     for i in range(len(dir_list)):
-        plt.figtext(0.70, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(opr_perf[i])/len(opr_perf[i]),2)) + "ms", horizontalalignment='left')
+        plt.figtext(0.70, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(read_perf[i])/len(read_perf[i]),2)) + "ms", horizontalalignment='left')
 plt.legend(loc='upper left')
 ax.grid
 
