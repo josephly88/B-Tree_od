@@ -5,176 +5,101 @@ import matplotlib.pyplot as plt
 import sys
 import math
 
-num = "_5M"
+file_list = []
+opr_name = ["Insert", "Delete", "Read", "Update"]
+rm_cnt = 0
 
-percent = 100.0
-dir_list = ["copy_on_write", "cmb"]
-#file_list = ["insert"+num+".dat", "delete"+num+".dat"]
-file_list = ["insert"+num+".dat"]
+if len(sys.argv) > 1:
+    state = 0
+    for i in range(1, len(sys.argv)):
+        if sys.argv[i] == "-r":
+            state = 1
+            continue
 
-if len(sys.argv) == 2:
-    percent = float(sys.argv[1])
+        if state == 0:
+            file_list.append(sys.argv[i])
+        elif state == 1:
+            rm_cnt = int(sys.argv[i])
+            if rm_cnt < 0:
+                print("Error: #remove must be >= 0")
+                sys.exit()
+            break
 else:
-    print("Usage: ./program {Percentage}")
+    print("Usage: {} input files ... [-r #remove]".format(sys.argv[0]))
     sys.exit()
 
-# Plot per workload
-for FILE in file_list:
-    opr_perf = [[] for i in range(len(dir_list))]
-    filename = FILE[:-4]
-
-    file_opr = [None] * len(dir_list)
-    for i in range(len(dir_list)):
-        file_opr[i] = open(dir_list[i] + "/" + FILE, "r")
-    
-    while True:
-        nstr = [None] * len(dir_list)
-        for i in range(len(dir_list)):
-            nstr[i] = file_opr[i].readline()
-        # read until EOF
-        if len(nstr[0]) == 0:
-            break
-
-        token = [None] * len(dir_list)
-        for i in range(len(dir_list)):
-            token[i] = nstr[i].split('\t')
-
-        if(token[0][0] == 'd'):
-            for i in range(len(dir_list)):
-                opr_perf[i].append(float(token[i][2]))
-        else:
-            for i in range(len(dir_list)):
-                opr_perf[i].append(float(token[i][3]))
-
-    for i in range(len(dir_list)):
-        file_opr[i].close()
-
-    rm_cnt = math.floor((100 - percent) / 100 * len(opr_perf[0]))
-    for i in range(rm_cnt):
-        for j in range(len(dir_list)):
-            opr_perf[j].remove(max(opr_perf[j]))
-        print("{:.2f}%".format(i / rm_cnt * 100), end="\r")
-
-    # plot
-    x = np.arange(0, len(opr_perf[0]), 1)
-    y = [[] for i in range(len(dir_list))]
-    for i in range(len(dir_list)):
-        y[i] = np.array(opr_perf[i])
-
-    fig, ax = plt.subplots()
-    for i in range(len(dir_list)):
-        ax.scatter(x, y[i], label=dir_list[i], s=0.5)
-
-    ax.set(xlabel='op#', ylabel='response time (ms)', title='Operation Response time')
-    if FILE[0] == "A" or FILE[0] == "B" or FILE[0] == "C" or FILE[0] == "D" or FILE[0] == "F":
-        plt.title("Workload " + FILE[0] + " - " + str(percent) + "%")
-    else:
-        plt.title(FILE[:-4] + " - " + str(percent) + "%")
-    plt.figtext(0.01, 0.96, "Overral latency: ", horizontalalignment='left')
-    for i in range(len(dir_list)):
-        plt.figtext(0.01, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(opr_perf[i]),2)) + "ms", horizontalalignment='left')
-    plt.figtext(0.70, 0.96, "Average latency: ", horizontalalignment='left')
-    for i in range(len(dir_list)):
-        plt.figtext(0.70, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(opr_perf[i])/len(opr_perf[i]),2)) + "ms", horizontalalignment='left')
-    plt.legend(loc='upper left')
-    ax.grid
-    
-    fig.savefig(filename + '.png')
-
-sys.exit()
-
-#Plot Read and Update
-update_perf = [[] for i in range(len(dir_list))]
-read_perf = [[] for i in range(len(dir_list))]
-file_list = ["read_and_update"+num+".dat"]
+perf = [[] for i in range(len(opr_name))]
 
 for FILE in file_list:
     # read opr.dat
-    file_opr = [None] * len(dir_list)
-    for i in range(len(dir_list)):
-        file_opr[i] = open(dir_list[i] + "/" + FILE, "r")
+    file_opr = open(FILE, "r")
+
+    i_perf = []
+    d_perf = []
+    r_perf = []
+    u_perf = []
 
     while True:
-        nstr = [None] * len(dir_list)
-        for i in range(len(dir_list)):
-            nstr[i] = file_opr[i].readline()
+        nstr = file_opr.readline()
         # read until EOF
-        if len(nstr[0]) == 0:
+        if len(nstr) == 0:
             break
 
-        token = [None] * len(dir_list)
-        for i in range(len(dir_list)):
-            token[i] = nstr[i].split('\t')
+        token = nstr.split('\t')
 
-        # Update data
-        if(token[0][0] == 'u'):
-            for i in range(len(dir_list)):
-                update_perf[i].append(float(token[i][3]))
+        # Operation data
+        if(token[0][0] == 'i'):
+            i_perf.append(float(token[3]))
+        elif(token[0][0] == 'd'):
+            d_perf.append(float(token[2]))
+        elif(token[0][0] == 'u'):
+            u_perf.append(float(token[3]))
+        elif(token[0][0] == 'r'):
+            r_perf.append(float(token[3]))
 
-        if(token[0][0] == 'r'):
-            for i in range(len(dir_list)):
-                read_perf[i].append(float(token[i][3]))
+    if(len(i_perf) > 0):
+        perf[0].append(i_perf)
+    if(len(d_perf) > 0):
+        perf[1].append(d_perf)
+    if(len(u_perf) > 0):
+        perf[2].append(u_perf)
+    if(len(r_perf) > 0):
+        perf[3].append(r_perf)
 
-    for i in range(len(dir_list)):
-        file_opr[i].close()
+    file_opr.close()
 
-# Remove certain percentage
-rm_cnt = math.floor((100 - percent) / 100 * len(update_perf[0]))
-for i in range(rm_cnt):
-    for j in range(len(dir_list)):
-        update_perf[j].remove(max(update_perf[j]))
-        read_perf[j].remove(max(read_perf[j]))
+# Remove the highest data
+for opr in perf:
+    if(len(opr) > 0):
+        if(rm_cnt >= min([len(x) for x in opr])):
+            print("Error: Number of remove >= data size")
+            print("Number of remove = " + str(rm_cnt))
+            print("Data size = " + str(min([len(x) for x in opr])))
+            sys.exit()
+        for i in range(rm_cnt):
+            for j in opr:
+                j.remove(max(j))
 
 # plot update
-x = np.arange(0, len(update_perf[0]), 1)
-y = [[] for i in range(len(dir_list))]
-for i in range(len(dir_list)):
-    y[i] = np.array(update_perf[i])
+for i in range(len(perf)):
+    dataset = perf[i]
+    if(len(dataset) > 0):
+        fig, ax = plt.subplots()
 
-fig, ax = plt.subplots()
-for i in range(len(dir_list)):
-    ax.scatter(x, y[i], label=dir_list[i], s=0.5)
+        for j in range(len(dataset)):
+            x = np.arange(0, len(dataset[j]), 1)
+            y = np.array(dataset[j])
+            ax.scatter(x, y, label="("+str(j+1)+") "+file_list[j], s=0.3)
 
-ax.set(xlabel='op#', ylabel='response time (ms)', title='Update Operation Response time')
-plt.title("update - " + str(percent) + "%")
-if len(update_perf[0]) > 0:
-    plt.figtext(0.01, 0.96, "Overral latency: ", horizontalalignment='left')
-    for i in range(len(dir_list)):
-        plt.figtext(0.01, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(update_perf[i]),2)) + "ms", horizontalalignment='left')
-    plt.figtext(0.70, 0.96, "Average latency: ", horizontalalignment='left')
-    for i in range(len(dir_list)):
-        plt.figtext(0.70, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(update_perf[i])/len(update_perf[i]),2)) + "ms", horizontalalignment='left')
-plt.legend(loc='upper left')
-ax.grid
+        ax.set(xlabel='op#', ylabel='response time (ms)', title=opr_name[i]+' Operation Response time')
+        plt.title(opr_name[i])
+        plt.figtext(0.01, 0.96, "Overral latency: ", horizontalalignment='left')
+        for j in range(len(file_list)):
+            plt.figtext(0.01, 0.96 - 0.03 * (j+1), "(" + str(j+1) + ") " + " - " + str(round(sum(dataset[j]),2)) + "ms", horizontalalignment='left')
+        plt.figtext(0.70, 0.96, "Average latency: ", horizontalalignment='left')
+        for j in range(len(file_list)):
+            plt.figtext(0.70, 0.96 - 0.03 * (j+1), "(" + str(j+1) + ") " +  " - " + str(round(sum(dataset[j])/len(dataset[j]),2)) + "ms", horizontalalignment='left')
+        plt.legend(loc='upper left')
+        ax.grid
 
-fig.savefig('update'+num+'.png')
-
-# Remove certain percentage
-rm_cnt = math.floor((100 - percent) / 100 * len(read_perf[0]))
-for i in range(rm_cnt):
-    for j in range(len(dir_list)):
-        read_perf[j].remove(max(read_perf[j]))
-
-# plot read
-x = np.arange(0, len(read_perf[0]), 1)
-y = [[] for i in range(len(dir_list))]
-for i in range(len(dir_list)):
-    y[i] = np.array(read_perf[i])
-
-fig, ax = plt.subplots()
-for i in range(len(dir_list)):
-    ax.scatter(x, y[i], label=dir_list[i], s=0.5)
-
-ax.set(xlabel='op#', ylabel='response time (ms)', title='Read Operation Response time')
-plt.title("read - " + str(percent) + "%")
-if len(read_perf[0]) > 0:
-    plt.figtext(0.01, 0.96, "Overral latency: ", horizontalalignment='left')
-    for i in range(len(dir_list)):
-        plt.figtext(0.01, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(read_perf[i]),2)) + "ms", horizontalalignment='left')
-    plt.figtext(0.70, 0.96, "Average latency: ", horizontalalignment='left')
-    for i in range(len(dir_list)):
-        plt.figtext(0.70, 0.96 - 0.03 * (i+1), dir_list[i] + " - " + str(round(sum(read_perf[i])/len(read_perf[i]),2)) + "ms", horizontalalignment='left')
-plt.legend(loc='upper left')
-ax.grid
-
-fig.savefig('read'+num+'.png')
+        fig.savefig(opr_name[i]+'.png')
