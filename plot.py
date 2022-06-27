@@ -123,6 +123,7 @@ rm_cnt = math.floor((100 - percent) / 100 * len(update_perf[0]))
 for i in range(rm_cnt):
     for j in range(len(dir_list)):
         update_perf[j].remove(max(update_perf[j]))
+        read_perf[j].remove(max(read_perf[j]))
 
 # plot update
 x = np.arange(0, len(update_perf[0]), 1)
