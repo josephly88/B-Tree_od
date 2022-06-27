@@ -38,8 +38,8 @@ int main(int argc, char** argv){
     char* tree_file = NULL;
     int start = 0;
     int end = 0;
-    bool cache = false;
     bool create = false;
+    MODE mode = COPY_ON_WRITE;
 
     if(argc < 2){
         usage();
@@ -47,28 +47,31 @@ int main(int argc, char** argv){
     }
     else{
         for(int i = 1; i < argc; i++){          
-            if(strcmp(argv[i], "-d") == 0){ // Degree
+            if(strcmp(argv[i], "-degree") == 0){ // Degree
                 degree = stoi(argv[i+1]);
                 i++;
             }
-            else if(strcmp(argv[i], "-l") == 0){ // log-file output
+            else if(strcmp(argv[i], "-log") == 0){ // log-file output
                 log_file = argv[i+1];
                 i++;
             }
-            else if(strcmp(argv[i], "-i") == 0){ // input-file
+            else if(strcmp(argv[i], "-input") == 0){ // input-file
                 input_file = argv[i+1];
                 i++;
             }
-            else if(strcmp(argv[i], "-r") == 0){ // range
+            else if(strcmp(argv[i], "-range") == 0){ // range
                 start = atoi(argv[i+1]);
                 end = atoi(argv[i+2]);
                 i += 2;
             }
-            else if(strcmp(argv[i], "-cache") == 0){ // cache CMB
-                cache = true;
-            }
             else if(strcmp(argv[i], "-new") == 0){ // Create a new tree
                 create = true; 
+            }
+            else if(strcmp(argv[i], "-cmb") == 0){ // Set as CMB mode
+                mode = REAL_CMB;
+            }
+            else if(strcmp(argv[i], "-dram") == 0){ // Set as DRAM mode
+                mode = DRAM;
             }
             else{
                 tree_file = argv[i];
@@ -91,7 +94,7 @@ int main(int argc, char** argv){
     // Create a new tree file
         cout << "Create tree <" << tree_file << ">" << endl;
         mylog << "Create tree <" << tree_file << ">" << endl;
-        t = new BTree<TYPE>(tree_file, degree, cache);
+        t = new BTree<TYPE>(tree_file, degree, mode);
     }
     else{
     // Existed tree file
@@ -100,7 +103,7 @@ int main(int argc, char** argv){
         int fd = open(tree_file, O_RDWR | O_DIRECT);
         t = (BTree<TYPE>*) calloc(1, sizeof(BTree<TYPE>));
         t->tree_read(fd, t);
-        t->reopen(fd, cache);
+        t->reopen(fd, mode);
     }
 
     t->stat();

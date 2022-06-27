@@ -19,8 +19,12 @@ using namespace std;
 
 #define CMB_ADDR 0xC0000000
 
-enum mode {COPY_ON_WRITE, REAL_CMB, FAKE_CMB, DRAM};
-#define CUR_MODE COPY_ON_WRITE
+typedef enum {
+    COPY_ON_WRITE, 
+    REAL_CMB, 
+    FAKE_CMB, 
+    DRAM
+} MODE;
 
 template <typename T> class BTree;
 template <typename T> class BTreeNode;
@@ -35,14 +39,15 @@ class BTree{
 	int fd;
 	int block_size;
 	int block_cap;
+    MODE mode;
 		
 	public:
 	    CMB* cmb;
 
-		BTree(char* filename, int degree, bool cache);
+		BTree(char* filename, int degree, MODE _mode);
 		~BTree();
 
-		void reopen(int _fd, bool cache);
+		void reopen(int _fd, MODE _mode);
 
 		void stat();
 
@@ -111,9 +116,10 @@ class CMB{
 	void* map_base;
     off_t map_idx;
     void* cache_base;
+    MODE mode;
 
 	public:
-		CMB(bool cache);
+		CMB(MODE _mode);
 		~CMB();
 
         void cmb_memcpy(void* dest, void* src, size_t len);
@@ -132,7 +138,7 @@ class removeList{
 };
 
 template <typename T>
-BTree<T>::BTree(char* filename, int degree, bool cache){
+BTree<T>::BTree(char* filename, int degree, MODE _mode){
     mylog << "BTree()" << endl;
 
     if(degree > (int)((PAGE_SIZE - sizeof(BTreeNode<T>) - sizeof(u_int64_t)) / (sizeof(u_int64_t) + sizeof(T))) ){
@@ -145,6 +151,7 @@ BTree<T>::BTree(char* filename, int degree, bool cache){
     m = degree;
     block_cap = (block_size - sizeof(BTree)) * 8;
     root_id = 0;
+    mode = _mode;
     
     char* buf;
     posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
@@ -157,14 +164,14 @@ BTree<T>::BTree(char* filename, int degree, bool cache){
     set_block_id(0, true); // block 0 is reserved
     set_block_id(1, true);
 
-    if(CUR_MODE == REAL_CMB || CUR_MODE == FAKE_CMB || CUR_MODE == DRAM){
+    if(mode == COPY_ON_WRITE)
+        cmb = NULL;
+    else{
         // Map CMB
-        cmb = new CMB(cache);    
+        cmb = new CMB(mode);    
         u_int64_t first_node_id = 1;
         cmb->write(0, &first_node_id, sizeof(u_int64_t));    
     }
-    else
-        cmb = NULL;
 }
 
 template <typename T>
@@ -175,14 +182,15 @@ BTree<T>::~BTree(){
 }
 
 template <typename T>
-void BTree<T>::reopen(int _fd, bool cache){
+void BTree<T>::reopen(int _fd, MODE _mode){
     mylog << "reopen()" << endl;
     fd = _fd;
+    mode = _mode;
     tree_write(fd, this);
-    if(CUR_MODE == REAL_CMB || CUR_MODE == FAKE_CMB || CUR_MODE == DRAM)
-        cmb = new CMB(cache);
-    else
+    if(mode == COPY_ON_WRITE)
         cmb = NULL;
+    else
+        cmb = new CMB(mode);
 }
 
 template <typename T>
@@ -1223,17 +1231,19 @@ removeList::removeList(int _id, removeList* _next){
 }
 
 
-CMB::CMB(bool cache){
+CMB::CMB(MODE _mode){
     mylog << "CMB()" << endl;
 
-    if (CUR_MODE == REAL_CMB){
+    mode = _mode;
+
+    if (mode == REAL_CMB){
         if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) == -1) FATAL;
         printf("\n/dev/mem opened.\n");
         bar_addr = CMB_ADDR;
     }
-    else if (CUR_MODE == FAKE_CMB || CUR_MODE == DRAM){
-        if ((fd = open("fake_cmb", O_RDWR | O_SYNC)) == -1) FATAL; 
-        printf("\nfake_cmb opened.\n");
+    else if (mode == FAKE_CMB || mode == DRAM){
+        if ((fd = open("dup_cmb", O_RDWR | O_SYNC)) == -1) FATAL; 
+        printf("\ndup_cmb opened.\n");
         bar_addr = 0;
     }
     
@@ -1244,14 +1254,11 @@ CMB::CMB(bool cache){
     if (map_base == (void*)-1) FATAL;
     printf("Memory mapped at address %p.\n", map_base);
 
-    if(CUR_MODE != COPY_ON_WRITE && (cache || CUR_MODE == DRAM))
+    if(mode == DRAM){
         cache_base = malloc(MAP_SIZE);
-    else
-        cache_base = NULL;
 
-    if(cache_base){
-        cout << " Cache base = %p\n" << endl;
-        mylog << " Cache base = %p\n" << endl;
+        cout << " Cache base = " << cache_base << "\n" << endl;
+        mylog << " Cache base = " << cache_base << "\n" << endl;
         u_int64_t* dest = (u_int64_t*) cache_base;
         u_int64_t* src = (u_int64_t*) map_base;
         cout << " Cache CMB " << endl;
@@ -1261,17 +1268,19 @@ CMB::CMB(bool cache){
             cout << "--" << (1 - ((double)i / (MAP_SIZE / sizeof(u_int64_t)))) * 100 << "%--\r";
         }
     }
+    else
+        cache_base = NULL;
 }
 
 CMB::~CMB(){
     mylog << "~CMB()" << endl;
 
-    if(CUR_MODE == DRAM)
+    if(mode == DRAM){
         memcpy(map_base, cache_base, MAP_SIZE);    
+        free(cache_base);
+    }
 
     if (munmap(map_base, MAP_SIZE) == -1) FATAL;
-    if(cache_base)
-        free(cache_base);
 	close(fd);
 }
 
@@ -1286,7 +1295,7 @@ void CMB::cmb_memcpy(void* dest, void* src, size_t len){
 void CMB::remap(off_t offset){
     if( ((bar_addr + offset) & ~MAP_MASK) != map_idx ){
         mylog << "remap() - offset:" << offset << endl;
-        if(CUR_MODE == DRAM)
+        if(cache_base)
             memcpy(map_base, cache_base, MAP_SIZE);  
 
         map_idx = (bar_addr + offset) & ~MAP_MASK;
@@ -1294,7 +1303,7 @@ void CMB::remap(off_t offset){
         /* Unmap the previous */
         if (munmap(map_base, MAP_SIZE) == -1) FATAL;
 
-        /* Rempa a new page */
+        /* Remap a new page */
         map_base = mmap(0, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, map_idx);
 	    if (map_base == (void*)-1) FATAL;
 
@@ -1319,15 +1328,11 @@ void CMB::write(off_t offset, void* buf, int size){
     remap(offset);
 
     void* virt_addr;
-    if(CUR_MODE == REAL_CMB || CUR_MODE == FAKE_CMB){
-        virt_addr = (char*)map_base + ((bar_addr + offset) & MAP_MASK);	
-        cmb_memcpy(virt_addr, buf, size);
-    }
-
-    if(cache_base){
-        virt_addr = (char*)cache_base + ((offset) & MAP_MASK);	
-        cmb_memcpy(virt_addr, buf, size);
-    }
+    if(cache_base)
+	    virt_addr = (char*)cache_base + ((offset) & MAP_MASK);	
+    else
+        virt_addr = (char*)map_base + ((offset) & MAP_MASK);
+    cmb_memcpy(virt_addr, buf, size);
 }
 
 #endif /* B_TREE_H */
