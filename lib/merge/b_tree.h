@@ -973,6 +973,7 @@ u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** 
             t->node_read(succ_id, succ);
 
             if(succ->num_key > min_num){
+                mylog << "borrow_from_succesor() - node id:" << node->node_id << endl;
                 // Borrow from succ
                 key[i] = succ->key[0];
                 value[i] = succ->value[0];
@@ -997,6 +998,7 @@ u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** 
                 BTreeNode<T>* pred = new BTreeNode<T>(0, 0, 0);  
                 t->node_read(pred_id, pred);
 
+                mylog << "borrow_from_predecesor() - node id:" << node->node_id << endl;
                 // Borrow from pred
                 key[i] = pred->key[pred->num_key - 1];
                 value[i] = pred->value[pred->num_key - 1];
@@ -1105,6 +1107,7 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
     int trans_node_id;
 
     if(idx - 1 >= 0 && left->num_key > min_num){
+        mylog << "borrow_from_sibling() - node id:" << child_id[idx] << endl;
         //Borrowing from left
         t->node_read(child_id[idx-1], left);
         t->node_read(child_id[idx], right);
@@ -1129,6 +1132,7 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
         t->node_write(node_id, this);                
     }
     else if(idx + 1 <= num_key && right->num_key > min_num){
+        mylog << "borrow_from_sibling() - node id:" << child_id[idx] << endl;
         //Borrowing from right
         t->node_read(child_id[idx], left);
         t->node_read(child_id[idx+1], right);
@@ -1153,6 +1157,8 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
         t->node_write(node_id, this);         
     }   
     else{
+        mylog << "merge() - node id:" << child_id[idx] << endl;
+
         //Merge with right unless idx = num_key
         if(idx == num_key) idx -= 1;
         t->node_read(child_id[idx], left);
