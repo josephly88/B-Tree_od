@@ -80,7 +80,7 @@ for opr in perf:
             for j in opr:
                 j.remove(max(j))
 
-# plot update
+# plot
 for i in range(len(perf)):
     dataset = perf[i]
     if(len(dataset) > 0):
