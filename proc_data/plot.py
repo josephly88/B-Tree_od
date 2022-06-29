@@ -91,14 +91,14 @@ for i in range(len(perf)):
             y = np.array(dataset[j])
             ax.scatter(x, y, label="("+str(j+1)+") "+file_list[j], s=0.3)
 
-        ax.set(xlabel='op#', ylabel='response time (ms)', title=opr_name[i]+' Operation Response time')
+        ax.set(xlabel='op#', ylabel='response time (us)', title=opr_name[i]+' Operation Response time')
         plt.title(opr_name[i])
         plt.figtext(0.01, 0.96, "Overral latency: ", horizontalalignment='left')
         for j in range(len(file_list)):
-            plt.figtext(0.01, 0.96 - 0.03 * (j+1), "(" + str(j+1) + ") " + " - " + str(round(sum(dataset[j]),2)) + "ms", horizontalalignment='left')
+            plt.figtext(0.01, 0.96 - 0.03 * (j+1), "(" + str(j+1) + ") " + " - " + str(round(sum(dataset[j]),2)) + "us", horizontalalignment='left')
         plt.figtext(0.70, 0.96, "Average latency: ", horizontalalignment='left')
         for j in range(len(file_list)):
-            plt.figtext(0.70, 0.96 - 0.03 * (j+1), "(" + str(j+1) + ") " +  " - " + str(round(sum(dataset[j])/len(dataset[j]),2)) + "ms", horizontalalignment='left')
+            plt.figtext(0.70, 0.96 - 0.03 * (j+1), "(" + str(j+1) + ") " +  " - " + str(round(sum(dataset[j])/len(dataset[j]),2)) + "us", horizontalalignment='left')
         plt.legend(loc='upper left')
         ax.grid
 
