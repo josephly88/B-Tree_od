@@ -1166,13 +1166,30 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
         trans_node_id = (right->is_leaf) ? 0 : right->child_id[0];
             // Insert parent's kv to left
         child_id[idx] = left->direct_insert(t, key[idx], value[idx], list, 0, trans_node_id);
+        left->key[left->num_key] = key[idx];
+        left->value[left->num_key] = value[idx];
+        if(!right->is_leaf)
+            left->child_id[left->num_key+1] = right->child_id[0];
+        left->num_key++;
             // Insert right to left
-        for(int i = 0; i < right->num_key; i++){
-            t->node_read(child_id[idx], left);
-            trans_node_id = (right->is_leaf) ? 0 : right->child_id[i+1];
-            child_id[idx] = left->direct_insert(t, right->key[i], right->value[i], list, 0, trans_node_id);
-        }
         t->node_read(child_id[idx], left);
+        for(int i = 0; i < right->num_key; i++){
+            left->key[left->num_key] = right->key[i];
+            left->value[left->num_key] = right->value[i];
+            if(!right->is_leaf) 
+                left->child_id[left->num_key+1] = right->child_id[i+1];
+            left->num_key++;  
+        }
+            // Store left node
+        if(t->cmb){
+            *list = new removeList(t->cmb_get_block_id(node_id), *list);
+            t->cmb_update_node_id(left->node_id, t->get_free_block_id());
+        }
+        else{
+            *list = new removeList(left->node_id, *list);
+            left->node_id = t->get_free_block_id();
+        }
+        t->node_write(left->node_id, left);
             // Delete the parent's kv
         node_id = direct_delete(t, key[idx], list);
         child_id[idx] = left->node_id;
