@@ -8,12 +8,19 @@ import math
 file_list = []
 opr_name = ["Insert", "Delete", "Read", "Update"]
 rm_cnt = 0
+mark_file = ""
 
+# Processing cmd arg
 if len(sys.argv) > 1:
     state = 0
     for i in range(1, len(sys.argv)):
+        # Number of removal
         if sys.argv[i] == "-r":
             state = 1
+            continue
+        # Mark special OP# file
+        if sys.argv[i] == "-m":
+            state = 2
             continue
 
         if state == 0:
@@ -23,9 +30,13 @@ if len(sys.argv) > 1:
             if rm_cnt < 0:
                 print("Error: #remove must be >= 0")
                 sys.exit()
-            break
+            state = 0
+        elif state == 2:
+            mark_file = sys.argv[i]
+            state = 0
+
 else:
-    print("Usage: {} input files ... [-r #remove]".format(sys.argv[0]))
+    print("Usage: {} input files ... [-r #remove] [-m mark OP# file]".format(sys.argv[0]))
     sys.exit()
 
 perf = [[] for i in range(len(opr_name))]
@@ -68,6 +79,25 @@ for FILE in file_list:
 
     file_opr.close()
 
+# Create marked #OP list
+mark_list = [[[] for j in range(2)] for i in range(len(file_list))]
+mfile = open(mark_file)
+while True:
+    nstr = mfile.readline()
+    # read until EOF
+    if len(nstr) == 0:
+        break
+
+    token = nstr.split('\t')
+
+    for i in range(len(file_list)):
+        mark_list[i][0].append(int(token[0]))
+        mark_list[i][1].append(perf[0][i][int(token[0])])
+mfile.close()
+
+for i in range(len(file_list)):
+    print(file_list[i] + ": " + str(sum(mark_list[i][1])))
+
 # Remove the highest data
 for opr in perf:
     if(len(opr) > 0):
@@ -80,7 +110,7 @@ for opr in perf:
             for j in opr:
                 j.remove(max(j))
 
-# plot
+# plot data
 for i in range(len(perf)):
     dataset = perf[i]
     if(len(dataset) > 0):
@@ -91,14 +121,21 @@ for i in range(len(perf)):
             y = np.array(dataset[j])
             ax.scatter(x, y, label="("+str(j+1)+") "+file_list[j], s=0.3)
 
-        ax.set(xlabel='op#', ylabel='response time (us)', title=opr_name[i]+' Operation Response time')
+        # Insert
+        if(i == 0):
+            for j in range(len(dataset)):
+                x = np.array(mark_list[j][0])
+                y = np.array(mark_list[j][1])
+                ax.scatter(x, y, label=file_list[j]+" - Split", s=0.3, marker='x')
+
+        ax.set(xlabel='op#', ylabel='response time (ms)', title=opr_name[i]+' Operation Response time')
         plt.title(opr_name[i])
         plt.figtext(0.01, 0.96, "Overral latency: ", horizontalalignment='left')
         for j in range(len(file_list)):
-            plt.figtext(0.01, 0.96 - 0.03 * (j+1), "(" + str(j+1) + ") " + " - " + str(round(sum(dataset[j]),2)) + "us", horizontalalignment='left')
+            plt.figtext(0.01, 0.96 - 0.03 * (j+1), "(" + str(j+1) + ") " + " - " + str(round(sum(dataset[j]),2)) + "ms", horizontalalignment='left')
         plt.figtext(0.70, 0.96, "Average latency: ", horizontalalignment='left')
         for j in range(len(file_list)):
-            plt.figtext(0.70, 0.96 - 0.03 * (j+1), "(" + str(j+1) + ") " +  " - " + str(round(sum(dataset[j])/len(dataset[j]),2)) + "us", horizontalalignment='left')
+            plt.figtext(0.70, 0.96 - 0.03 * (j+1), "(" + str(j+1) + ") " +  " - " + str(round(sum(dataset[j])/len(dataset[j]),2)) + "ms", horizontalalignment='left')
         plt.legend(loc='upper left')
         ax.grid
 
