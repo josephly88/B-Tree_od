@@ -6,7 +6,7 @@ import sys
 import math
 
 file_list = []
-opr_name = ["Insert", "Delete", "Read", "Update"]
+opr_name = ["Insert", "Delete", "Update", "Read"]
 rm_cnt = 0
 
 if len(sys.argv) > 1:
