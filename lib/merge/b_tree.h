@@ -7,12 +7,17 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/mman.h>
-#include "memory_map.h"
 
 using namespace std;
 
 #define FATAL do { fprintf(stderr, "Error at line %d, file %s (%d) [%s]\n", \
   __LINE__, __FILE__, errno, strerror(errno)); exit(1); } while(0)
+
+#define PAGE_SIZE 16384UL
+#define MAP_SIZE (1 << 29) // 512MB
+#define MAP_MASK (MAP_SIZE - 1)
+
+#define CMB_ADDR 0xC0000000
 
 typedef enum {
     COPY_ON_WRITE, 
@@ -611,15 +616,9 @@ u_int64_t BTree<T>::cmb_get_new_node_id(){
     mylog << "cmb_get_new_node_id()" << endl;
 
     u_int64_t new_node_id;
-    cmb->read(&new_node_id, BLOCK_MAPPING_START_ADDR, sizeof(u_int64_t));
-
+    cmb->read(&new_node_id, 0, sizeof(u_int64_t));
     u_int64_t next_node_id = new_node_id + 1;
-    if(next_node_id > (BLOCK_MAPPING_END_ADDR - BLOCK_MAPPING_START_ADDR) / sizeof(u_int64_t)){
-        cout << "CMB Block Mapping Limit Exceeded" << endl;
-        mylog << "CMB Block Mapping Limit Exceeded" << endl;
-        exit(1);
-    }
-    cmb->write(BLOCK_MAPPING_START_ADDR, &next_node_id, sizeof(u_int64_t));
+    cmb->write(0, &next_node_id, sizeof(u_int64_t));
 
     return new_node_id;
 }
@@ -627,30 +626,16 @@ u_int64_t BTree<T>::cmb_get_new_node_id(){
 template <typename T>
 u_int64_t BTree<T>::cmb_get_block_id(u_int64_t node_id){
     mylog << "cmb_get_block_id() - node id:" << node_id << endl;
-    off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(u_int64_t);
-    if(addr > BLOCK_MAPPING_END_ADDR){
-        cout << "CMB Block Mapping Read Out of Range" << endl;
-        mylog << "CMB Block Mapping Read Out of Range" << endl;
-        exit(1);
-    }
-
     u_int64_t readval;
-	cmb->read(&readval, addr, sizeof(u_int64_t));
+	cmb->read(&readval, node_id * sizeof(u_int64_t), sizeof(u_int64_t));
     return readval;
 }
 
 template <typename T>
 void BTree<T>::cmb_update_node_id(u_int64_t node_id, u_int64_t block_id){
     mylog << "cmb_update_node_id() - node id:" << node_id << " block id:" << block_id << endl;
-    off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(u_int64_t);
-    if(addr > BLOCK_MAPPING_END_ADDR){
-        cout << "CMB Block Mapping Write Out of Range" << endl;
-        mylog << "CMB Block Mapping Write Out of Range" << endl;
-        exit(1);
-    }
-
     u_int64_t writeval = block_id;
-	cmb->write(addr, &writeval, sizeof(u_int64_t));
+	cmb->write(node_id * sizeof(u_int64_t), &writeval, sizeof(u_int64_t));
 }
 
 template <typename T>
