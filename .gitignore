@@ -7,3 +7,4 @@ fake_cmb
 data/*.txt
 *.png
 run/cmb/fake_cmb
+run/merge/dup_cmb

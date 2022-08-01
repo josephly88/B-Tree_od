@@ -68,7 +68,7 @@ int main(int argc, char** argv){
                 create = true; 
             }
             else if(strcmp(argv[i], "-cmb") == 0){ // Set as CMB mode
-                mode = REAL_CMB;
+                mode = FAKE_CMB;
             }
             else if(strcmp(argv[i], "-dram") == 0){ // Set as DRAM mode
                 mode = DRAM;
@@ -210,6 +210,7 @@ int main(int argc, char** argv){
     }
 
     t->inorder_traversal((char*)"tree.dat");
+    t->display_tree();
 
     mylog.close();
 

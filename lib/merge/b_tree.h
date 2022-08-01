@@ -7,17 +7,12 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include "memory_map.h"
 
 using namespace std;
 
 #define FATAL do { fprintf(stderr, "Error at line %d, file %s (%d) [%s]\n", \
   __LINE__, __FILE__, errno, strerror(errno)); exit(1); } while(0)
-
-#define PAGE_SIZE 16384UL
-#define MAP_SIZE (1 << 29) // 512MB
-#define MAP_MASK (MAP_SIZE - 1)
-
-#define CMB_ADDR 0xC0000000
 
 typedef enum {
     COPY_ON_WRITE, 
@@ -93,7 +88,7 @@ class BTreeNode{
 
 		void stat();
 
-		void display_tree(BTree<T>* t, int level);
+		void display_tree(BTree<T>* t, MODE mode, int level);
         void inorder_traversal(BTree<T>* t, ofstream &outFile);
 
 		void search(BTree<T>* t, u_int64_t _k, T* buf);
@@ -416,7 +411,7 @@ void BTree<T>::display_tree(){
     if(root_id){
         BTreeNode<T>* root = new BTreeNode<T>(0, 0, 0);
         node_read(root_id, root);
-        root->display_tree(this, 0);
+        root->display_tree(this, mode, 0);
         delete root;
     }
     else
@@ -616,9 +611,15 @@ u_int64_t BTree<T>::cmb_get_new_node_id(){
     mylog << "cmb_get_new_node_id()" << endl;
 
     u_int64_t new_node_id;
-    cmb->read(&new_node_id, 0, sizeof(u_int64_t));
+    cmb->read(&new_node_id, BLOCK_MAPPING_START_ADDR, sizeof(u_int64_t));
+
     u_int64_t next_node_id = new_node_id + 1;
-    cmb->write(0, &next_node_id, sizeof(u_int64_t));
+    if(next_node_id > (BLOCK_MAPPING_END_ADDR - BLOCK_MAPPING_START_ADDR) / sizeof(u_int64_t)){
+        cout << "CMB Block Mapping Limit Exceeded" << endl;
+        mylog << "CMB Block Mapping Limit Exceeded" << endl;
+        exit(1);
+    }
+    cmb->write(BLOCK_MAPPING_START_ADDR, &next_node_id, sizeof(u_int64_t));
 
     return new_node_id;
 }
@@ -626,16 +627,30 @@ u_int64_t BTree<T>::cmb_get_new_node_id(){
 template <typename T>
 u_int64_t BTree<T>::cmb_get_block_id(u_int64_t node_id){
     mylog << "cmb_get_block_id() - node id:" << node_id << endl;
+    off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(u_int64_t);
+    if(addr > BLOCK_MAPPING_END_ADDR){
+        cout << "CMB Block Mapping Read Out of Range" << endl;
+        mylog << "CMB Block Mapping Read Out of Range" << endl;
+        exit(1);
+    }
+
     u_int64_t readval;
-	cmb->read(&readval, node_id * sizeof(u_int64_t), sizeof(u_int64_t));
+	cmb->read(&readval, addr, sizeof(u_int64_t));
     return readval;
 }
 
 template <typename T>
 void BTree<T>::cmb_update_node_id(u_int64_t node_id, u_int64_t block_id){
     mylog << "cmb_update_node_id() - node id:" << node_id << " block id:" << block_id << endl;
+    off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(u_int64_t);
+    if(addr > BLOCK_MAPPING_END_ADDR){
+        cout << "CMB Block Mapping Write Out of Range" << endl;
+        mylog << "CMB Block Mapping Write Out of Range" << endl;
+        exit(1);
+    }
+
     u_int64_t writeval = block_id;
-	cmb->write(node_id * sizeof(u_int64_t), &writeval, sizeof(u_int64_t));
+	cmb->write(addr, &writeval, sizeof(u_int64_t));
 }
 
 template <typename T>
@@ -672,18 +687,20 @@ void BTreeNode<T>::stat(){
 }
 
 template <typename T>
-void BTreeNode<T>::display_tree(BTree<T>* t, int level){
-    cout << "display_tree()" << endl;
-
+void BTreeNode<T>::display_tree(BTree<T>* t, MODE mode, int level){
+    
     for(int j = 0; j < level; j++) cout << '\t';
-        cout << '[' << node_id << "=>" << t->get_block_id(node_id) << ']' << endl;
+    if(mode == COPY_ON_WRITE)
+        cout << '[' << node_id << ']' << endl;
+    else
+        cout << '[' << node_id << "=>" << t->cmb_get_block_id(node_id) << ']' << endl;
 
     int i = 0;
     for(i = 0; i < num_key; i++){
         if(!is_leaf){
             BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
             t->node_read(child_id[i], node);
-            node->display_tree(t, level + 1);
+            node->display_tree(t, mode, level + 1);
             delete node;
         }
         for(int j = 0; j < level; j++) cout << '\t';
@@ -692,7 +709,7 @@ void BTreeNode<T>::display_tree(BTree<T>* t, int level){
     if(!is_leaf){
         BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
         t->node_read(child_id[i], node);
-        node->display_tree(t, level + 1);
+        node->display_tree(t, mode, level + 1);
         delete node;
     }
 }
@@ -1252,7 +1269,6 @@ removeList::removeList(int _id, removeList* _next){
     id = _id;
     next = _next;
 }
-
 
 CMB::CMB(MODE _mode){
     mylog << "CMB()" << endl;
