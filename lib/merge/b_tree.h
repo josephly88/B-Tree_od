@@ -156,7 +156,7 @@ class ITV2Leaf{
         void enqueue(CMB* cmb, u_int64_t node_id, u_int64_t lower, u_int64_t upper);
         void dequeue(CMB* cmb, ITV2LeafCache* buf);
 
-        u_int64_t search(CMB*, u_int64_t);    
+        void search(CMB* cmb, u_int64_t key, ITV2LeafCache* buf);    
     };
 
 class ITV2LeafCache{
@@ -1601,8 +1601,19 @@ void ITV2Leaf::dequeue(CMB* cmb, ITV2LeafCache* buf){
     free_push(cmb, del_idx);
 }
 
-u_int64_t ITV2Leaf::search(CMB* cmb, u_int64_t key){
-    return 0;
+void ITV2Leaf::search(CMB* cmb, u_int64_t key, ITV2LeafCache* buf){
+    off_t offset;
+
+    u_int64_t cur_idx = Q_front_idx;
+    while(cur_idx != 0){
+        offset = LEAF_CACHE_BASE_ADDR + cur_idx * sizeof(ITV2LeafCache);
+        cmb->read(buf, offset, sizeof(ITV2LeafCache));
+        if(key >= buf->lower && key <= buf->upper)
+            return;
+        cur_idx = buf->nextQ;
+    }
+
+    memset(buf, 0, sizeof(ITV2LeafCache));
 }
 
 #endif /* B_TREE_H */
