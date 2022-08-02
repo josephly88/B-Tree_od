@@ -21,14 +21,11 @@ typedef enum {
     DRAM
 } MODE;
 
-ofstream mylog;
-
 template <typename T> class BTree;
 template <typename T> class BTreeNode;
-class removeList;
 class CMB;
-class ITV2Leaf;
-class ITV2LeafCache;
+class removeList;
+ofstream mylog;
 
 template <typename T>
 class BTree{
@@ -85,7 +82,6 @@ class BTreeNode{
 		u_int64_t *child_id;	// array of child pointers
 		bool is_leaf;		// Is leaf or not
 		u_int64_t node_id;
-        u_int64_t parent_id;
 			
 		BTreeNode(int _m, bool _is_leaf, u_int64_t _node_id);
 		~BTreeNode();
@@ -109,13 +105,6 @@ class BTreeNode{
 		u_int64_t get_succ(BTree<T>* t);	
 };
 
-class removeList{
-	public:
-		int id;
-		removeList* next;
-		removeList(int _id, removeList* _next);
-};
-
 class CMB{
 	int fd;
     off_t bar_addr;
@@ -128,8 +117,6 @@ class CMB{
 		CMB(MODE _mode);
 		~CMB();
 
-        void* get_map_base();
-
         void cmb_memcpy(void* dest, void* src, size_t len);
         void remap(off_t offset);
 
@@ -138,33 +125,11 @@ class CMB{
 
 };
 
-class ITV2Leaf{
-    u_int64_t Q_front_idx;
-    u_int64_t Q_rear_idx;
-    u_int64_t free_Stack_idx;
-    u_int64_t free_idx;
-
-    public:
-        ITV2Leaf(CMB* cmb);
-
-        void stat(CMB* cmb);
-
-        u_int64_t get_free_idx(CMB* cmb);
-        void free_push(CMB* cmb, u_int64_t idx);
-        u_int64_t free_pop(CMB* cmb);
-
-        void enqueue(CMB* cmb, u_int64_t node_id, u_int64_t lower, u_int64_t upper);
-        void dequeue();
-        void search();    
-    };
-
-class ITV2LeafCache{
-    public:
-        u_int64_t node_id;
-        u_int64_t lower;
-        u_int64_t upper;
-        u_int64_t lastQ;
-        u_int64_t nextQ;
+class removeList{
+	public:
+		int id;
+		removeList* next;
+		removeList(int _id, removeList* _next);
 };
 
 template <typename T>
@@ -202,25 +167,6 @@ BTree<T>::BTree(char* filename, int degree, MODE _mode){
         u_int64_t first_node_id = 1;
         cmb->write(0, &first_node_id, sizeof(u_int64_t));    
     }
-
-    // Verification
-    cout << "Verification" << endl;
-    ITV2Leaf* tmp = new ITV2Leaf(cmb);
-    u_int64_t ret;
-    for(int i = 0; i < 10; i++){
-        ret = tmp->get_free_idx(cmb);
-        cout << ret << endl;
-    }
-    tmp->stat(cmb);
-    for(int i = 1; i < 10; i+=2){
-        tmp->free_push(cmb, i);
-    }
-    tmp->stat(cmb);
-    for(int i = 1; i < 10; i++){
-        ret = tmp->get_free_idx(cmb);
-        cout << ret << endl;
-    }
-
 }
 
 template <typename T>
@@ -719,7 +665,6 @@ BTreeNode<T>::BTreeNode(int _m, bool _is_leaf, u_int64_t _node_id){
     child_id = new u_int64_t[m+1];
     is_leaf = _is_leaf;
     node_id = _node_id;
-    parent_id = 0;
 }
 
 template <typename T>
@@ -1005,9 +950,6 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
         
     int dup_par_id = parent->direct_insert(t, node->key[min_num], node->value[min_num], list, node->node_id, new_node_id);
     node->num_key = min_num;
-
-    node->parent_id = dup_par_id;
-    new_node->parent_id = dup_par_id;
 
     t->node_write(node->node_id, node);
     t->node_write(new_node_id, new_node);
@@ -1381,10 +1323,6 @@ CMB::~CMB(){
 	close(fd);
 }
 
-void* CMB::get_map_base(){
-    return map_base;
-}
-
 void CMB::cmb_memcpy(void* dest, void* src, size_t len){
 
     u_int64_t* d = (u_int64_t*) dest;
@@ -1408,8 +1346,7 @@ void CMB::remap(off_t offset){
         map_base = mmap(0, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, map_idx);
 	    if (map_base == (void*)-1) FATAL;
 
-        if(cache_base)
-            cmb_memcpy(cache_base, map_base, MAP_SIZE);
+        cmb_memcpy(cache_base, map_base, MAP_SIZE);
     }
 }
 
@@ -1436,158 +1373,5 @@ void CMB::write(off_t offset, void* buf, int size){
         virt_addr = (char*)map_base + ((offset) & MAP_MASK);
     cmb_memcpy(virt_addr, buf, size);
 }
-
-ITV2Leaf::ITV2Leaf(CMB* cmb){
-    Q_front_idx = 0;
-    Q_rear_idx = 0;
-    free_Stack_idx = 0;
-    free_idx = 1;
-
-    off_t offset = LEAF_CACHE_START_ADDR;
-
-    cmb->write(offset, this, sizeof(ITV2Leaf));
-}
-
-void ITV2Leaf::stat(CMB* cmb){
-    ITV2Leaf* meta = (ITV2Leaf*) malloc(sizeof(ITV2Leaf));
-
-    off_t offset = LEAF_CACHE_START_ADDR;
-    cmb->read(meta, offset, sizeof(ITV2Leaf));
-
-    cout << "ITV2Leaf: stat()" << endl;
-    cout << "Q_front_idx = " << meta->Q_front_idx << endl;
-    cout << "Q_rear_idx = " << meta->Q_rear_idx << endl;
-    cout << "free_Stack_idx = " << meta->free_Stack_idx << endl;
-    cout << "free_idx = " << meta->free_idx << endl;
-
-    free(meta);
-}
-
-u_int64_t ITV2Leaf::get_free_idx(CMB* cmb){
-    // If the stack is empty
-    if(free_Stack_idx == 0){
-        off_t ret_idx = free_idx;
-        free_idx++;
-
-        // Write the new free_idx back
-        off_t offset = LEAF_CACHE_START_ADDR + ((char*) &free_idx - (char*) this);
-        cmb->write(offset, &free_idx, sizeof(u_int64_t));
-
-        return ret_idx;
-    }
-    else
-        return free_pop(cmb);
-}
-
-void ITV2Leaf::free_push(CMB* cmb, u_int64_t idx){
-    // Set the new head->next as the current head idx
-    off_t offset = LEAF_CACHE_BASE_ADDR + idx * sizeof(ITV2LeafCache);
-    if(offset >= LEAF_CACHE_END_ADDR){
-        cout << "Leaf Cache Limit Excced" << endl;
-        mylog << "Leaf Cache Limit Excced" << endl;
-        exit(1);
-    }
-    cmb->write(offset, &free_Stack_idx, sizeof(u_int64_t));
-
-    // Set the stack head to the new head
-    offset = LEAF_CACHE_START_ADDR + ((char*)&free_Stack_idx - (char*)this);
-    cmb->write(offset, &idx, sizeof(u_int64_t)); 
-
-    free_Stack_idx = idx;
-}
-
-u_int64_t ITV2Leaf::free_pop(CMB* cmb){
-    u_int64_t ret, next;
-
-    if(free_Stack_idx == 0)
-        return 0;
-
-    // Return value would be the stack head
-    ret = free_Stack_idx;
-    
-    // Read the new stack head from the head idx
-    off_t offset = LEAF_CACHE_BASE_ADDR + free_Stack_idx * sizeof(ITV2LeafCache);
-    if(offset >= LEAF_CACHE_END_ADDR){
-        cout << "Leaf Cache Limit Excced" << endl;
-        mylog << "Leaf Cache Limit Excced" << endl;
-        exit(1);
-    }
-    cmb->read(&next, offset, sizeof(u_int64_t));
-
-    // Write the new stack head back
-    free_Stack_idx = next;
-
-    offset = LEAF_CACHE_START_ADDR + ((char*)&free_Stack_idx - (char*)this);
-    if(offset >= LEAF_CACHE_END_ADDR){
-        cout << "Leaf Cache Limit Excced" << endl;
-        mylog << "Leaf Cache Limit Excced" << endl;
-        exit(1);
-    }
-    cmb->write(offset, &free_Stack_idx, sizeof(u_int64_t));
-
-    return ret;
-}
-
-/*
-void ITV2Leaf::enqueue(CMB* cmb, u_int64_t node_id, u_int64_t lower, u_int64_t upper){
-    // Get the new idx
-    u_int64_t new_idx = get_free_idx(cmb);
-
-    // Write the cache to the CMB
-    ITV2LeafCache* new_cache = new ITV2LeafCache();
-    new_cache->node_id = node_id;
-    new_cache->lower = lower;
-    new_cache->upper = upper;
-    new_cache->lastQ = Q_rear_idx;
-    new_cache->nextQ = 0;
-
-    off_t offset = LEAF_CACHE_BASE_ADDR + new_idx * sizeof(ITV2LeafCache);
-        if(offset >= LEAF_CACHE_END_ADDR){
-        cout << "Leaf Cache Limit Excced" << endl;
-        mylog << "Leaf Cache Limit Excced" << endl;
-        exit(1);
-    }
-    cmb->remap(offset);
-    void* virt_addr = (char*)cmb->get_map_base() + (offset & MAP_MASK);
-    cmb->cmb_memcpy(virt_addr, &new_cache, sizeof(ITV2LeafCache));
-
-    // Set the old rear->next to new cache
-    offset = LEAF_CACHE_BASE_ADDR + Q_rear_idx * sizeof(ITV2LeafCache) + ((char*)&new_cache->nextQ - (char*)&new_cache);
-    if(offset >= LEAF_CACHE_END_ADDR){
-        cout << "Leaf Cache Limit Excced" << endl;
-        mylog << "Leaf Cache Limit Excced" << endl;
-        exit(1);
-    }
-    cmb->remap(offset);
-    virt_addr = (char*)cmb->get_map_base() + (offset & MAP_MASK);
-    cmb->cmb_memcpy(virt_addr, &Q_rear_idx, sizeof(u_int64_t));
-
-    // Set the rear idx to the new cache idx
-    // If the front == 0 which means the queue is empty, set the front as well
-    if(Q_front_idx == 0){
-        offset = LEAF_CACHE_START_ADDR + ((char*)&Q_front_idx - (char*)this);
-        if(offset >= LEAF_CACHE_END_ADDR){
-            cout << "Leaf Cache Limit Excced" << endl;
-            mylog << "Leaf Cache Limit Excced" << endl;
-            exit(1);
-        }
-        cmb->remap(offset);
-        virt_addr = (char*)cmb->get_map_base() + (offset & MAP_MASK);
-        cmb->cmb_memcpy(virt_addr, &new_idx, sizeof(u_int64_t));
-    }
-    offset = LEAF_CACHE_START_ADDR + ((char*)&Q_rear_idx - (char*)this);
-    if(offset >= LEAF_CACHE_END_ADDR){
-        cout << "Leaf Cache Limit Excced" << endl;
-        mylog << "Leaf Cache Limit Excced" << endl;
-        exit(1);
-    }
-    cmb->remap(offset);
-    virt_addr = (char*)cmb->get_map_base() + (offset & MAP_MASK);
-    cmb->cmb_memcpy(virt_addr, &new_idx, sizeof(u_int64_t));
-
-    delete new_cache;
-}
-*/
-
 
 #endif /* B_TREE_H */
