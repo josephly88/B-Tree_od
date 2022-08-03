@@ -155,8 +155,9 @@ class ITV2Leaf{
 
         void enqueue(CMB* cmb, u_int64_t node_id, u_int64_t lower, u_int64_t upper);
         void dequeue(CMB* cmb, ITV2LeafCache* buf);
+        void remove(CMB* cmb, ITV2LeafCache* buf, u_int64_t idx);
 
-        void search(CMB* cmb, u_int64_t key, ITV2LeafCache* buf);    
+        u_int64_t search(CMB* cmb, u_int64_t key, ITV2LeafCache* buf);    
     };
 
 class ITV2LeafCache{
@@ -203,7 +204,6 @@ BTree<T>::BTree(char* filename, int degree, MODE _mode){
         u_int64_t first_node_id = 1;
         cmb->write(0, &first_node_id, sizeof(u_int64_t));    
     }
-
 }
 
 template <typename T>
@@ -1601,7 +1601,40 @@ void ITV2Leaf::dequeue(CMB* cmb, ITV2LeafCache* buf){
     free_push(cmb, del_idx);
 }
 
-void ITV2Leaf::search(CMB* cmb, u_int64_t key, ITV2LeafCache* buf){
+void ITV2Leaf::remove(CMB* cmb, ITV2LeafCache* buf, u_int64_t idx){
+    if(idx == 0) return;
+
+    off_t offset;
+    u_int64_t zero = 0;
+
+    if(Q_front_idx != idx){
+        // Set the last->next = cur->next
+        offset = LEAF_CACHE_BASE_ADDR + buf->lastQ * sizeof(ITV2LeafCache) + ((char*)&(buf->nextQ) - (char*)buf);
+        cmb->write(offset, &(buf->nextQ), sizeof(u_int64_t));
+    }
+    else{
+        // Set the front = cur->next
+        offset = LEAF_CACHE_START_ADDR + ((char*)&Q_front_idx - (char*)this);
+        cmb->write(offset, &(buf->nextQ), sizeof(u_int64_t));
+        Q_front_idx = buf->nextQ;
+    }
+
+    if(Q_rear_idx != idx){
+        // Set the next->last = cur->last
+        offset = LEAF_CACHE_BASE_ADDR + buf->nextQ * sizeof(ITV2LeafCache) + ((char*)&(buf->lastQ) - (char*)buf);
+        cmb->write(offset, &(buf->lastQ), sizeof(u_int64_t));
+    }
+    else{
+        // Set the rear = cur->last
+        offset = LEAF_CACHE_START_ADDR + ((char*)&Q_rear_idx - (char*)this);
+        cmb->write(offset, &(buf->lastQ), sizeof(u_int64_t));
+        Q_rear_idx = buf->lastQ;
+    }
+
+    free_push(cmb, idx);
+}
+
+u_int64_t ITV2Leaf::search(CMB* cmb, u_int64_t key, ITV2LeafCache* buf){
     off_t offset;
 
     u_int64_t cur_idx = Q_front_idx;
@@ -1609,11 +1642,12 @@ void ITV2Leaf::search(CMB* cmb, u_int64_t key, ITV2LeafCache* buf){
         offset = LEAF_CACHE_BASE_ADDR + cur_idx * sizeof(ITV2LeafCache);
         cmb->read(buf, offset, sizeof(ITV2LeafCache));
         if(key >= buf->lower && key <= buf->upper)
-            return;
+            return cur_idx;
         cur_idx = buf->nextQ;
     }
 
     memset(buf, 0, sizeof(ITV2LeafCache));
+    return 0;
 }
 
 #endif /* B_TREE_H */
