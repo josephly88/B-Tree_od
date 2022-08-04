@@ -71,11 +71,6 @@ class BTree{
         void search(u_int64_t _k, T* buf);
         void update(u_int64_t _k, T _v);
 		void deletion(u_int64_t _k);	
-
-		u_int64_t cmb_get_new_node_id();
-
-		u_int64_t cmb_get_block_id(u_int64_t node_id);
-		void cmb_update_node_id(u_int64_t node_id, u_int64_t block_id);
 };
 
 template <typename T>
@@ -140,11 +135,20 @@ class CMB{
 
 		void read(void* buf, off_t offset, int size);
 		void write(off_t offset, void* buf, int size);
+
+        // BKMap
+		u_int64_t get_new_node_id();
+		u_int64_t get_block_id(u_int64_t node_id);
+		void update_node_id(u_int64_t node_id, u_int64_t block_id);
+
+        u_int64_t get_lfcache_id(u_int64_t node_id);
+        void update_lfcache_id(u_int64_t node_id, u_int64_t value);
 };
 
 class BKMap{
     public:
         u_int64_t block_id;
+        u_int64_t lfcache_id;
 };
 
 class ITV2Leaf{
@@ -169,6 +173,7 @@ class ITV2Leaf{
         void enqueue(CMB* cmb, u_int64_t node_id, u_int64_t num_key, u_int64_t lower, u_int64_t upper);
         u_int64_t dequeue(CMB* cmb, ITV2LeafCache* buf);
         void remove(CMB* cmb, ITV2LeafCache* buf, u_int64_t idx);
+        void read(CMB* cmb, u_int64_t idx, ITV2LeafCache* buf);
 
         u_int64_t search(CMB* cmb, u_int64_t key, ITV2LeafCache* buf);    
     };
@@ -310,7 +315,7 @@ void BTree<T>::node_read(u_int64_t node_id, BTreeNode<T>* node){
 
     u_int64_t block_id;
     if(cmb)
-        block_id = cmb_get_block_id(node_id);       
+        block_id = cmb->get_block_id(node_id);       
     else
         block_id = node_id;
 
@@ -355,7 +360,7 @@ void BTree<T>::node_write(u_int64_t node_id, BTreeNode<T>* node){
 
     u_int64_t block_id;
     if(cmb)
-        block_id = cmb_get_block_id(node_id);
+        block_id = cmb->get_block_id(node_id);
     else
         block_id = node_id;
 
@@ -621,8 +626,9 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
             int new_root_id;     
 
             if(cmb){
-                new_root_id = cmb_get_new_node_id();
-                cmb_update_node_id(new_root_id, get_free_block_id());
+                new_root_id = cmb->get_new_node_id();
+                cmb->update_node_id(new_root_id, get_free_block_id());
+                cmb->update_lfcache_id(new_root_id, 0);
             }
             else
                 new_root_id = get_free_block_id();
@@ -651,8 +657,9 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
     }
     else{
         if(cmb){
-            root_id = cmb_get_new_node_id();
-            cmb_update_node_id(root_id, get_free_block_id());
+            root_id = cmb->get_new_node_id();
+            cmb->update_node_id(root_id, get_free_block_id());
+            cmb->update_lfcache_id(root_id, 0);
         }
         else
             root_id = get_free_block_id();
@@ -690,7 +697,7 @@ void BTree<T>::deletion(u_int64_t _k){
         node_read(root_id, root);
         if(root->num_key == 0){
             if(cmb)
-                rmlist = new removeList(cmb_get_block_id(root_id), rmlist);
+                rmlist = new removeList(cmb->get_block_id(root_id), rmlist);
             else
                 rmlist = new removeList(root_id, rmlist);
             if(root->is_leaf){
@@ -716,55 +723,6 @@ void BTree<T>::deletion(u_int64_t _k){
     }
     else
         return;
-}
-
-template <typename T>
-u_int64_t BTree<T>::cmb_get_new_node_id(){
-    mylog << "cmb_get_new_node_id()" << endl;
-
-    u_int64_t new_node_id;
-    cmb->read(&new_node_id, BLOCK_MAPPING_START_ADDR, sizeof(u_int64_t));
-
-    u_int64_t next_node_id = new_node_id + 1;
-    if(next_node_id > (BLOCK_MAPPING_END_ADDR - BLOCK_MAPPING_START_ADDR) / sizeof(u_int64_t)){
-        cout << "CMB Block Mapping Limit Exceeded" << endl;
-        mylog << "CMB Block Mapping Limit Exceeded" << endl;
-        exit(1);
-    }
-    cmb->write(BLOCK_MAPPING_START_ADDR, &next_node_id, sizeof(u_int64_t));
-
-    return new_node_id;
-}
-
-template <typename T>
-u_int64_t BTree<T>::cmb_get_block_id(u_int64_t node_id){
-    mylog << "cmb_get_block_id() - node id:" << node_id << endl;
-    BKMap ref;
-    off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.block_id - (char*)&ref);
-    if(addr > BLOCK_MAPPING_END_ADDR){
-        cout << "CMB Block Mapping Read Out of Range" << endl;
-        mylog << "CMB Block Mapping Read Out of Range" << endl;
-        exit(1);
-    }
-
-    u_int64_t readval;
-	cmb->read(&readval, addr, sizeof(u_int64_t));
-    return readval;
-}
-
-template <typename T>
-void BTree<T>::cmb_update_node_id(u_int64_t node_id, u_int64_t block_id){
-    mylog << "cmb_update_node_id() - node id:" << node_id << " block id:" << block_id << endl;
-    BKMap ref;
-    off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.block_id - (char*)&ref);
-    if(addr > BLOCK_MAPPING_END_ADDR){
-        cout << "CMB Block Mapping Write Out of Range" << endl;
-        mylog << "CMB Block Mapping Write Out of Range" << endl;
-        exit(1);
-    }
-
-    u_int64_t writeval = block_id;
-	cmb->write(addr, &writeval, sizeof(u_int64_t));
 }
 
 template <typename T>
@@ -808,7 +766,7 @@ void BTreeNode<T>::display_tree(BTree<T>* t, MODE mode, int level){
     if(mode == COPY_ON_WRITE)
         cout << '[' << node_id << ']' << endl;
     else
-        cout << '[' << node_id << "=>" << t->cmb_get_block_id(node_id) << ']' << endl;
+        cout << '[' << node_id << "=>" << t->cmb->get_block_id(node_id) << ']' << endl;
 
     int i = 0;
     for(i = 0; i < num_key; i++){
@@ -901,8 +859,8 @@ u_int64_t BTreeNode<T>::update(BTree<T>* t, u_int64_t _k, T _v, removeList** lis
         if(_k == key[i]){
             value[i] = _v;
             if(t->cmb){
-                *list = new removeList(t->cmb_get_block_id(node_id), *list);
-                t->cmb_update_node_id(node_id, t->get_free_block_id());
+                *list = new removeList(t->cmb->get_block_id(node_id), *list);
+                t->cmb->update_node_id(node_id, t->get_free_block_id());
             }
             else{
                 *list = new removeList(node_id, *list);
@@ -1022,8 +980,8 @@ u_int64_t BTreeNode<T>::direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeLis
     num_key++;
 
     if(t->cmb){
-        *list = new removeList(t->cmb_get_block_id(node_id), *list);
-        t->cmb_update_node_id(node_id, t->get_free_block_id());
+        *list = new removeList(t->cmb->get_block_id(node_id), *list);
+        t->cmb->update_node_id(node_id, t->get_free_block_id());
     }
     else{
         *list = new removeList(node_id, *list);
@@ -1047,8 +1005,9 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
 
     int new_node_id;
     if(t->cmb){
-        new_node_id = t->cmb_get_new_node_id();
-        t->cmb_update_node_id(new_node_id, t->get_free_block_id());
+        new_node_id = t->cmb->get_new_node_id();
+        t->cmb->update_node_id(new_node_id, t->get_free_block_id());
+        t->cmb->update_lfcache_id(new_node_id, 0);
     }
     else
         new_node_id = t->get_free_block_id();
@@ -1066,8 +1025,8 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
         new_node->child_id[j] = node->child_id[i];
 
     if(t->cmb){
-        *list = new removeList(t->cmb_get_block_id(node->node_id), *list);
-        t->cmb_update_node_id(node->node_id, t->get_free_block_id());
+        *list = new removeList(t->cmb->get_block_id(node->node_id), *list);
+        t->cmb->update_node_id(node->node_id, t->get_free_block_id());
     }
     else{
         *list = new removeList(node->node_id, *list);
@@ -1127,8 +1086,8 @@ u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** 
                 child_id[i+1] = node->traverse_delete(t, key[i], list);
 
                 if(t->cmb){
-                    *list = new removeList(t->cmb_get_block_id(node_id), *list);
-                    t->cmb_update_node_id(node_id, t->get_free_block_id());
+                    *list = new removeList(t->cmb->get_block_id(node_id), *list);
+                    t->cmb->update_node_id(node_id, t->get_free_block_id());
                 }
                 else{
                     *list = new removeList(node_id, *list);
@@ -1152,8 +1111,8 @@ u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** 
                 child_id[i] = node->traverse_delete(t, key[i], list);
 
                 if(t->cmb){
-                    *list = new removeList(t->cmb_get_block_id(node_id), *list);
-                    t->cmb_update_node_id(node_id, t->get_free_block_id());
+                    *list = new removeList(t->cmb->get_block_id(node_id), *list);
+                    t->cmb->update_node_id(node_id, t->get_free_block_id());
                 }
                 else{
                     *list = new removeList(node_id, *list);
@@ -1218,8 +1177,8 @@ u_int64_t BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** li
     num_key--;
 
     if(t->cmb){
-        *list = new removeList(t->cmb_get_block_id(node_id), *list);
-        t->cmb_update_node_id(node_id, t->get_free_block_id());
+        *list = new removeList(t->cmb->get_block_id(node_id), *list);
+        t->cmb->update_node_id(node_id, t->get_free_block_id());
     }
     else{
         *list = new removeList(node_id, *list);
@@ -1267,8 +1226,8 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
         child_id[idx-1] = left->direct_delete(t, key[idx-1], list);
 
         if(t->cmb){
-            *list = new removeList(t->cmb_get_block_id(node_id), *list);
-            t->cmb_update_node_id(node_id, t->get_free_block_id());
+            *list = new removeList(t->cmb->get_block_id(node_id), *list);
+            t->cmb->update_node_id(node_id, t->get_free_block_id());
         }
         else{
             *list = new removeList(node_id, *list);
@@ -1292,8 +1251,8 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
         child_id[idx+1] = right->direct_delete(t, key[idx], list);
         
         if(t->cmb){
-            *list = new removeList(t->cmb_get_block_id(node_id), *list);
-            t->cmb_update_node_id(node_id, t->get_free_block_id());
+            *list = new removeList(t->cmb->get_block_id(node_id), *list);
+            t->cmb->update_node_id(node_id, t->get_free_block_id());
         }
         else{
             *list = new removeList(node_id, *list);
@@ -1328,8 +1287,8 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
         }
             // Store left node
         if(t->cmb){
-            *list = new removeList(t->cmb_get_block_id(node_id), *list);
-            t->cmb_update_node_id(left->node_id, t->get_free_block_id());
+            *list = new removeList(t->cmb->get_block_id(node_id), *list);
+            t->cmb->update_node_id(left->node_id, t->get_free_block_id());
         }
         else{
             *list = new removeList(left->node_id, *list);
@@ -1341,8 +1300,8 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
         child_id[idx] = left->node_id;
 
         if(t->cmb){
-            *list = new removeList(t->cmb_get_block_id(node_id), *list);
-            t->cmb_update_node_id(node_id, t->get_free_block_id());
+            *list = new removeList(t->cmb->get_block_id(node_id), *list);
+            t->cmb->update_node_id(node_id, t->get_free_block_id());
         }
         else{
             *list = new removeList(node_id, *list);
@@ -1352,7 +1311,7 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
         t->node_write(node_id, this);
 
         if(t->cmb)
-            *list = new removeList(t->cmb_get_block_id(right->node_id), *list);
+            *list = new removeList(t->cmb->get_block_id(right->node_id), *list);
         else
             *list = new removeList(right->node_id, *list);
     }
@@ -1506,6 +1465,81 @@ void CMB::write(off_t offset, void* buf, int size){
     else
         virt_addr = (char*)map_base + ((offset) & MAP_MASK);
     cmb_memcpy(virt_addr, buf, size);
+}
+
+u_int64_t CMB::get_new_node_id(){
+    mylog << "get_new_node_id()" << endl;
+
+    u_int64_t new_node_id;
+    read(&new_node_id, BLOCK_MAPPING_START_ADDR, sizeof(u_int64_t));
+
+    u_int64_t next_node_id = new_node_id + 1;
+    if(next_node_id > (BLOCK_MAPPING_END_ADDR - BLOCK_MAPPING_START_ADDR) / sizeof(u_int64_t)){
+        cout << "CMB Block Mapping Limit Exceeded" << endl;
+        mylog << "CMB Block Mapping Limit Exceeded" << endl;
+        exit(1);
+    }
+    write(BLOCK_MAPPING_START_ADDR, &next_node_id, sizeof(u_int64_t));
+
+    return new_node_id;
+}
+
+u_int64_t CMB::get_block_id(u_int64_t node_id){
+    mylog << "get_block_id() - node id:" << node_id << endl;
+    BKMap ref;
+    off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.block_id - (char*)&ref);
+    if(addr > BLOCK_MAPPING_END_ADDR){
+        cout << "CMB Block Mapping Read Out of Range" << endl;
+        mylog << "CMB Block Mapping Read Out of Range" << endl;
+        exit(1);
+    }
+
+    u_int64_t readval;
+	read(&readval, addr, sizeof(u_int64_t));
+    return readval;
+}
+
+void CMB::update_node_id(u_int64_t node_id, u_int64_t block_id){
+    mylog << "update_node_id() - node id:" << node_id << " block id:" << block_id << endl;
+    BKMap ref;
+    off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.block_id - (char*)&ref);
+    if(addr > BLOCK_MAPPING_END_ADDR){
+        cout << "CMB Block Mapping Write Out of Range" << endl;
+        mylog << "CMB Block Mapping Write Out of Range" << endl;
+        exit(1);
+    }
+
+    u_int64_t writeval = block_id;
+	write(addr, &writeval, sizeof(u_int64_t));
+}
+
+u_int64_t CMB::get_lfcache_id(u_int64_t node_id){
+    mylog << "get_lfcache_id() - node id:" << node_id << endl;
+    BKMap ref;
+    off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.lfcache_id - (char*)&ref);
+    if(addr > BLOCK_MAPPING_END_ADDR){
+        cout << "CMB Block Mapping Read Out of Range" << endl;
+        mylog << "CMB Block Mapping Read Out of Range" << endl;
+        exit(1);
+    }
+
+    u_int64_t readval;
+	read(&readval, addr, sizeof(u_int64_t));
+    return readval;
+}
+
+void CMB::update_lfcache_id(u_int64_t node_id, u_int64_t value){
+    mylog << "update_lfcache_id() - node id:" << node_id << " value:" << value << endl;
+    BKMap ref;
+    off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.lfcache_id - (char*)&ref);
+    if(addr > BLOCK_MAPPING_END_ADDR){
+        cout << "CMB Block Mapping Write Out of Range" << endl;
+        mylog << "CMB Block Mapping Write Out of Range" << endl;
+        exit(1);
+    }
+
+    u_int64_t writeval = value;
+	write(addr, &writeval, sizeof(u_int64_t));
 }
 
 ITV2Leaf::ITV2Leaf(CMB* cmb, u_int64_t cap){
@@ -1754,12 +1788,27 @@ void ITV2Leaf::remove(CMB* cmb, ITV2LeafCache* buf, u_int64_t idx){
     cmb->write(offset, &num_of_cache, sizeof(u_int64_t));
 }
 
+void ITV2Leaf::read(CMB* cmb, u_int64_t idx, ITV2LeafCache* buf){
+    off_t offset = LEAF_CACHE_BASE_ADDR + idx * sizeof(ITV2LeafCache);
+    if(offset >= LEAF_CACHE_END_ADDR){
+        cout << "Leaf Cache Limit Excced" << endl;
+        mylog << "Leaf Cache Limit Excced" << endl;
+        exit(1);
+    }
+    cmb->read(buf, offset, sizeof(ITV2LeafCache));
+}
+
 u_int64_t ITV2Leaf::search(CMB* cmb, u_int64_t key, ITV2LeafCache* buf){
     off_t offset;
 
     u_int64_t cur_idx = Q_front_idx;
     while(cur_idx != 0){
         offset = LEAF_CACHE_BASE_ADDR + cur_idx * sizeof(ITV2LeafCache);
+        if(offset >= LEAF_CACHE_END_ADDR){
+            cout << "Leaf Cache Limit Excced" << endl;
+            mylog << "Leaf Cache Limit Excced" << endl;
+            exit(1);
+        }
         cmb->read(buf, offset, sizeof(ITV2LeafCache));
         if(key >= buf->lower && key <= buf->upper)
             return cur_idx;
