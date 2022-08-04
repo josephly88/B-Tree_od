@@ -140,7 +140,7 @@ class CMB{
 		u_int64_t get_new_node_id();
 		u_int64_t get_block_id(u_int64_t node_id);
 		void update_node_id(u_int64_t node_id, u_int64_t block_id);
-
+        // ITV2Leaf Cache
         u_int64_t get_lfcache_id(u_int64_t node_id);
         void update_lfcache_id(u_int64_t node_id, u_int64_t value);
 };
@@ -170,7 +170,7 @@ class ITV2Leaf{
         void free_push(CMB* cmb, u_int64_t idx);
         u_int64_t free_pop(CMB* cmb);
 
-        void enqueue(CMB* cmb, u_int64_t node_id, u_int64_t num_key, u_int64_t lower, u_int64_t upper);
+        u_int64_t enqueue(CMB* cmb, u_int64_t node_id, u_int64_t num_key, u_int64_t lower, u_int64_t upper);
         u_int64_t dequeue(CMB* cmb, ITV2LeafCache* buf);
         void remove(CMB* cmb, ITV2LeafCache* buf, u_int64_t idx);
         void read(CMB* cmb, u_int64_t idx, ITV2LeafCache* buf);
@@ -607,6 +607,40 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
     if(root_id){
         removeList* rmlist = NULL;
 
+        if(leafCache){
+            ITV2LeafCache lfcache;
+            u_int64_t hit_idx = leafCache->search(cmb, _k, &lfcache);
+
+            if(hit_idx != 0){
+                if(lfcache.num_key < m - 1){
+                    //Hit and no split
+                    // ##
+                    HIT++;
+                    BTreeNode<T>* leaf = new BTreeNode<T>(0, 0, 0);
+                    node_read(lfcache.node_id, leaf);
+                    leafCache->remove(cmb, &lfcache, hit_idx);
+                    leaf->direct_insert(this, _k, _v, &rmlist);
+                    delete leaf;
+
+                    if(rmlist){
+                        removeList* cur = rmlist;
+                        removeList* next = NULL;
+                        while(cur != NULL){
+                            next = cur->next;
+                            set_block_id(cur->id, false);
+                            delete cur;
+                            cur = next;
+                        }
+                    }
+
+                    return;
+                }
+                else{
+                    leafCache->remove(cmb, &lfcache, hit_idx);
+                }
+            }
+        }
+
         BTreeNode<T>* root = new BTreeNode<T>(0, 0, 0);
         node_read(root_id, root);
         int dup_node_id = root->traverse_insert(this, _k, _v, &rmlist);
@@ -990,6 +1024,20 @@ u_int64_t BTreeNode<T>::direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeLis
 
     t->node_write(node_id, this);
 
+    if(t->leafCache && is_leaf && num_key <= m - 1){
+        u_int64_t lfcache_id = t->cmb->get_lfcache_id(node_id);
+        ITV2LeafCache lfcache;
+        if(lfcache_id != 0){
+            // Remove the leaf cache if it is existed
+            t->leafCache->read(t->cmb, lfcache_id, &lfcache);
+            t->leafCache->remove(t->cmb, &lfcache, lfcache_id);
+            t->cmb->update_lfcache_id(node_id, 0);
+        }
+        // Create a new cache an update it
+        u_int64_t new_id = t->leafCache->enqueue(t->cmb, node_id, num_key, key[0], key[num_key - 1]);
+        t->cmb->update_lfcache_id(node_id, new_id);
+    }
+
     return node_id;
 }
 
@@ -1041,6 +1089,36 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
 
     t->node_write(node->node_id, node);
     t->node_write(new_node_id, new_node);
+
+    // Update or Create a new cache for node
+    if(t->leafCache && node->is_leaf && node->num_key <= m - 1){
+        u_int64_t lfcache_id = t->cmb->get_lfcache_id(node->node_id);
+        ITV2LeafCache lfcache;
+        if(lfcache_id != 0){
+            // Remove the leaf cache if it is existed
+            t->leafCache->read(t->cmb, lfcache_id, &lfcache);
+            t->leafCache->remove(t->cmb, &lfcache, lfcache_id);
+            t->cmb->update_lfcache_id(node->node_id, 0);
+        }
+        // Create a new cache an update it
+        u_int64_t new_id = t->leafCache->enqueue(t->cmb, node->node_id, node->num_key, node->key[0], node->key[node->num_key - 1]);
+        t->cmb->update_lfcache_id(node->node_id, new_id);
+    }
+
+    // Update or Create a new cache for new node
+    if(t->leafCache && new_node->is_leaf && new_node->num_key <= m - 1){
+        u_int64_t lfcache_id = t->cmb->get_lfcache_id(new_node->node_id);
+        ITV2LeafCache lfcache;
+        if(lfcache_id != 0){
+            // Remove the leaf cache if it is existed
+            t->leafCache->read(t->cmb, lfcache_id, &lfcache);
+            t->leafCache->remove(t->cmb, &lfcache, lfcache_id);
+            t->cmb->update_lfcache_id(new_node->node_id, 0);
+        }
+        // Create a new cache an update it
+        u_int64_t new_id = t->leafCache->enqueue(t->cmb, new_node->node_id, new_node->num_key, new_node->key[0], new_node->key[new_node->num_key - 1]);
+        t->cmb->update_lfcache_id(new_node->node_id, new_id);
+    }
 
     delete node;
     delete parent;
@@ -1643,7 +1721,7 @@ u_int64_t ITV2Leaf::free_pop(CMB* cmb){
     return ret;
 }
 
-void ITV2Leaf::enqueue(CMB* cmb, u_int64_t node_id, u_int64_t num_key, u_int64_t lower, u_int64_t upper){
+u_int64_t ITV2Leaf::enqueue(CMB* cmb, u_int64_t node_id, u_int64_t num_key, u_int64_t lower, u_int64_t upper){
     
     if(full()){
         ITV2LeafCache* deQ = new ITV2LeafCache();
@@ -1709,6 +1787,8 @@ void ITV2Leaf::enqueue(CMB* cmb, u_int64_t node_id, u_int64_t num_key, u_int64_t
     cmb->write(offset, &num_of_cache, sizeof(u_int64_t));
 
     delete new_cache;
+
+    return new_idx;
 }
 
 u_int64_t ITV2Leaf::dequeue(CMB* cmb, ITV2LeafCache* buf){
@@ -1740,6 +1820,12 @@ u_int64_t ITV2Leaf::dequeue(CMB* cmb, ITV2LeafCache* buf){
         offset = LEAF_CACHE_BASE_ADDR + Q_front_idx * sizeof(ITV2LeafCache) + ((char*)&(buf->lastQ) - (char*)buf);
         cmb->write(offset, &zero, sizeof(u_int64_t));
     }
+
+    // Clear the BKMap->lfcache_id
+    u_int64_t node_id;
+    offset = LEAF_CACHE_BASE_ADDR + del_idx * sizeof(ITV2LeafCache) + ((char*)&(buf->node_id) - (char*)buf);
+    cmb->read(&node_id, offset, sizeof(u_int64_t));
+    cmb->update_lfcache_id(node_id, 0);
 
     // return the free cache slot to free stack
     free_push(cmb, del_idx);
@@ -1780,6 +1866,12 @@ void ITV2Leaf::remove(CMB* cmb, ITV2LeafCache* buf, u_int64_t idx){
         cmb->write(offset, &(buf->lastQ), sizeof(u_int64_t));
         Q_rear_idx = buf->lastQ;
     }
+
+    // Clear the BKMap->lfcache_id
+    u_int64_t node_id;
+    offset = LEAF_CACHE_BASE_ADDR + idx * sizeof(ITV2LeafCache) + ((char*)&(buf->node_id) - (char*)buf);
+    cmb->read(&node_id, offset, sizeof(u_int64_t));
+    cmb->update_lfcache_id(node_id, 0);
 
     free_push(cmb, idx);
 
