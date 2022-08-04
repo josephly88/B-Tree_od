@@ -210,6 +210,12 @@ int main(int argc, char** argv){
 
     }
 
+    t->inorder_traversal((char*)"tree.dat");
+    if(t->leafCache){
+        t->leafCache->stat(t->cmb);
+       cout << "HIT = " << HIT << endl;
+    }
+
     // For Debug
     //t->display_tree();
     //t->print_used_block_id();
