@@ -30,6 +30,7 @@ template <typename T> class BTree;
 template <typename T> class BTreeNode;
 class removeList;
 class CMB;
+class BKMap;
 class ITV2Leaf;
 class ITV2LeafCache;
 
@@ -139,7 +140,11 @@ class CMB{
 
 		void read(void* buf, off_t offset, int size);
 		void write(off_t offset, void* buf, int size);
+};
 
+class BKMap{
+    public:
+        u_int64_t block_id;
 };
 
 class ITV2Leaf{
@@ -305,7 +310,7 @@ void BTree<T>::node_read(u_int64_t node_id, BTreeNode<T>* node){
 
     u_int64_t block_id;
     if(cmb)
-        cmb->read(&block_id, node_id * sizeof(u_int64_t), sizeof(u_int64_t));  
+        block_id = cmb_get_block_id(node_id);       
     else
         block_id = node_id;
 
@@ -350,7 +355,7 @@ void BTree<T>::node_write(u_int64_t node_id, BTreeNode<T>* node){
 
     u_int64_t block_id;
     if(cmb)
-        cmb->read(&block_id, node_id * sizeof(u_int64_t), sizeof(u_int64_t));  
+        block_id = cmb_get_block_id(node_id);
     else
         block_id = node_id;
 
@@ -597,12 +602,6 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
     if(root_id){
         removeList* rmlist = NULL;
 
-        if(leafCache){
-            ITV2LeafCache lfcache;
-            u_int64_t hit_idx = leafCache->search(cmb, _k, &lfcache);
-
-        }
-
         BTreeNode<T>* root = new BTreeNode<T>(0, 0, 0);
         node_read(root_id, root);
         int dup_node_id = root->traverse_insert(this, _k, _v, &rmlist);
@@ -740,7 +739,8 @@ u_int64_t BTree<T>::cmb_get_new_node_id(){
 template <typename T>
 u_int64_t BTree<T>::cmb_get_block_id(u_int64_t node_id){
     mylog << "cmb_get_block_id() - node id:" << node_id << endl;
-    off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(u_int64_t);
+    BKMap ref;
+    off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.block_id - (char*)&ref);
     if(addr > BLOCK_MAPPING_END_ADDR){
         cout << "CMB Block Mapping Read Out of Range" << endl;
         mylog << "CMB Block Mapping Read Out of Range" << endl;
@@ -755,7 +755,8 @@ u_int64_t BTree<T>::cmb_get_block_id(u_int64_t node_id){
 template <typename T>
 void BTree<T>::cmb_update_node_id(u_int64_t node_id, u_int64_t block_id){
     mylog << "cmb_update_node_id() - node id:" << node_id << " block id:" << block_id << endl;
-    off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(u_int64_t);
+    BKMap ref;
+    off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.block_id - (char*)&ref);
     if(addr > BLOCK_MAPPING_END_ADDR){
         cout << "CMB Block Mapping Write Out of Range" << endl;
         mylog << "CMB Block Mapping Write Out of Range" << endl;
@@ -1030,7 +1031,6 @@ u_int64_t BTreeNode<T>::direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeLis
     }
 
     t->node_write(node_id, this);
-
 
     return node_id;
 }
