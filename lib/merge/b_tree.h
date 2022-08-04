@@ -37,6 +37,7 @@ class ITV2LeafCache;
 template <typename T>
 class BTree{
 	int m;				// degree
+    int min_num; 		// minimun number of node
 	u_int64_t root_id;		// Pointer to root node
 	int fd;
 	int block_size;
@@ -200,6 +201,7 @@ BTree<T>::BTree(char* filename, int degree, MODE _mode, int lfcache){
     fd = open(filename, O_RDWR | O_DIRECT);
     block_size = PAGE_SIZE;
     m = degree;
+    min_num = (m % 2 == 0) ? m / 2 - 1 : m / 2;
     block_cap = (block_size - sizeof(BTree)) * 8;
     root_id = 0;
     mode = _mode;
@@ -713,6 +715,40 @@ void BTree<T>::deletion(u_int64_t _k){
 
     if(root_id){
         removeList* rmlist = NULL;
+
+        if(leafCache){
+            ITV2LeafCache lfcache;
+            u_int64_t hit_idx = leafCache->search(cmb, _k, &lfcache);
+
+            if(hit_idx != 0){
+                if(lfcache.num_key > min_num){
+                    //Hit and no merge
+                    // ##
+                    HIT++;
+                    BTreeNode<T>* leaf = new BTreeNode<T>(0, 0, 0);
+                    node_read(lfcache.node_id, leaf);
+                    leafCache->remove(cmb, &lfcache, hit_idx);
+                    leaf->direct_delete(this, _k, &rmlist);
+                    delete leaf;
+
+                    if(rmlist){
+                        removeList* cur = rmlist;
+                        removeList* next = NULL;
+                        while(cur != NULL){
+                            next = cur->next;
+                            set_block_id(cur->id, false);
+                            delete cur;
+                            cur = next;
+                        }
+                    }
+
+                    return;
+                }
+                else{
+                    leafCache->remove(cmb, &lfcache, hit_idx);
+                }
+            }
+        }
 
         BTreeNode<T>* root = new BTreeNode<T>(0, 0, 0);
         node_read(root_id, root);
@@ -1265,6 +1301,20 @@ u_int64_t BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** li
 
     t->node_write(node_id, this);
 
+    if(t->leafCache && is_leaf && num_key >= min_num){
+        u_int64_t lfcache_id = t->cmb->get_lfcache_id(node_id);
+        ITV2LeafCache lfcache;
+        if(lfcache_id != 0){
+            // Remove the leaf cache if it is existed
+            t->leafCache->read(t->cmb, lfcache_id, &lfcache);
+            t->leafCache->remove(t->cmb, &lfcache, lfcache_id);
+            t->cmb->update_lfcache_id(node_id, 0);
+        }
+        // Create a new cache an update it
+        u_int64_t new_id = t->leafCache->enqueue(t->cmb, node_id, num_key, key[0], key[num_key - 1]);
+        t->cmb->update_lfcache_id(node_id, new_id);
+    }
+
     return node_id;
 }
 
@@ -1290,7 +1340,7 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
     int trans_node_id;
 
     if(idx - 1 >= 0 && left->num_key > min_num){
-        mylog << "borrow_from_sibling() - node id:" << child_id[idx] << endl;
+        mylog << "borrow_from_left_sibling() - node id:" << child_id[idx] << endl;
         //Borrowing from left
         t->node_read(child_id[idx-1], left);
         t->node_read(child_id[idx], right);
@@ -1312,10 +1362,10 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             node_id = t->get_free_block_id();
         }
 
-        t->node_write(node_id, this);                
+        t->node_write(node_id, this);          
     }
     else if(idx + 1 <= num_key && right->num_key > min_num){
-        mylog << "borrow_from_sibling() - node id:" << child_id[idx] << endl;
+        mylog << "borrow_from_rigtt_sibling() - node id:" << child_id[idx] << endl;
         //Borrowing from right
         t->node_read(child_id[idx], left);
         t->node_read(child_id[idx+1], right);
@@ -1392,6 +1442,32 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             *list = new removeList(t->cmb->get_block_id(right->node_id), *list);
         else
             *list = new removeList(right->node_id, *list);
+
+        // Remove the leaf cache of right if it is in the queue
+        if(t->leafCache && right->is_leaf){
+            u_int64_t lfcache_id = t->cmb->get_lfcache_id(right->node_id);
+            ITV2LeafCache lfcache;
+            if(lfcache_id != 0){
+                // Remove the leaf cache if it is existed
+                t->leafCache->read(t->cmb, lfcache_id, &lfcache);
+                t->leafCache->remove(t->cmb, &lfcache, lfcache_id);
+            }
+        }
+
+        // Update or Create a new cache for left
+        if(t->leafCache && left->is_leaf && left->num_key >= min_num){
+            u_int64_t lfcache_id = t->cmb->get_lfcache_id(left->node_id);
+            ITV2LeafCache lfcache;
+            if(lfcache_id != 0){
+                // Remove the leaf cache if it is existed
+                t->leafCache->read(t->cmb, lfcache_id, &lfcache);
+                t->leafCache->remove(t->cmb, &lfcache, lfcache_id);
+                t->cmb->update_lfcache_id(left->node_id, 0);
+            }
+            // Create a new cache an update it
+            u_int64_t new_id = t->leafCache->enqueue(t->cmb, left->node_id, left->num_key, left->key[0], left->key[left->num_key - 1]);
+            t->cmb->update_lfcache_id(left->node_id, new_id);
+        }
     }
 
     delete node;
