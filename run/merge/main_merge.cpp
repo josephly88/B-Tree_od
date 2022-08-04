@@ -40,6 +40,7 @@ int main(int argc, char** argv){
     int end = 0;
     bool create = false;
     MODE mode = COPY_ON_WRITE;
+    int lfcache = 0;
 
     if(argc < 2){
         usage();
@@ -73,6 +74,10 @@ int main(int argc, char** argv){
             else if(strcmp(argv[i], "-dram") == 0){ // Set as DRAM mode
                 mode = DRAM;
             }
+            else if(strcmp(argv[i], "-lfcache") == 0){
+                lfcache = atoi(argv[i+1]);
+                i++;
+            }
             else{
                 tree_file = argv[i];
                 break;
@@ -94,7 +99,7 @@ int main(int argc, char** argv){
     // Create a new tree file
         cout << "Create tree <" << tree_file << ">" << endl;
         mylog << "Create tree <" << tree_file << ">" << endl;
-        t = new BTree<TYPE>(tree_file, degree, mode);
+        t = new BTree<TYPE>(tree_file, degree, mode, lfcache);
     }
     else{
     // Existed tree file
@@ -103,7 +108,7 @@ int main(int argc, char** argv){
         int fd = open(tree_file, O_RDWR | O_DIRECT);
         t = (BTree<TYPE>*) calloc(1, sizeof(BTree<TYPE>));
         t->tree_read(fd, t);
-        t->reopen(fd, mode);
+        t->reopen(fd, mode, lfcache);
     }
 
     t->stat();
@@ -196,11 +201,7 @@ int main(int argc, char** argv){
             }
             else{
                 continue;
-            }            
-                
-            // Display tree sturcture for Debug
-            //t->display_tree();
-            //t->print_used_block_id();
+            }
         }
 	    cout << endl << "Done!" << endl;;
 
@@ -209,8 +210,9 @@ int main(int argc, char** argv){
 
     }
 
-    t->inorder_traversal((char*)"tree.dat");
-    t->display_tree();
+    // For Debug
+    //t->display_tree();
+    //t->print_used_block_id();
 
     mylog.close();
 

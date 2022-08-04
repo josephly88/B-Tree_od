@@ -41,11 +41,12 @@ class BTree{
 		
 	public:
 	    CMB* cmb;
+        ITV2Leaf* leafCache;
 
-		BTree(char* filename, int degree, MODE _mode);
+		BTree(char* filename, int degree, MODE _mode, int lfcache);
 		~BTree();
 
-		void reopen(int _fd, MODE _mode);
+		void reopen(int _fd, MODE _mode, int lfcache);
 
 		void stat();
 
@@ -143,18 +144,22 @@ class ITV2Leaf{
     u_int64_t Q_rear_idx;
     u_int64_t free_Stack_idx;
     u_int64_t free_idx;
+    u_int64_t capacity;
+    u_int64_t num_of_cache;
 
     public:
-        ITV2Leaf(CMB* cmb);
+        ITV2Leaf(CMB* cmb, u_int64_t cap);
 
         void stat(CMB* cmb);
+
+        bool full();
 
         u_int64_t get_free_idx(CMB* cmb);
         void free_push(CMB* cmb, u_int64_t idx);
         u_int64_t free_pop(CMB* cmb);
 
         void enqueue(CMB* cmb, u_int64_t node_id, u_int64_t lower, u_int64_t upper);
-        void dequeue(CMB* cmb, ITV2LeafCache* buf);
+        u_int64_t dequeue(CMB* cmb, ITV2LeafCache* buf);
         void remove(CMB* cmb, ITV2LeafCache* buf, u_int64_t idx);
 
         u_int64_t search(CMB* cmb, u_int64_t key, ITV2LeafCache* buf);    
@@ -170,7 +175,7 @@ class ITV2LeafCache{
 };
 
 template <typename T>
-BTree<T>::BTree(char* filename, int degree, MODE _mode){
+BTree<T>::BTree(char* filename, int degree, MODE _mode, int lfcache){
     mylog << "BTree()" << endl;
 
     if(degree > (int)((PAGE_SIZE - sizeof(BTreeNode<T>) - sizeof(u_int64_t)) / (sizeof(u_int64_t) + sizeof(T))) ){
@@ -184,6 +189,7 @@ BTree<T>::BTree(char* filename, int degree, MODE _mode){
     block_cap = (block_size - sizeof(BTree)) * 8;
     root_id = 0;
     mode = _mode;
+    leafCache = NULL;
     
     char* buf;
     posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
@@ -202,7 +208,11 @@ BTree<T>::BTree(char* filename, int degree, MODE _mode){
         // Map CMB
         cmb = new CMB(mode);    
         u_int64_t first_node_id = 1;
-        cmb->write(0, &first_node_id, sizeof(u_int64_t));    
+        cmb->write(0, &first_node_id, sizeof(u_int64_t));
+
+        // Interval to Leaf Cache Optimization
+        if(lfcache > 0)
+            leafCache = new ITV2Leaf(cmb, (u_int64_t)lfcache);
     }
 }
 
@@ -214,15 +224,19 @@ BTree<T>::~BTree(){
 }
 
 template <typename T>
-void BTree<T>::reopen(int _fd, MODE _mode){
+void BTree<T>::reopen(int _fd, MODE _mode, int lfcache){
     mylog << "reopen()" << endl;
     fd = _fd;
     mode = _mode;
     tree_write(fd, this);
     if(mode == COPY_ON_WRITE)
         cmb = NULL;
-    else
+    else{
         cmb = new CMB(mode);
+        if(lfcache > 0)
+            leafCache = new ITV2Leaf(cmb, (u_int64_t)lfcache);
+    }
+
 }
 
 template <typename T>
@@ -476,6 +490,26 @@ void BTree<T>::search(u_int64_t _k, T* buf){
     mylog << "search() - key:" << _k << endl;
 
     if(root_id){
+        // Interval to Leaf Optimization
+        u_int64_t hit_idx;
+
+        if(leafCache){
+            ITV2LeafCache lfcache;
+            u_int64_t hit_idx = leafCache->search(cmb, _k, &lfcache);
+
+            if(hit_idx != 0){
+                // Hit
+                // Remove the cache from the queue, then Read the value
+                BTreeNode<T>* leaf = new BTreeNode<T>(0, 0, 0);
+                node_read(lfcache.node_id, leaf);
+                leafCache->remove(cmb, &lfcache, hit_idx);
+                leaf->search(this, _k, buf);
+                delete leaf;
+
+                return;
+            }
+        }
+
         BTreeNode<T>* root = new BTreeNode<T>(0, 0, 0);
         node_read(root_id, root);
         root->search(this, _k, buf);
@@ -491,6 +525,34 @@ void BTree<T>::update(u_int64_t _k, T _v){
 
     if(root_id){
         removeList* rmlist = NULL;
+
+        if(leafCache){
+            ITV2LeafCache lfcache;
+            u_int64_t hit_idx = leafCache->search(cmb, _k, &lfcache);
+
+            if(hit_idx != 0){
+                // Hit
+                // Remove the cache from the queue, then Update the value 
+                BTreeNode<T>* leaf = new BTreeNode<T>(0, 0, 0);
+                node_read(lfcache.node_id, leaf);
+                leafCache->remove(cmb, &lfcache, hit_idx);
+                leaf->update(this, _k, _v, &rmlist);
+                delete leaf;
+
+                if(rmlist){
+                    removeList* cur = rmlist;
+                    removeList* next = NULL;
+                    while(cur != NULL){
+                        next = cur->next;
+                        set_block_id(cur->id, false);
+                        delete cur;
+                        cur = next;
+                    }
+                }
+
+                return;
+            }
+        }
 
         BTreeNode<T>* root = new BTreeNode<T>(0, 0, 0);
         node_read(root_id, root);
@@ -776,12 +838,24 @@ void BTreeNode<T>::inorder_traversal(BTree<T>* t, ofstream &outFile){
 
 template <typename T>
 void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf){
-    mylog << "serach() - key:" << _k << endl;
+    mylog << "search() - key:" << _k << endl;
 
     int i;
     for(i = 0; i < num_key; i++){
         if(_k == key[i]){
+            // Key match
             memcpy(buf, &value[i], sizeof(T));
+
+            // Add to the leaf interval cache
+            if(t->leafCache && is_leaf){
+                if(t->leafCache->full()){
+                    ITV2LeafCache* deQ = new ITV2LeafCache();
+                    u_int64_t idx;
+                    idx = t->leafCache->dequeue(t->cmb, deQ);
+                }
+                t->leafCache->enqueue(t->cmb, node_id, key[0], key[num_key - 1]);
+            }
+
             return;
         }
         if(_k < key[i]){
@@ -827,6 +901,17 @@ u_int64_t BTreeNode<T>::update(BTree<T>* t, u_int64_t _k, T _v, removeList** lis
             }                
 
             t->node_write(node_id, this);
+
+            // Add to the leaf interval cache
+            if(t->leafCache && is_leaf){
+                if(t->leafCache->full()){
+                    ITV2LeafCache* deQ = new ITV2LeafCache();
+                    u_int64_t idx;
+                    idx = t->leafCache->dequeue(t->cmb, deQ);
+                }
+                t->leafCache->enqueue(t->cmb, node_id, key[0], key[num_key - 1]);
+            }
+
             return node_id;
         }
         if(_k < key[i])
@@ -1420,11 +1505,13 @@ void CMB::write(off_t offset, void* buf, int size){
     cmb_memcpy(virt_addr, buf, size);
 }
 
-ITV2Leaf::ITV2Leaf(CMB* cmb){
+ITV2Leaf::ITV2Leaf(CMB* cmb, u_int64_t cap){
     Q_front_idx = 0;
     Q_rear_idx = 0;
     free_Stack_idx = 0;
     free_idx = 1;
+    capacity = cap;
+    num_of_cache = 0;
 
     off_t offset = LEAF_CACHE_START_ADDR;
 
@@ -1442,8 +1529,16 @@ void ITV2Leaf::stat(CMB* cmb){
     cout << "Q_rear_idx = " << meta->Q_rear_idx << endl;
     cout << "free_Stack_idx = " << meta->free_Stack_idx << endl;
     cout << "free_idx = " << meta->free_idx << endl;
+    cout << "capacity = " << meta->capacity << endl;
+    cout << "num_of_cache = " << meta->num_of_cache << endl;
 
     free(meta);
+}
+
+bool ITV2Leaf::full(){
+    if(num_of_cache >= capacity)
+        return true;
+    return false;
 }
 
 u_int64_t ITV2Leaf::get_free_idx(CMB* cmb){
@@ -1564,13 +1659,17 @@ void ITV2Leaf::enqueue(CMB* cmb, u_int64_t node_id, u_int64_t lower, u_int64_t u
         Q_front_idx = new_idx;
     }
 
+    num_of_cache++;
+    offset = LEAF_CACHE_START_ADDR + ((char*) &num_of_cache - (char*) this);
+    cmb->write(offset, &num_of_cache, sizeof(u_int64_t));
+
     delete new_cache;
 }
 
-void ITV2Leaf::dequeue(CMB* cmb, ITV2LeafCache* buf){
+u_int64_t ITV2Leaf::dequeue(CMB* cmb, ITV2LeafCache* buf){
     if(Q_front_idx == 0){
         memset(buf, 0, sizeof(ITV2LeafCache));
-        return;
+        return 0;
     }
 
     u_int64_t del_idx = Q_front_idx;
@@ -1599,6 +1698,12 @@ void ITV2Leaf::dequeue(CMB* cmb, ITV2LeafCache* buf){
 
     // return the free cache slot to free stack
     free_push(cmb, del_idx);
+
+    num_of_cache--;
+    offset = LEAF_CACHE_START_ADDR + ((char*) &num_of_cache - (char*) this);
+    cmb->write(offset, &num_of_cache, sizeof(u_int64_t));
+
+    return del_idx;
 }
 
 void ITV2Leaf::remove(CMB* cmb, ITV2LeafCache* buf, u_int64_t idx){
@@ -1632,6 +1737,10 @@ void ITV2Leaf::remove(CMB* cmb, ITV2LeafCache* buf, u_int64_t idx){
     }
 
     free_push(cmb, idx);
+
+    num_of_cache--;
+    offset = LEAF_CACHE_START_ADDR + ((char*) &num_of_cache - (char*) this);
+    cmb->write(offset, &num_of_cache, sizeof(u_int64_t));
 }
 
 u_int64_t ITV2Leaf::search(CMB* cmb, u_int64_t key, ITV2LeafCache* buf){
