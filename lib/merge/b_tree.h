@@ -237,6 +237,7 @@ BTree<T>::~BTree(){
     mylog << "~BTree()" << endl;
     close(fd);
     if(cmb) delete cmb;
+    if(leafCache) delete leafCache;
 }
 
 template <typename T>
@@ -1803,6 +1804,7 @@ u_int64_t ITV2Leaf::enqueue(CMB* cmb, u_int64_t node_id, u_int64_t num_key, u_in
         ITV2LeafCache* deQ = new ITV2LeafCache();
         u_int64_t idx;
         idx = dequeue(cmb, deQ);
+        delete deQ;
     }
     
     // Get the new idx
