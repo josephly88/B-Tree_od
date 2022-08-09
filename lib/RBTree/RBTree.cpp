@@ -114,6 +114,7 @@ void RBTree::insert(u_int64_t key){
                 
                 free_idx++;
 
+                delete new_node;
                 break;
             }
         }
@@ -308,6 +309,7 @@ void RBTree::remove(u_int64_t key){
         removeFix(replace_idx, target_node->parent_idx);
     }
     
+    delete delete_node;
     delete target_node;
 }
 
@@ -464,6 +466,7 @@ void RBTree::removeFix(u_int64_t idx, u_int64_t cur_parent_idx){
         else{
             addr = (char*)map_base + cur_idx * sizeof(RBTreeNode) + ((char*)&cur->color - (char*)cur);
             memcpy(addr, &black, sizeof(u_int64_t));
+            delete cur;
             break;
         }  
 
@@ -685,6 +688,7 @@ int main(){
         rbtree->display();
     }   
 
+    delete rbtree;
     munmap(map_base, MAP_SIZE);
     close(fd);
 
