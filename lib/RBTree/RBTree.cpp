@@ -28,8 +28,9 @@ class RBTree{
 
         void insert(u_int64_t key);
         void insertFix(u_int64_t idx);
-        void remove();
-        void search();
+        void remove(u_int64_t key);
+        void removeFix(u_int64_t idx, u_int64_t cur_parent_idx);
+        u_int64_t search(u_int64_t key);
 
         void display();
 
@@ -40,15 +41,17 @@ class RBTree{
 
         void leafRotation(u_int64_t x_idx);
         void rightRotation(u_int64_t x_idx);
+
+        u_int64_t succesor(u_int64_t idx);
 };
 
 class RBTreeNode{
     public:
         u_int64_t key;
-        u_int64_t color;    // Red - 1, Black - 0
-        u_int64_t parent_idx;
         u_int64_t left_child_idx;
-        u_int64_t right_child_idx;     
+        u_int64_t right_child_idx;  
+        u_int64_t color;    // Red - 1, Black - 0
+        u_int64_t parent_idx;   
 
         RBTreeNode(u_int64_t key, u_int64_t color, u_int64_t parent_idx);   
 
@@ -239,6 +242,261 @@ void RBTree::insertFix(u_int64_t idx){
     }
 }
 
+void RBTree::remove(u_int64_t key){
+    u_int64_t delete_idx = search(key);
+    if(delete_idx == 0){
+        cout << "Data not found" << endl;
+        return;
+    }
+    RBTreeNode* delete_node = new RBTreeNode(0,0,0);
+
+    char* addr;
+    u_int64_t target_idx = 0;
+    RBTreeNode* target_node = new RBTreeNode(0,0,0);
+    u_int64_t replace_idx = 0;
+
+    readNode(delete_idx, delete_node);
+
+    if(delete_node->left_child_idx == 0 || delete_node->right_child_idx == 0){
+        // Has <= 1 child
+        target_idx = delete_idx;
+        memcpy(target_node, delete_node, sizeof(RBTreeNode));
+    }
+    else{
+        // Has two children
+        target_idx = succesor(delete_node->right_child_idx);
+        readNode(target_idx, target_node);
+    }
+
+    // Set the replace_idx as the target's child
+    if(target_node->left_child_idx != 0)
+        replace_idx = target_node->left_child_idx;
+    else
+        replace_idx = target_node->right_child_idx;
+
+    if(replace_idx != 0){
+        // If the replace_idx is not NIL, set it's parent to target->parent
+        addr = (char*)map_base + replace_idx * sizeof(RBTreeNode) + ((char*)&delete_node->parent_idx - (char*)delete_node);
+        memcpy(addr, &target_node->parent_idx, sizeof(u_int64_t));
+    }
+
+    if(target_node->parent_idx == 0){
+        // If the target is the root, set the root as the replacement
+        root_idx = replace_idx;
+    }
+    else{
+        u_int64_t parent_left;
+        addr = (char*)map_base + target_node->parent_idx * sizeof(RBTreeNode) + ((char*)&delete_node->left_child_idx - (char*)delete_node);
+        memcpy(&parent_left, addr, sizeof(u_int64_t));
+
+        if(parent_left == target_idx){
+            // If target is the left child, set the replace to the left child of target->parent
+            memcpy(addr, &replace_idx, sizeof(u_int64_t));
+        }
+        else{
+            addr = (char*)map_base + target_node->parent_idx * sizeof(RBTreeNode) + ((char*)&delete_node->right_child_idx - (char*)delete_node);
+            memcpy(addr, &replace_idx, sizeof(u_int64_t));
+        }
+    }
+
+    if(target_idx != delete_idx){
+        addr = (char*)map_base + delete_idx * sizeof(RBTreeNode) + ((char*)&delete_node->key - (char*)delete_node);
+        memcpy(addr, &target_node->key, sizeof(u_int64_t));
+    }
+
+    if(target_node->color == BLACK){
+        removeFix(replace_idx, target_node->parent_idx);
+    }
+    
+    delete target_node;
+}
+
+void RBTree::removeFix(u_int64_t idx, u_int64_t cur_parent_idx){
+    u_int64_t cur_idx = idx;
+    u_int64_t parent_idx = cur_parent_idx;
+    u_int64_t red = RED;
+    u_int64_t black = BLACK;
+    while(true){
+        char* addr; 
+        RBTreeNode* cur = new RBTreeNode(0,0,0);
+        readNode(cur_idx, cur);
+
+        if(cur_idx != root_idx && cur->color == BLACK){
+            RBTreeNode* parent = new RBTreeNode(0,0,0);
+            readNode(parent_idx, parent);
+
+            if(cur_idx == parent->left_child_idx){
+                // Current is the left child
+                RBTreeNode* sibling = new RBTreeNode(0,0,0);
+                u_int64_t sibling_idx = parent->right_child_idx;
+                readNode(sibling_idx, sibling);
+
+                if(sibling->color == RED){
+                    //Case 1
+                    sibling->color = BLACK;
+                    addr = (char*)map_base + sibling_idx * sizeof(RBTreeNode) + ((char*)&cur->color - (char*)cur);
+                    memcpy(addr, &black, sizeof(u_int64_t));
+                    parent->color = RED;
+                    addr = (char*)map_base + parent_idx * sizeof(RBTreeNode) + ((char*)&cur->color - (char*)cur);
+                    memcpy(addr, &red, sizeof(u_int64_t));
+                    leafRotation(parent_idx);
+                    readNode(parent_idx, parent);
+                    sibling_idx = parent->right_child_idx;
+                    readNode(sibling_idx, sibling);
+                }
+
+                RBTreeNode* sibling_left_child = new RBTreeNode(0,0,0);
+                readNode(sibling->left_child_idx, sibling_left_child);
+                RBTreeNode* sibling_right_child = new RBTreeNode(0,0,0);
+                readNode(sibling->right_child_idx, sibling_right_child);
+
+                if(sibling_left_child->color == BLACK && sibling_right_child->color == BLACK){
+                    // Case 2
+                    sibling->color = RED;
+                    addr = (char*)map_base + sibling_idx * sizeof(RBTreeNode) + ((char*)&cur->color - (char*)cur);
+                    memcpy(addr, &red, sizeof(u_int64_t));
+                    cur_idx = parent_idx;
+                    addr = (char*)map_base + cur_idx * sizeof(RBTreeNode) + ((char*)&cur->parent_idx - (char*)cur);
+                    memcpy(&parent_idx, addr, sizeof(u_int64_t));
+                }
+                else{
+                    if(sibling_right_child->color == BLACK){
+                        // Case 3
+                        sibling_left_child->color = BLACK;
+                        addr = (char*)map_base + sibling->left_child_idx * sizeof(RBTreeNode) + ((char*)&cur->color - (char*)cur);
+                        memcpy(addr, &black, sizeof(u_int64_t));
+                        sibling->color = RED;
+                        addr = (char*)map_base + sibling_idx * sizeof(RBTreeNode) + ((char*)&cur->color - (char*)cur);
+                        memcpy(addr, &red, sizeof(u_int64_t));
+                        rightRotation(sibling_idx);
+                        readNode(parent_idx, parent);
+                        sibling_idx = parent->right_child_idx;
+                        readNode(sibling_idx, sibling);
+                    }
+
+                    // Case 4
+                    sibling->color = parent->color;
+                    addr = (char*)map_base + sibling_idx * sizeof(RBTreeNode) + ((char*)&cur->color - (char*)cur);
+                    memcpy(addr, &parent->color, sizeof(u_int64_t));
+                    parent->color = BLACK;
+                    addr = (char*)map_base + parent_idx * sizeof(RBTreeNode) + ((char*)&cur->color - (char*)cur);
+                    memcpy(addr, &black, sizeof(u_int64_t));
+                    // sibling->right->color = BLACK
+                    addr = (char*)map_base + sibling->right_child_idx * sizeof(RBTreeNode) + ((char*)&cur->color - (char*)cur);
+                    memcpy(addr, &black, sizeof(u_int64_t));
+                    leafRotation(parent_idx);
+                    cur_idx = root_idx;
+                }    
+
+                delete sibling;    
+                delete sibling_left_child;
+                delete sibling_right_child;        
+            }
+            else{
+                // Current is the right child
+                RBTreeNode* sibling = new RBTreeNode(0,0,0);
+                u_int64_t sibling_idx = parent->left_child_idx;
+                readNode(sibling_idx, sibling);
+
+                if(sibling->color == RED){
+                    //Case 1
+                    sibling->color = BLACK;
+                    addr = (char*)map_base + sibling_idx * sizeof(RBTreeNode) + ((char*)&cur->color - (char*)cur);
+                    memcpy(addr, &black, sizeof(u_int64_t));
+                    parent->color = RED;
+                    addr = (char*)map_base + parent_idx * sizeof(RBTreeNode) + ((char*)&cur->color - (char*)cur);
+                    memcpy(addr, &red, sizeof(u_int64_t));
+                    rightRotation(parent_idx);
+                    readNode(parent_idx, parent);
+                    sibling_idx = parent->left_child_idx;
+                    readNode(sibling_idx, sibling);
+                }
+
+                RBTreeNode* sibling_left_child = new RBTreeNode(0,0,0);
+                readNode(sibling->left_child_idx, sibling_left_child);
+                RBTreeNode* sibling_right_child = new RBTreeNode(0,0,0);
+                readNode(sibling->right_child_idx, sibling_right_child);
+
+                if(sibling_left_child->color == BLACK && sibling_right_child->color == BLACK){
+                    // Case 2
+                    sibling->color = RED;
+                    addr = (char*)map_base + sibling_idx * sizeof(RBTreeNode) + ((char*)&cur->color - (char*)cur);
+                    memcpy(addr, &red, sizeof(u_int64_t));
+                    cur_idx = parent_idx;
+                    addr = (char*)map_base + cur_idx * sizeof(RBTreeNode) + ((char*)&cur->parent_idx - (char*)cur);
+                    memcpy(&parent_idx, addr, sizeof(u_int64_t));
+                }
+                else{
+                    if(sibling_left_child->color == BLACK){
+                        // Case 3
+                        sibling_right_child->color = BLACK;
+                        addr = (char*)map_base + sibling->right_child_idx * sizeof(RBTreeNode) + ((char*)&cur->color - (char*)cur);
+                        memcpy(addr, &black, sizeof(u_int64_t));
+                        sibling->color = RED;
+                        addr = (char*)map_base + sibling_idx * sizeof(RBTreeNode) + ((char*)&cur->color - (char*)cur);
+                        memcpy(addr, &red, sizeof(u_int64_t));
+                        leafRotation(sibling_idx);
+                        readNode(parent_idx, parent);
+                        sibling_idx = parent->left_child_idx;
+                        readNode(sibling_idx, sibling);
+                    }
+
+                    // Case 4
+                    sibling->color = parent->color;
+                    addr = (char*)map_base + sibling_idx * sizeof(RBTreeNode) + ((char*)&cur->color - (char*)cur);
+                    memcpy(addr, &parent->color, sizeof(u_int64_t));
+                    parent->color = BLACK;
+                    addr = (char*)map_base + parent_idx * sizeof(RBTreeNode) + ((char*)&cur->color - (char*)cur);
+                    memcpy(addr, &black, sizeof(u_int64_t));
+                    // sibling->left->color = BLACK
+                    addr = (char*)map_base + sibling->left_child_idx * sizeof(RBTreeNode) + ((char*)&cur->color - (char*)cur);
+                    memcpy(addr, &black, sizeof(u_int64_t));
+                    rightRotation(parent_idx);
+                    cur_idx = root_idx;
+                }   
+
+                delete sibling;    
+                delete sibling_left_child;
+                delete sibling_right_child;   
+            }
+            delete parent;
+        }
+        else{
+            addr = (char*)map_base + cur_idx * sizeof(RBTreeNode) + ((char*)&cur->color - (char*)cur);
+            memcpy(addr, &black, sizeof(u_int64_t));
+            break;
+        }  
+
+        delete cur;   
+    }
+}
+
+u_int64_t RBTree::search(u_int64_t key){
+    u_int64_t cur_idx = root_idx;
+
+    u_int64_t* addr;
+    u_int64_t cur_key;
+    while(cur_idx){
+        //Read the cur node
+        addr = (u_int64_t*) ((char*)map_base + cur_idx * sizeof(RBTreeNode));
+        memcpy(&cur_key, addr, sizeof(u_int64_t));
+
+        if(key == cur_key){
+            return cur_idx;
+        }
+        else if(key < cur_key){
+            addr++;
+            memcpy(&cur_idx, addr, sizeof(u_int64_t));
+        }
+        else{
+            addr += 2;
+            memcpy(&cur_idx, addr, sizeof(u_int64_t));
+        }
+    }
+
+    return 0;
+}
+
 void RBTree::display(){
     if(root_idx != 0){
         RBTreeNode* node = new RBTreeNode(0,0,0);
@@ -384,6 +642,28 @@ void RBTree::rightRotation(u_int64_t x_idx){
     delete parent;
 }
 
+u_int64_t RBTree::succesor(u_int64_t idx){
+    u_int64_t cur_idx = idx;
+    
+    while(cur_idx){
+        RBTreeNode* ref = new RBTreeNode(0,0,0);
+        u_int64_t left_child;
+        char* addr = (char*)map_base + cur_idx * sizeof(RBTreeNode) + ((char*)&ref->left_child_idx - (char*)ref);
+        memcpy(&left_child, addr, sizeof(u_int64_t));
+
+        if(left_child){
+            cur_idx = left_child;
+            delete ref;
+        }
+        else{
+            delete ref;
+            return cur_idx;
+        }
+    }
+
+    return 0;
+}
+
 int main(){
 
     int fd = open("TREE", O_RDWR | O_DIRECT);
@@ -395,9 +675,15 @@ int main(){
     int array[] = {31,94,1,78,22, 7,38,65,30,93, 58,89,51,4,2};
     for(int i = 0; i < sizeof(array) / sizeof(int); i++){
         rbtree->insert(array[i]);
-    }    
+    }  
 
     rbtree->display();
+    int arr[] = {4,7,65,89,2, 78,1,30,58,94, 31,51,22,93,38};
+    for(int i = 0; i < sizeof(arr) / sizeof(int); i++){
+        cout << "# Delete : " << arr[i] << endl;
+        rbtree->remove(arr[i]);
+        rbtree->display();
+    }   
 
     munmap(map_base, MAP_SIZE);
     close(fd);
