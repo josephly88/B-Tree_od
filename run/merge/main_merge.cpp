@@ -201,6 +201,7 @@ int main(int argc, char** argv){
             else{
                 continue;
             }
+                
         }
 	    cout << endl << "Done!" << endl;;
 
@@ -211,15 +212,8 @@ int main(int argc, char** argv){
 
     t->inorder_traversal((char*)"tree.dat");
     if(t->leafCache){
+       //t->leafCache->stat(t->cmb);
         //t->leafCache->stat(t->cmb);
-        /*
-        ITV2LeafCache tmp;
-        for(int i = 0; i < 15; i++){
-            u_int64_t ret = t->leafCache->dequeue(t->cmb, &tmp);
-            if(ret == 0) break;
-            cout << "< " << tmp.node_id << ":" << tmp.lower << "-" << tmp.upper << " >" <<endl;
-        }
-        */
        cout << "HIT = " << HIT << endl;
     }
 
