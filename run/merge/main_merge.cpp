@@ -40,7 +40,7 @@ int main(int argc, char** argv){
     int end = 0;
     bool create = false;
     MODE mode = COPY_ON_WRITE;
-    int lfcache = 0;
+    int lfcache = false;
 
     if(argc < 2){
         usage();
@@ -75,8 +75,7 @@ int main(int argc, char** argv){
                 mode = DRAM;
             }
             else if(strcmp(argv[i], "-lfcache") == 0){
-                lfcache = atoi(argv[i+1]);
-                i++;
+                lfcache = true;
             }
             else{
                 tree_file = argv[i];
@@ -212,7 +211,7 @@ int main(int argc, char** argv){
 
     t->inorder_traversal((char*)"tree.dat");
     if(t->leafCache){
-        t->leafCache->stat(t->cmb);
+        //t->leafCache->stat(t->cmb);
         /*
         ITV2LeafCache tmp;
         for(int i = 0; i < 15; i++){

@@ -14,7 +14,8 @@
 
 #define LEAF_CACHE_START_ADDR           0x00200000
 #define LEAF_CACHE_BASE_ADDR            (LEAF_CACHE_START_ADDR + sizeof(ITV2Leaf))
-#define LEAF_CACHE_END_ADDR             0x006FFFFF  // 5 MB
+#define LEAF_CACHE_END_ADDR             LEAF_CACHE_BASE_ADDR + 101 * sizeof(ITV2LeafCache)  // 10X
+//#define LEAF_CACHE_END_ADDR             0x006FFFFF  // 5 MB
 
 #define END_ADDR 0x20000000
 
