@@ -36,6 +36,7 @@ template <typename T> class BTreeNode;
 class removeList;
 class CMB;
 class BKMap;
+class LEAF_CACHE;
 class ITV2Leaf;
 class ITV2LeafCache;
 class RBTree;
@@ -53,7 +54,8 @@ class BTree{
 		
 	public:
 	    CMB* cmb;
-        ITV2Leaf* leafCache;
+        LEAF_CACHE* leafCache;
+        RBTree* rbtree;
 
 		BTree(char* filename, int degree, MODE _mode, bool lfcache = false);
 		~BTree();
@@ -159,6 +161,12 @@ class BKMap{
         u_int64_t lfcache_id;
 };
 
+class LEAF_CACHE{
+    public:
+        ITV2Leaf* LRU;
+        RBTree* RBTREE;
+};
+
 class ITV2Leaf{
     u_int64_t Q_front_idx;
     u_int64_t Q_rear_idx;
@@ -210,6 +218,7 @@ class RBTree{
         void removeFix(CMB* cmb, u_int64_t idx, u_int64_t cur_parent_idx);
         u_int64_t search(CMB* cmb, u_int64_t key);
 
+        void stat(CMB* cmb);
         void display(CMB* cmb);
 
         u_int64_t get_free_idx(CMB* cmb);
@@ -277,8 +286,11 @@ BTree<T>::BTree(char* filename, int degree, MODE _mode, bool lfcache){
 
         // Interval to Leaf Cache Optimization
         if(lfcache){
-            leafCache = new ITV2Leaf(cmb);
-            leafCache->stat(cmb);
+            leafCache = new LEAF_CACHE();
+            leafCache->LRU = new ITV2Leaf(cmb);
+            leafCache->LRU->stat(cmb);
+            leafCache->RBTREE = new RBTree(cmb);
+            leafCache->RBTREE->stat(cmb);
         }            
     }
 }
@@ -288,7 +300,11 @@ BTree<T>::~BTree(){
     mylog << "~BTree()" << endl;
     close(fd);
     if(cmb) delete cmb;
-    if(leafCache) delete leafCache;
+    if(leafCache){
+        delete leafCache->LRU;
+        delete leafCache->RBTREE;
+        delete leafCache;
+    } 
 }
 
 template <typename T>
@@ -302,11 +318,20 @@ void BTree<T>::reopen(int _fd, MODE _mode, bool lfcache){
     else{
         cmb = new CMB(mode);
         if(lfcache){
-            leafCache = (ITV2Leaf*) malloc(sizeof(ITV2Leaf));
-            off_t addr = LEAF_CACHE_START_ADDR;
+            leafCache = new LEAF_CACHE();
+
+            off_t addr;
+
+            leafCache->LRU = (ITV2Leaf*) malloc(sizeof(ITV2Leaf));
+            addr = LEAF_CACHE_START_ADDR;
             cmb->read(leafCache, addr, sizeof(ITV2Leaf));
+
+            leafCache->RBTREE = (ITV2Leaf*) malloc(sizeof(ITV2Leaf));
+            addr = RED_BLACK_TREE_START_ADDR;
+            cmb->read(leafCache, addr, sizeof(RBTree));
         }
     }
+
 }
 
 template <typename T>
@@ -665,9 +690,12 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
 
         if(leafCache){
             ITV2LeafCache lfcache;
-            u_int64_t hit_idx = leafCache->search(cmb, _k, &lfcache);
+            u_int64_t hit_idx = leafCache->RBTREE->search(cmb, _k);
 
             if(hit_idx != 0){
+                off_t addr = LEAF_CACHE_BASE_ADDR + hit_idx * sizeof(ITV2LeafCache);
+                cmb->read(&lfcache, addr, sizeof(ITV2LeafCache));
+
                 if(lfcache.num_key < m - 1){
                     //Hit and no split
                     // ##
@@ -2086,6 +2114,9 @@ void RBTree::insert(CMB* cmb, u_int64_t key){
         RBTreeNode* new_node = new RBTreeNode(key, BLACK, 0);
         writeNode(cmb, root_idx, new_node);
 
+        off_t addr = RED_BLACK_TREE_START_ADDR + ((char*)&root_idx - (char*)this);
+        cmb->write(addr, &root_idx, sizeof(u_int64_t));
+
         delete new_node;
     }
     else{
@@ -2505,6 +2536,22 @@ u_int64_t RBTree::search(CMB* cmb, u_int64_t key){
 
     delete ref;
     return 0;
+}
+
+void RBTree::stat(CMB* cmb){
+    RBTree* meta = (RBTree*) malloc(sizeof(RBTree));
+
+    off_t offset = RED_BLACK_TREE_START_ADDR;
+    cmb->read(meta, offset, sizeof(RBTree));
+
+    cout << "RBTree: stat()" << endl;
+    cout << "root_idx = " << root_idx << endl;
+    cout << "free_Stack_idx = " << free_Stack_idx << endl;
+    cout << "free_idx = " << free_idx << endl;
+    
+    display(cmb);
+
+    free(meta);
 }
 
 void RBTree::display(CMB* cmb){
