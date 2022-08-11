@@ -212,8 +212,8 @@ int main(int argc, char** argv){
 
     t->inorder_traversal((char*)"tree.dat");
     if(t->leafCache){
-       //t->leafCache->stat(t->cmb);
-        //t->leafCache->stat(t->cmb);
+       //t->leafCache->RBTREE->stat(t->cmb);
+       //t->leafCache->LRU->stat(t->cmb);
        cout << "HIT = " << HIT << endl;
     }
 

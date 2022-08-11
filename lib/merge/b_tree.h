@@ -186,9 +186,9 @@ class ITV2Leaf{
         void free_push(CMB* cmb, u_int64_t idx);
         u_int64_t free_pop(CMB* cmb);
 
-        u_int64_t enqueue(CMB* cmb, u_int64_t node_id, u_int64_t num_key, u_int64_t lower, u_int64_t upper);
-        u_int64_t dequeue(CMB* cmb, ITV2LeafCache* buf);
-        void remove(CMB* cmb, ITV2LeafCache* buf, u_int64_t idx);
+        void enqueue(CMB* cmb, RBTree* rbtree, u_int64_t node_id, u_int64_t num_key, u_int64_t lower, u_int64_t upper);
+        u_int64_t dequeue(CMB* cmb, RBTree* rbtree, ITV2LeafCache* buf);
+        void remove(CMB* cmb, RBTree* rbtree, ITV2LeafCache* buf, u_int64_t idx);
         void read(CMB* cmb, u_int64_t idx, ITV2LeafCache* buf);
 
         u_int64_t search(CMB* cmb, u_int64_t key, ITV2LeafCache* buf);    
@@ -202,21 +202,24 @@ class ITV2LeafCache{
         u_int64_t upper;
         u_int64_t lastQ;
         u_int64_t nextQ;
+        u_int64_t RBTREE_idx;
 };
 
 class RBTree{
     u_int64_t root_idx;
     u_int64_t free_Stack_idx;
     u_int64_t free_idx;
+    u_int64_t capacity;
+    u_int64_t num_of_cache;
 
     public:
         RBTree(CMB* cmb);
 
-        void insert(CMB* cmb, u_int64_t key);
+        void insert(CMB* cmb, u_int64_t idx, u_int64_t lower, u_int64_t upper);
         void insertFix(CMB* cmb, u_int64_t idx);
-        void remove(CMB* cmb, u_int64_t key);
+        void remove(CMB* cmb, u_int64_t lower);
         void removeFix(CMB* cmb, u_int64_t idx, u_int64_t cur_parent_idx);
-        u_int64_t search(CMB* cmb, u_int64_t key);
+        u_int64_t search(CMB* cmb, u_int64_t key, bool LRU_trans);
 
         void stat(CMB* cmb);
         void display(CMB* cmb);
@@ -236,13 +239,13 @@ class RBTree{
 
 class RBTreeNode{
     public:
-        u_int64_t key;
+        u_int64_t LRU_idx;
         u_int64_t left_child_idx;
         u_int64_t right_child_idx;  
         u_int64_t color;    // Red - 1, Black - 0
         u_int64_t parent_idx;   
 
-        RBTreeNode(u_int64_t key, u_int64_t color, u_int64_t parent_idx);   
+        RBTreeNode(u_int64_t _LRU_idx, u_int64_t _color, u_int64_t _parent_idx);   
 
         void display(CMB* cmb, int level);
 };
@@ -324,11 +327,11 @@ void BTree<T>::reopen(int _fd, MODE _mode, bool lfcache){
 
             leafCache->LRU = (ITV2Leaf*) malloc(sizeof(ITV2Leaf));
             addr = LEAF_CACHE_START_ADDR;
-            cmb->read(leafCache, addr, sizeof(ITV2Leaf));
+            cmb->read(leafCache->LRU, addr, sizeof(ITV2Leaf));
 
-            leafCache->RBTREE = (ITV2Leaf*) malloc(sizeof(ITV2Leaf));
+            leafCache->RBTREE = (RBTree*) malloc(sizeof(RBTree));
             addr = RED_BLACK_TREE_START_ADDR;
-            cmb->read(leafCache, addr, sizeof(RBTree));
+            cmb->read(leafCache->RBTREE, addr, sizeof(RBTree));
         }
     }
 
@@ -589,17 +592,18 @@ void BTree<T>::search(u_int64_t _k, T* buf){
         u_int64_t hit_idx;
 
         if(leafCache){
-            ITV2LeafCache lfcache;
-            u_int64_t hit_idx = leafCache->search(cmb, _k, &lfcache);
+            u_int64_t hit_idx = leafCache->RBTREE->search(cmb, _k, true);
 
             if(hit_idx != 0){
+                ITV2LeafCache lfcache;
+                leafCache->LRU->read(cmb, hit_idx, &lfcache);
                 // Hit
                 // Remove the cache from the queue, then Read the value
                 // ##
                 HIT++;
                 BTreeNode<T>* leaf = new BTreeNode<T>(0, 0, 0);
                 node_read(lfcache.node_id, leaf);
-                leafCache->remove(cmb, &lfcache, hit_idx);
+                leafCache->LRU->remove(cmb, leafCache->RBTREE, &lfcache, hit_idx);
                 leaf->search(this, _k, buf);
                 delete leaf;
 
@@ -624,17 +628,18 @@ void BTree<T>::update(u_int64_t _k, T _v){
         removeList* rmlist = NULL;
 
         if(leafCache){
-            ITV2LeafCache lfcache;
-            u_int64_t hit_idx = leafCache->search(cmb, _k, &lfcache);
+            u_int64_t hit_idx = leafCache->RBTREE->search(cmb, _k, true);
 
             if(hit_idx != 0){
+                ITV2LeafCache lfcache;
+                leafCache->LRU->read(cmb, hit_idx, &lfcache);
                 // Hit
                 // Remove the cache from the queue, then Update the value 
                 // ##
                 HIT++;
                 BTreeNode<T>* leaf = new BTreeNode<T>(0, 0, 0);
                 node_read(lfcache.node_id, leaf);
-                leafCache->remove(cmb, &lfcache, hit_idx);
+                leafCache->LRU->remove(cmb, leafCache->RBTREE, &lfcache, hit_idx);
                 leaf->update(this, _k, _v, &rmlist);
                 delete leaf;
 
@@ -689,12 +694,11 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
         removeList* rmlist = NULL;
 
         if(leafCache){
-            ITV2LeafCache lfcache;
-            u_int64_t hit_idx = leafCache->RBTREE->search(cmb, _k);
+            u_int64_t hit_idx = leafCache->RBTREE->search(cmb, _k, true);
 
             if(hit_idx != 0){
-                off_t addr = LEAF_CACHE_BASE_ADDR + hit_idx * sizeof(ITV2LeafCache);
-                cmb->read(&lfcache, addr, sizeof(ITV2LeafCache));
+                ITV2LeafCache lfcache;
+                leafCache->LRU->read(cmb, hit_idx, &lfcache);
 
                 if(lfcache.num_key < m - 1){
                     //Hit and no split
@@ -702,7 +706,7 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
                     HIT++;
                     BTreeNode<T>* leaf = new BTreeNode<T>(0, 0, 0);
                     node_read(lfcache.node_id, leaf);
-                    leafCache->remove(cmb, &lfcache, hit_idx);
+                    leafCache->LRU->remove(cmb, leafCache->RBTREE, &lfcache, hit_idx);
                     leaf->direct_insert(this, _k, _v, &rmlist);
                     delete leaf;
 
@@ -720,7 +724,7 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
                     return;
                 }
                 else{
-                    leafCache->remove(cmb, &lfcache, hit_idx);
+                    leafCache->LRU->remove(cmb, leafCache->RBTREE, &lfcache, hit_idx);
                 }
             }
         }
@@ -799,17 +803,19 @@ void BTree<T>::deletion(u_int64_t _k){
         removeList* rmlist = NULL;
 
         if(leafCache){
-            ITV2LeafCache lfcache;
-            u_int64_t hit_idx = leafCache->search(cmb, _k, &lfcache);
+            u_int64_t hit_idx = leafCache->RBTREE->search(cmb, _k, true);
 
             if(hit_idx != 0){
+                ITV2LeafCache lfcache;
+                leafCache->LRU->read(cmb, hit_idx, &lfcache);
+
                 if(lfcache.num_key > min_num){
                     //Hit and no merge
                     // ##
                     HIT++;
                     BTreeNode<T>* leaf = new BTreeNode<T>(0, 0, 0);
                     node_read(lfcache.node_id, leaf);
-                    leafCache->remove(cmb, &lfcache, hit_idx);
+                    leafCache->LRU->remove(cmb, leafCache->RBTREE, &lfcache, hit_idx);
                     leaf->direct_delete(this, _k, &rmlist);
                     delete leaf;
 
@@ -827,7 +833,7 @@ void BTree<T>::deletion(u_int64_t _k){
                     return;
                 }
                 else{
-                    leafCache->remove(cmb, &lfcache, hit_idx);
+                    leafCache->LRU->remove(cmb, leafCache->RBTREE, &lfcache, hit_idx);
                 }
             }
         }
@@ -972,8 +978,9 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf){
             memcpy(buf, &value[i], sizeof(T));
 
             // Add to the leaf interval cache
-            if(t->leafCache && is_leaf)
-                t->leafCache->enqueue(t->cmb, node_id, num_key, key[0], key[num_key - 1]);
+            if(t->leafCache && is_leaf){
+                t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, node_id, num_key, key[0], key[num_key - 1]);
+            }                
 
             return;
         }
@@ -1022,8 +1029,9 @@ u_int64_t BTreeNode<T>::update(BTree<T>* t, u_int64_t _k, T _v, removeList** lis
             t->node_write(node_id, this);
 
             // Add to the leaf interval cache
-            if(t->leafCache && is_leaf)
-                t->leafCache->enqueue(t->cmb, node_id, num_key, key[0], key[num_key - 1]);
+            if(t->leafCache && is_leaf){
+                t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, node_id, num_key, key[0], key[num_key - 1]);
+            }                
 
             return node_id;
         }
@@ -1147,13 +1155,11 @@ u_int64_t BTreeNode<T>::direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeLis
         ITV2LeafCache lfcache;
         if(lfcache_id != 0){
             // Remove the leaf cache if it is existed
-            t->leafCache->read(t->cmb, lfcache_id, &lfcache);
-            t->leafCache->remove(t->cmb, &lfcache, lfcache_id);
-            t->cmb->update_lfcache_id(node_id, 0);
+            t->leafCache->LRU->read(t->cmb, lfcache_id, &lfcache);
+            t->leafCache->LRU->remove(t->cmb, t->leafCache->RBTREE, &lfcache, lfcache_id);
         }
         // Create a new cache an update it
-        u_int64_t new_id = t->leafCache->enqueue(t->cmb, node_id, num_key, key[0], key[num_key - 1]);
-        t->cmb->update_lfcache_id(node_id, new_id);
+        t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, node_id, num_key, key[0], key[num_key - 1]);
     }
 
     return node_id;
@@ -1214,13 +1220,11 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
         ITV2LeafCache lfcache;
         if(lfcache_id != 0){
             // Remove the leaf cache if it is existed
-            t->leafCache->read(t->cmb, lfcache_id, &lfcache);
-            t->leafCache->remove(t->cmb, &lfcache, lfcache_id);
-            t->cmb->update_lfcache_id(node->node_id, 0);
+            t->leafCache->LRU->read(t->cmb, lfcache_id, &lfcache);
+            t->leafCache->LRU->remove(t->cmb, t->leafCache->RBTREE, &lfcache, lfcache_id);
         }
         // Create a new cache an update it
-        u_int64_t new_id = t->leafCache->enqueue(t->cmb, node->node_id, node->num_key, node->key[0], node->key[node->num_key - 1]);
-        t->cmb->update_lfcache_id(node->node_id, new_id);
+        t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, node->node_id, node->num_key, node->key[0], node->key[node->num_key - 1]);
     }
 
     // Update or Create a new cache for new node
@@ -1229,13 +1233,11 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
         ITV2LeafCache lfcache;
         if(lfcache_id != 0){
             // Remove the leaf cache if it is existed
-            t->leafCache->read(t->cmb, lfcache_id, &lfcache);
-            t->leafCache->remove(t->cmb, &lfcache, lfcache_id);
-            t->cmb->update_lfcache_id(new_node->node_id, 0);
+            t->leafCache->LRU->read(t->cmb, lfcache_id, &lfcache);
+            t->leafCache->LRU->remove(t->cmb, t->leafCache->RBTREE, &lfcache, lfcache_id);
         }
         // Create a new cache an update it
-        u_int64_t new_id = t->leafCache->enqueue(t->cmb, new_node->node_id, new_node->num_key, new_node->key[0], new_node->key[new_node->num_key - 1]);
-        t->cmb->update_lfcache_id(new_node->node_id, new_id);
+        t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, new_node->node_id, new_node->num_key, new_node->key[0], new_node->key[new_node->num_key - 1]);
     }
 
     delete node;
@@ -1388,13 +1390,11 @@ u_int64_t BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** li
         ITV2LeafCache lfcache;
         if(lfcache_id != 0){
             // Remove the leaf cache if it is existed
-            t->leafCache->read(t->cmb, lfcache_id, &lfcache);
-            t->leafCache->remove(t->cmb, &lfcache, lfcache_id);
-            t->cmb->update_lfcache_id(node_id, 0);
+            t->leafCache->LRU->read(t->cmb, lfcache_id, &lfcache);
+            t->leafCache->LRU->remove(t->cmb, t->leafCache->RBTREE, &lfcache, lfcache_id);
         }
         // Create a new cache an update it
-        u_int64_t new_id = t->leafCache->enqueue(t->cmb, node_id, num_key, key[0], key[num_key - 1]);
-        t->cmb->update_lfcache_id(node_id, new_id);
+        t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, node_id, num_key, key[0], key[num_key - 1]);
     }
 
     return node_id;
@@ -1531,8 +1531,8 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             ITV2LeafCache lfcache;
             if(lfcache_id != 0){
                 // Remove the leaf cache if it is existed
-                t->leafCache->read(t->cmb, lfcache_id, &lfcache);
-                t->leafCache->remove(t->cmb, &lfcache, lfcache_id);
+                t->leafCache->LRU->read(t->cmb, lfcache_id, &lfcache);
+                t->leafCache->LRU->remove(t->cmb, t->leafCache->RBTREE, &lfcache, lfcache_id);
             }
         }
 
@@ -1542,13 +1542,11 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             ITV2LeafCache lfcache;
             if(lfcache_id != 0){
                 // Remove the leaf cache if it is existed
-                t->leafCache->read(t->cmb, lfcache_id, &lfcache);
-                t->leafCache->remove(t->cmb, &lfcache, lfcache_id);
-                t->cmb->update_lfcache_id(left->node_id, 0);
+                t->leafCache->LRU->read(t->cmb, lfcache_id, &lfcache);
+                t->leafCache->LRU->remove(t->cmb, t->leafCache->RBTREE, &lfcache, lfcache_id);
             }
             // Create a new cache an update it
-            u_int64_t new_id = t->leafCache->enqueue(t->cmb, left->node_id, left->num_key, left->key[0], left->key[left->num_key - 1]);
-            t->cmb->update_lfcache_id(left->node_id, new_id);
+            t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, left->node_id, left->num_key, left->key[0], left->key[left->num_key - 1]);
         }
     }
 
@@ -1774,8 +1772,7 @@ void CMB::update_lfcache_id(u_int64_t node_id, u_int64_t value){
         exit(1);
     }
 
-    u_int64_t writeval = value;
-	write(addr, &writeval, sizeof(u_int64_t));
+	write(addr, &value, sizeof(u_int64_t));
 }
 
 ITV2Leaf::ITV2Leaf(CMB* cmb){
@@ -1823,7 +1820,7 @@ void ITV2Leaf::stat(CMB* cmb){
 }
 
 bool ITV2Leaf::full(){
-    mylog << "full(): " << num_of_cache << "/" << capacity << endl;
+    mylog << "ITV2Leaf::full(): " << num_of_cache << "/" << capacity << endl;
     if(num_of_cache >= capacity)
         return true;
     return false;
@@ -1892,12 +1889,12 @@ u_int64_t ITV2Leaf::free_pop(CMB* cmb){
     return ret;
 }
 
-u_int64_t ITV2Leaf::enqueue(CMB* cmb, u_int64_t node_id, u_int64_t num_key, u_int64_t lower, u_int64_t upper){
+void ITV2Leaf::enqueue(CMB* cmb, RBTree* rbtree, u_int64_t node_id, u_int64_t num_key, u_int64_t lower, u_int64_t upper){
     mylog << "enqueue() : " << "node_id = " << node_id << ", num_key = " << num_key << ", lower = " << lower << ", upper = " << upper << endl;
     if(full()){
         ITV2LeafCache* deQ = new ITV2LeafCache();
         u_int64_t idx;
-        idx = dequeue(cmb, deQ);
+        idx = dequeue(cmb, rbtree, deQ);
         delete deQ;
     }
     
@@ -1954,16 +1951,19 @@ u_int64_t ITV2Leaf::enqueue(CMB* cmb, u_int64_t node_id, u_int64_t num_key, u_in
         Q_front_idx = new_idx;
     }
 
+    cmb->update_lfcache_id(node_id, new_idx);
+
     num_of_cache++;
     offset = LEAF_CACHE_START_ADDR + ((char*) &num_of_cache - (char*) this);
     cmb->write(offset, &num_of_cache, sizeof(u_int64_t));
 
     delete new_cache;
 
-    return new_idx;
+    // Insert to the red black tree
+    rbtree->insert(cmb, new_idx, lower, upper);        
 }
 
-u_int64_t ITV2Leaf::dequeue(CMB* cmb, ITV2LeafCache* buf){
+u_int64_t ITV2Leaf::dequeue(CMB* cmb, RBTree* rbtree, ITV2LeafCache* buf){
     mylog << "dequeue()" << endl;
     if(Q_front_idx == 0){
         memset(buf, 0, sizeof(ITV2LeafCache));
@@ -2007,10 +2007,13 @@ u_int64_t ITV2Leaf::dequeue(CMB* cmb, ITV2LeafCache* buf){
     offset = LEAF_CACHE_START_ADDR + ((char*) &num_of_cache - (char*) this);
     cmb->write(offset, &num_of_cache, sizeof(u_int64_t));
 
+    // Remove from Red black tree
+    rbtree->remove(cmb, buf->lower);
+
     return del_idx;
 }
 
-void ITV2Leaf::remove(CMB* cmb, ITV2LeafCache* buf, u_int64_t idx){
+void ITV2Leaf::remove(CMB* cmb, RBTree* rbtree, ITV2LeafCache* buf, u_int64_t idx){
     mylog << "remove(): idx = " << idx << endl;
     if(idx == 0) return;
 
@@ -2052,6 +2055,9 @@ void ITV2Leaf::remove(CMB* cmb, ITV2LeafCache* buf, u_int64_t idx){
     num_of_cache--;
     offset = LEAF_CACHE_START_ADDR + ((char*) &num_of_cache - (char*) this);
     cmb->write(offset, &num_of_cache, sizeof(u_int64_t));
+
+    // Remove from Red black tree
+    rbtree->remove(cmb, buf->lower);
 }
 
 void ITV2Leaf::read(CMB* cmb, u_int64_t idx, ITV2LeafCache* buf){
@@ -2090,6 +2096,8 @@ u_int64_t ITV2Leaf::search(CMB* cmb, u_int64_t key, ITV2LeafCache* buf){
 RBTree::RBTree(CMB* cmb){
     root_idx = 0;
     free_idx = 1;
+    capacity = ((RED_BLACK_TREE_END_ADDR - RED_BLACK_TREE_BASE_ADDR) / sizeof(RBTreeNode)) - 1;
+    num_of_cache = 0;
     
     off_t offset = RED_BLACK_TREE_START_ADDR;
     cmb->write(offset, this, sizeof(RBTree));
@@ -2099,19 +2107,19 @@ RBTree::RBTree(CMB* cmb){
     delete zero;
 }
 
-RBTreeNode::RBTreeNode(u_int64_t _key, u_int64_t _color, u_int64_t _parent_idx){
-    key = _key;
+RBTreeNode::RBTreeNode(u_int64_t _LRU_idx, u_int64_t _color, u_int64_t _parent_idx){
+    LRU_idx = _LRU_idx;
     color = _color;
     parent_idx = _parent_idx;
     left_child_idx = 0;
     right_child_idx = 0;
 }
 
-void RBTree::insert(CMB* cmb, u_int64_t key){
+void RBTree::insert(CMB* cmb, u_int64_t idx, u_int64_t lower, u_int64_t upper){
     if(root_idx == 0){
         root_idx = get_free_idx(cmb);
 
-        RBTreeNode* new_node = new RBTreeNode(key, BLACK, 0);
+        RBTreeNode* new_node = new RBTreeNode(idx, BLACK, 0);
         writeNode(cmb, root_idx, new_node);
 
         off_t addr = RED_BLACK_TREE_START_ADDR + ((char*)&root_idx - (char*)this);
@@ -2121,38 +2129,68 @@ void RBTree::insert(CMB* cmb, u_int64_t key){
     }
     else{
         u_int64_t cur_idx = root_idx;
-        RBTreeNode* cur_node = new RBTreeNode(0, 0, 0);
-        u_int64_t *child_ptr;
+        u_int64_t cur_lower, cur_upper;
+        u_int64_t child_ptr, new_idx;
+        off_t addr;
+        ITV2LeafCache* lru_ref = new ITV2LeafCache();
+        RBTreeNode* rbtree_ref = new RBTreeNode(0,0,0);;
 
         while(cur_idx){
-            readNode(cmb, cur_idx, cur_node);
+            u_int64_t lru_idx;
+            addr = RED_BLACK_TREE_BASE_ADDR + cur_idx * sizeof(RBTreeNode) + ((char*)&rbtree_ref->LRU_idx - (char*)rbtree_ref);
+            cmb->read(&lru_idx, addr, sizeof(u_int64_t));
 
-            if(key < cur_node->key){
-                child_ptr = &cur_node->left_child_idx;
+            addr = LEAF_CACHE_BASE_ADDR + lru_idx * sizeof(ITV2LeafCache) + ((char*)&lru_ref->lower - (char*)lru_ref);
+            cmb->read(&cur_lower, addr, sizeof(u_int64_t));
+            addr = LEAF_CACHE_BASE_ADDR + lru_idx * sizeof(ITV2LeafCache) + ((char*)&lru_ref->upper - (char*)lru_ref);
+            cmb->read(&cur_upper, addr, sizeof(u_int64_t));
+
+            if(upper < cur_lower){
+                addr = RED_BLACK_TREE_BASE_ADDR + cur_idx * sizeof(RBTreeNode) + ((char*)&rbtree_ref->left_child_idx - (char*)rbtree_ref);
+                cmb->read(&child_ptr, addr, sizeof(u_int64_t));
             }                
-            else if(key > cur_node->key){
-                child_ptr = &cur_node->right_child_idx;
-            }
-
-            if(*child_ptr != 0){
-                cur_idx = *child_ptr;
+            else if(lower > cur_upper){
+                addr = RED_BLACK_TREE_BASE_ADDR + cur_idx * sizeof(RBTreeNode) + ((char*)&rbtree_ref->right_child_idx - (char*)rbtree_ref);
+                cmb->read(&child_ptr, addr, sizeof(u_int64_t));
             }
             else{
-                RBTreeNode* new_node = new RBTreeNode(key, RED, cur_idx);
-                writeNode(cmb, free_idx, new_node);      
+                cout << "Overlapping intervals" << endl;
+                mylog << "Overlapping intervals" << endl;
+                exit(1);
+            }
 
-                *child_ptr = get_free_idx(cmb);
-                off_t addr = RED_BLACK_TREE_BASE_ADDR + cur_idx * sizeof(RBTreeNode) + ((char*)child_ptr - (char*)cur_node);
-                cmb->write(addr, child_ptr, sizeof(u_int64_t));
+            if(child_ptr != 0){
+                cur_idx = child_ptr;
+            }
+            else{
+                // Write the new node
+                new_idx = get_free_idx(cmb);
+                RBTreeNode* new_node = new RBTreeNode(idx, RED, cur_idx);
+                writeNode(cmb, new_idx, new_node);      
+
+                // Update the cur->child = new_idx
+                if(upper < cur_lower){
+                    addr = RED_BLACK_TREE_BASE_ADDR + cur_idx * sizeof(RBTreeNode) + ((char*)&rbtree_ref->left_child_idx - (char*)rbtree_ref);
+                    cmb->write(addr, &new_idx, sizeof(u_int64_t));
+                }
+                else{
+                    addr = RED_BLACK_TREE_BASE_ADDR + cur_idx * sizeof(RBTreeNode) + ((char*)&rbtree_ref->right_child_idx - (char*)rbtree_ref);
+                    cmb->write(addr, &new_idx, sizeof(u_int64_t));
+                }
 
                 delete new_node;
                 break;
             }
         }
-        insertFix(cmb, *child_ptr);
-        
-        delete cur_node;
+        insertFix(cmb, new_idx);
+
+        delete lru_ref;
+        delete rbtree_ref;
     }
+
+    num_of_cache++;
+    off_t addr = RED_BLACK_TREE_START_ADDR + ((char*) &num_of_cache - (char*) this);
+    cmb->write(addr, &num_of_cache, sizeof(u_int64_t));
 }
 
 void RBTree::insertFix(CMB* cmb, u_int64_t idx){
@@ -2237,7 +2275,6 @@ void RBTree::insertFix(CMB* cmb, u_int64_t idx){
                         addr = RED_BLACK_TREE_BASE_ADDR + parent->parent_idx * sizeof(RBTreeNode) + ((char*)&cur->color - (char*)cur);
                         cmb->write(addr, &cur->color, sizeof(u_int64_t));
                     }
-                    
 
                     cur_idx = parent->parent_idx;
                 }
@@ -2274,8 +2311,8 @@ void RBTree::insertFix(CMB* cmb, u_int64_t idx){
     }
 }
 
-void RBTree::remove(CMB* cmb, u_int64_t key){
-    u_int64_t delete_idx = search(cmb, key);
+void RBTree::remove(CMB* cmb, u_int64_t lower){
+    u_int64_t delete_idx = search(cmb, lower, false);
     if(delete_idx == 0){
         cout << "Data not found" << endl;
         return;
@@ -2334,8 +2371,8 @@ void RBTree::remove(CMB* cmb, u_int64_t key){
     }
 
     if(target_idx != delete_idx){
-        addr = RED_BLACK_TREE_BASE_ADDR + delete_idx * sizeof(RBTreeNode) + ((char*)&delete_node->key - (char*)delete_node);
-        cmb->write(addr, &target_node->key, sizeof(u_int64_t));
+        addr = RED_BLACK_TREE_BASE_ADDR + delete_idx * sizeof(RBTreeNode) + ((char*)&delete_node->LRU_idx - (char*)delete_node);
+        cmb->write(addr, &target_node->LRU_idx, sizeof(u_int64_t));
     }
 
     if(target_node->color == BLACK){
@@ -2343,6 +2380,10 @@ void RBTree::remove(CMB* cmb, u_int64_t key){
     }
 
     free_push(cmb, target_idx);
+
+    num_of_cache--;
+    addr = RED_BLACK_TREE_START_ADDR + ((char*) &num_of_cache - (char*) this);
+    cmb->write(addr, &num_of_cache, sizeof(u_int64_t));
     
     delete delete_node;
     delete target_node;
@@ -2509,32 +2550,44 @@ void RBTree::removeFix(CMB* cmb, u_int64_t idx, u_int64_t cur_parent_idx){
     }
 }
 
-u_int64_t RBTree::search(CMB* cmb, u_int64_t key){
+u_int64_t RBTree::search(CMB* cmb, u_int64_t key, bool LRU_trans){
     u_int64_t cur_idx = root_idx;
-    RBTreeNode* ref = new RBTreeNode(0,0,0);
+    ITV2LeafCache* lru_ref = new ITV2LeafCache();
+    RBTreeNode* rbtree_ref = new RBTreeNode(0,0,0);
 
     off_t addr;
-    u_int64_t cur_key;
-    while(cur_idx){
-        //Read the cur node
-        addr = RED_BLACK_TREE_BASE_ADDR + cur_idx * sizeof(RBTreeNode) + ((char*)&ref->key - (char*)ref);
-        cmb->read(&cur_key, addr, sizeof(u_int64_t));
+    u_int64_t cur_lower, cur_upper;
 
-        if(key == cur_key){
-            delete ref;
-            return cur_idx;
+    while(cur_idx){
+        u_int64_t lru_idx;
+        addr = RED_BLACK_TREE_BASE_ADDR + cur_idx * sizeof(RBTreeNode) + ((char*)&rbtree_ref->LRU_idx - (char*)rbtree_ref);
+        cmb->read(&lru_idx, addr, sizeof(u_int64_t));
+
+        addr = LEAF_CACHE_BASE_ADDR + lru_idx * sizeof(ITV2LeafCache) + ((char*)&lru_ref->lower - (char*)lru_ref);
+        cmb->read(&cur_lower, addr, sizeof(u_int64_t));
+        addr = LEAF_CACHE_BASE_ADDR + lru_idx * sizeof(ITV2LeafCache) + ((char*)&lru_ref->upper - (char*)lru_ref);
+        cmb->read(&cur_upper, addr, sizeof(u_int64_t));
+
+        if(key >= cur_lower && key <= cur_upper){
+            delete lru_ref;
+            delete rbtree_ref;
+            if(LRU_trans)
+                return lru_idx;
+            else
+                return cur_idx;
         }
-        else if(key < cur_key){
-            addr = RED_BLACK_TREE_BASE_ADDR + cur_idx * sizeof(RBTreeNode) +  + ((char*)&ref->left_child_idx - (char*)ref);
+        else if(key < cur_lower){
+            addr = RED_BLACK_TREE_BASE_ADDR + cur_idx * sizeof(RBTreeNode) +  + ((char*)&rbtree_ref->left_child_idx - (char*)rbtree_ref);
             cmb->read(&cur_idx, addr, sizeof(u_int64_t));
         }
         else{
-            addr = RED_BLACK_TREE_BASE_ADDR + cur_idx * sizeof(RBTreeNode) +  + ((char*)&ref->right_child_idx - (char*)ref);
+            addr = RED_BLACK_TREE_BASE_ADDR + cur_idx * sizeof(RBTreeNode) +  + ((char*)&rbtree_ref->right_child_idx - (char*)rbtree_ref);
             cmb->read(&cur_idx, addr, sizeof(u_int64_t));
         }
     }
 
-    delete ref;
+    delete lru_ref;
+    delete rbtree_ref;
     return 0;
 }
 
@@ -2545,9 +2598,11 @@ void RBTree::stat(CMB* cmb){
     cmb->read(meta, offset, sizeof(RBTree));
 
     cout << "RBTree: stat()" << endl;
-    cout << "root_idx = " << root_idx << endl;
-    cout << "free_Stack_idx = " << free_Stack_idx << endl;
-    cout << "free_idx = " << free_idx << endl;
+    cout << "root_idx = " << meta->root_idx << endl;
+    cout << "free_Stack_idx = " << meta->free_Stack_idx << endl;
+    cout << "free_idx = " << meta->free_idx << endl;
+    cout << "capacity = " << meta->capacity << endl;
+    cout << "num_of_cache = " << meta->num_of_cache << endl;
     
     display(cmb);
 
@@ -2576,10 +2631,14 @@ void RBTreeNode::display(CMB* cmb, int level){
         delete node;
     }
 
+    ITV2LeafCache* ref = new ITV2LeafCache();
+    off_t addr = LEAF_CACHE_BASE_ADDR + LRU_idx * sizeof(ITV2LeafCache);
+    cmb->read(ref, addr, sizeof(ITV2LeafCache));
+
     for(int i = 0; i < level; i++)
         cout << "\t";
     string color_code = (color == RED) ? "Red" : "Black";
-    cout << "(" << key << ":" << color_code << ")" << endl;
+    cout << "(" << ref->lower << "-" << ref->upper << ":" << color_code << ")" << endl;
     
 
     if(left_child_idx != 0){
