@@ -6,6 +6,6 @@ fake_cmb
 *.dat
 data/*.txt
 *.png
-run/cmb/fake_cmb
-run/merge/dup_cmb
+run/merge/dup*
 run/merge/tmp.sh
+run/merge/checkpoint
