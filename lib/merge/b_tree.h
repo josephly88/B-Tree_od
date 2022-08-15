@@ -150,14 +150,14 @@ class CMB{
 		u_int64_t get_block_id(u_int64_t node_id);
 		void update_node_id(u_int64_t node_id, u_int64_t block_id);
         // LRU_QUEUE Cache
-        u_int64_t get_lfcache_id(u_int64_t node_id);
-        void update_lfcache_id(u_int64_t node_id, u_int64_t value);
+        u_int64_t get_lru_id(u_int64_t node_id);
+        void update_lru_id(u_int64_t node_id, u_int64_t value);
 };
 
 class BKMap{
     public:
         u_int64_t block_id;
-        u_int64_t lfcache_id;
+        u_int64_t lru_id;
 };
 
 class LEAF_CACHE{
@@ -749,7 +749,7 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
             if(cmb){
                 new_root_id = cmb->get_new_node_id();
                 cmb->update_node_id(new_root_id, get_free_block_id());
-                cmb->update_lfcache_id(new_root_id, 0);
+                cmb->update_lru_id(new_root_id, 0);
             }
             else
                 new_root_id = get_free_block_id();
@@ -780,7 +780,7 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
         if(cmb){
             root_id = cmb->get_new_node_id();
             cmb->update_node_id(root_id, get_free_block_id());
-            cmb->update_lfcache_id(root_id, 0);
+            cmb->update_lru_id(root_id, 0);
         }
         else
             root_id = get_free_block_id();
@@ -1150,12 +1150,12 @@ u_int64_t BTreeNode<T>::direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeLis
     t->node_write(node_id, this);
 
     if(t->leafCache && is_leaf && num_key <= m - 1){
-        u_int64_t lfcache_id = t->cmb->get_lfcache_id(node_id);
+        u_int64_t lru_id = t->cmb->get_lru_id(node_id);
         LRU_QUEUE_ENTRY lfcache;
-        if(lfcache_id != 0){
+        if(lru_id != 0){
             // Remove the leaf cache if it is existed
-            t->leafCache->LRU->read(t->cmb, lfcache_id, &lfcache);
-            t->leafCache->LRU->remove(t->cmb, t->leafCache->RBTREE, &lfcache, lfcache_id);
+            t->leafCache->LRU->read(t->cmb, lru_id, &lfcache);
+            t->leafCache->LRU->remove(t->cmb, t->leafCache->RBTREE, &lfcache, lru_id);
         }
         // Create a new cache an update it
         t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, node_id, num_key, key[0], key[num_key - 1]);
@@ -1178,7 +1178,7 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
     if(t->cmb){
         new_node_id = t->cmb->get_new_node_id();
         t->cmb->update_node_id(new_node_id, t->get_free_block_id());
-        t->cmb->update_lfcache_id(new_node_id, 0);
+        t->cmb->update_lru_id(new_node_id, 0);
     }
     else
         new_node_id = t->get_free_block_id();
@@ -1215,12 +1215,12 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
 
     // Update or Create a new cache for node
     if(t->leafCache && node->is_leaf && node->num_key <= m - 1){
-        u_int64_t lfcache_id = t->cmb->get_lfcache_id(node->node_id);
+        u_int64_t lru_id = t->cmb->get_lru_id(node->node_id);
         LRU_QUEUE_ENTRY lfcache;
-        if(lfcache_id != 0){
+        if(lru_id != 0){
             // Remove the leaf cache if it is existed
-            t->leafCache->LRU->read(t->cmb, lfcache_id, &lfcache);
-            t->leafCache->LRU->remove(t->cmb, t->leafCache->RBTREE, &lfcache, lfcache_id);
+            t->leafCache->LRU->read(t->cmb, lru_id, &lfcache);
+            t->leafCache->LRU->remove(t->cmb, t->leafCache->RBTREE, &lfcache, lru_id);
         }
         // Create a new cache an update it
         t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, node->node_id, node->num_key, node->key[0], node->key[node->num_key - 1]);
@@ -1228,12 +1228,12 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
 
     // Update or Create a new cache for new node
     if(t->leafCache && new_node->is_leaf && new_node->num_key <= m - 1){
-        u_int64_t lfcache_id = t->cmb->get_lfcache_id(new_node->node_id);
+        u_int64_t lru_id = t->cmb->get_lru_id(new_node->node_id);
         LRU_QUEUE_ENTRY lfcache;
-        if(lfcache_id != 0){
+        if(lru_id != 0){
             // Remove the leaf cache if it is existed
-            t->leafCache->LRU->read(t->cmb, lfcache_id, &lfcache);
-            t->leafCache->LRU->remove(t->cmb, t->leafCache->RBTREE, &lfcache, lfcache_id);
+            t->leafCache->LRU->read(t->cmb, lru_id, &lfcache);
+            t->leafCache->LRU->remove(t->cmb, t->leafCache->RBTREE, &lfcache, lru_id);
         }
         // Create a new cache an update it
         t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, new_node->node_id, new_node->num_key, new_node->key[0], new_node->key[new_node->num_key - 1]);
@@ -1385,12 +1385,12 @@ u_int64_t BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** li
     t->node_write(node_id, this);
 
     if(t->leafCache && is_leaf && num_key >= min_num){
-        u_int64_t lfcache_id = t->cmb->get_lfcache_id(node_id);
+        u_int64_t lru_id = t->cmb->get_lru_id(node_id);
         LRU_QUEUE_ENTRY lfcache;
-        if(lfcache_id != 0){
+        if(lru_id != 0){
             // Remove the leaf cache if it is existed
-            t->leafCache->LRU->read(t->cmb, lfcache_id, &lfcache);
-            t->leafCache->LRU->remove(t->cmb, t->leafCache->RBTREE, &lfcache, lfcache_id);
+            t->leafCache->LRU->read(t->cmb, lru_id, &lfcache);
+            t->leafCache->LRU->remove(t->cmb, t->leafCache->RBTREE, &lfcache, lru_id);
         }
         // Create a new cache an update it
         t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, node_id, num_key, key[0], key[num_key - 1]);
@@ -1526,23 +1526,23 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
 
         // Remove the leaf cache of right if it is in the queue
         if(t->leafCache && right->is_leaf){
-            u_int64_t lfcache_id = t->cmb->get_lfcache_id(right->node_id);
+            u_int64_t lru_id = t->cmb->get_lru_id(right->node_id);
             LRU_QUEUE_ENTRY lfcache;
-            if(lfcache_id != 0){
+            if(lru_id != 0){
                 // Remove the leaf cache if it is existed
-                t->leafCache->LRU->read(t->cmb, lfcache_id, &lfcache);
-                t->leafCache->LRU->remove(t->cmb, t->leafCache->RBTREE, &lfcache, lfcache_id);
+                t->leafCache->LRU->read(t->cmb, lru_id, &lfcache);
+                t->leafCache->LRU->remove(t->cmb, t->leafCache->RBTREE, &lfcache, lru_id);
             }
         }
 
         // Update or Create a new cache for left
         if(t->leafCache && left->is_leaf && left->num_key >= min_num){
-            u_int64_t lfcache_id = t->cmb->get_lfcache_id(left->node_id);
+            u_int64_t lru_id = t->cmb->get_lru_id(left->node_id);
             LRU_QUEUE_ENTRY lfcache;
-            if(lfcache_id != 0){
+            if(lru_id != 0){
                 // Remove the leaf cache if it is existed
-                t->leafCache->LRU->read(t->cmb, lfcache_id, &lfcache);
-                t->leafCache->LRU->remove(t->cmb, t->leafCache->RBTREE, &lfcache, lfcache_id);
+                t->leafCache->LRU->read(t->cmb, lru_id, &lfcache);
+                t->leafCache->LRU->remove(t->cmb, t->leafCache->RBTREE, &lfcache, lru_id);
             }
             // Create a new cache an update it
             t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, left->node_id, left->num_key, left->key[0], left->key[left->num_key - 1]);
@@ -1746,10 +1746,10 @@ void CMB::update_node_id(u_int64_t node_id, u_int64_t block_id){
 	write(addr, &writeval, sizeof(u_int64_t));
 }
 
-u_int64_t CMB::get_lfcache_id(u_int64_t node_id){
-    mylog << "get_lfcache_id() - node id:" << node_id << endl;
+u_int64_t CMB::get_lru_id(u_int64_t node_id){
+    mylog << "get_lru_id() - node id:" << node_id << endl;
     BKMap ref;
-    off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.lfcache_id - (char*)&ref);
+    off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.lru_id - (char*)&ref);
     if(addr > BLOCK_MAPPING_END_ADDR){
         cout << "CMB Block Mapping Read Out of Range" << endl;
         mylog << "CMB Block Mapping Read Out of Range" << endl;
@@ -1761,10 +1761,10 @@ u_int64_t CMB::get_lfcache_id(u_int64_t node_id){
     return readval;
 }
 
-void CMB::update_lfcache_id(u_int64_t node_id, u_int64_t value){
-    mylog << "update_lfcache_id() - node id:" << node_id << " value:" << value << endl;
+void CMB::update_lru_id(u_int64_t node_id, u_int64_t value){
+    mylog << "update_lru_id() - node id:" << node_id << " value:" << value << endl;
     BKMap ref;
-    off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.lfcache_id - (char*)&ref);
+    off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.lru_id - (char*)&ref);
     if(addr > BLOCK_MAPPING_END_ADDR){
         cout << "CMB Block Mapping Write Out of Range" << endl;
         mylog << "CMB Block Mapping Write Out of Range" << endl;
@@ -1950,7 +1950,7 @@ void LRU_QUEUE::enqueue(CMB* cmb, RBTree* rbtree, u_int64_t node_id, u_int64_t n
         Q_front_idx = new_idx;
     }
 
-    cmb->update_lfcache_id(node_id, new_idx);
+    cmb->update_lru_id(node_id, new_idx);
 
     num_of_cache++;
     offset = LRU_QUEUE_START_ADDR + ((char*) &num_of_cache - (char*) this);
@@ -1993,11 +1993,11 @@ u_int64_t LRU_QUEUE::dequeue(CMB* cmb, RBTree* rbtree, LRU_QUEUE_ENTRY* buf){
         cmb->write(offset, &zero, sizeof(u_int64_t));
     }
 
-    // Clear the BKMap->lfcache_id
+    // Clear the BKMap->lru_id
     u_int64_t node_id;
     offset = LRU_QUEUE_BASE_ADDR + del_idx * sizeof(LRU_QUEUE_ENTRY) + ((char*)&(buf->node_id) - (char*)buf);
     cmb->read(&node_id, offset, sizeof(u_int64_t));
-    cmb->update_lfcache_id(node_id, 0);
+    cmb->update_lru_id(node_id, 0);
 
     // return the free cache slot to free stack
     free_push(cmb, del_idx);
@@ -2043,11 +2043,11 @@ void LRU_QUEUE::remove(CMB* cmb, RBTree* rbtree, LRU_QUEUE_ENTRY* buf, u_int64_t
         Q_rear_idx = buf->lastQ;
     }
 
-    // Clear the BKMap->lfcache_id
+    // Clear the BKMap->lru_id
     u_int64_t node_id;
     offset = LRU_QUEUE_BASE_ADDR + idx * sizeof(LRU_QUEUE_ENTRY) + ((char*)&(buf->node_id) - (char*)buf);
     cmb->read(&node_id, offset, sizeof(u_int64_t));
-    cmb->update_lfcache_id(node_id, 0);
+    cmb->update_lru_id(node_id, 0);
 
     free_push(cmb, idx);
 
