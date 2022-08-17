@@ -1220,9 +1220,6 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
         new_node_id = t->cmb->get_new_node_id();
         t->cmb->update_node_id(new_node_id, t->get_free_block_id());
         t->cmb->update_lru_id(new_node_id, 0);
-        t->cmb->update_num_key(new_node_id, m - min_num - 1);
-        t->cmb->update_lower(new_node_id, node->key[min_num+1]);
-        t->cmb->update_upper(new_node_id, node->key[num_key-1]);
     }
     else
         new_node_id = t->get_free_block_id();
@@ -1241,6 +1238,11 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
 
     if(t->cmb){
         *list = new removeList(t->cmb->get_block_id(node->node_id), *list);
+        
+        t->cmb->update_num_key(new_node_id, new_node->num_key);
+        t->cmb->update_lower(new_node_id, new_node->key[0]);
+        t->cmb->update_upper(new_node_id, new_node->key[new_node->num_key-1]);
+
         t->cmb->update_node_id(node->node_id, t->get_free_block_id());
         t->cmb->update_num_key(node->node_id, min_num);
         t->cmb->update_upper(node->node_id, node->key[min_num-1]);
