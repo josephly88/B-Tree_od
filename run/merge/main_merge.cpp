@@ -200,8 +200,7 @@ int main(int argc, char** argv){
             }
             else{
                 continue;
-            }
-                
+            }      
         }
 	    cout << endl << "Done!" << endl;;
 
@@ -209,6 +208,9 @@ int main(int argc, char** argv){
         op_file.close();
 
     }
+
+    mylog.close();
+    mylog.open("/dev/null");
 
     t->inorder_traversal((char*)"tree.dat");
     if(t->leafCache){
