@@ -761,20 +761,21 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
 
             tree_write(fd, this);
 
-            if(rmlist){
-                removeList* cur = rmlist;
-                removeList* next = NULL;
-                while(cur != NULL){
-                    next = cur->next;
-                    set_block_id(cur->id, false);
-                    delete cur;
-                    cur = next;
-                }
-            }
-
-            delete new_root;            
-            delete root;
+            delete new_root;    
         }
+        
+        if(rmlist){
+            removeList* cur = rmlist;
+            removeList* next = NULL;
+            while(cur != NULL){
+                next = cur->next;
+                set_block_id(cur->id, false);
+                delete cur;
+                cur = next;
+            }
+        }
+                
+        delete root;
     }
     else{
         if(cmb){
@@ -1419,7 +1420,13 @@ u_int64_t BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** li
     }
     idx = i;
     
-    if(i == num_key) return 0;
+    if(i == num_key){
+        mylog << "~~Key not found~~" << endl;
+        if(t->leafCache && rbtree_id != 0){
+            t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, rbtree_id);
+        }
+        return 0;
+    } 
 
     if(i < num_key-1){
         for(; i < num_key-1; i++){
@@ -1558,14 +1565,12 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
         t->node_read(child_id[idx+1], right);
         trans_node_id = (right->is_leaf) ? 0 : right->child_id[0];
             // Insert parent's kv to left
-        child_id[idx] = left->direct_insert(t, key[idx], value[idx], list, 0, trans_node_id);
         left->key[left->num_key] = key[idx];
         left->value[left->num_key] = value[idx];
-        if(!right->is_leaf)
+        if(!left->is_leaf)
             left->child_id[left->num_key+1] = right->child_id[0];
         left->num_key++;
             // Insert right to left
-        t->node_read(child_id[idx], left);
         for(int i = 0; i < right->num_key; i++){
             left->key[left->num_key] = right->key[i];
             left->value[left->num_key] = right->value[i];
@@ -1578,7 +1583,6 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             *list = new removeList(t->cmb->get_block_id(node_id), *list);
             t->cmb->update_node_id(left->node_id, t->get_free_block_id());
             t->cmb->update_num_key(left->node_id, left->num_key);
-            t->cmb->update_lower(left->node_id, left->key[0]);
             t->cmb->update_upper(left->node_id, left->key[left->num_key-1]);
         }
         else{
@@ -1612,20 +1616,29 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             // If lru cache existed
             if(lru_id != 0){
                 // Re-enqueue if it is existed
-                u_int64_t rm_rb_idx = t->leafCache->LRU->remove(t->cmb, node_id);
+                u_int64_t rm_rb_idx = t->leafCache->LRU->remove(t->cmb, right->node_id);
                 t->leafCache->RBTREE->remove(t->cmb, rm_rb_idx);
             }
         }
 
         // Update or Create a new cache for left
         if(t->leafCache && left->is_leaf && left->num_key >= min_num){
-            if(t->leafCache->LRU->full()){
-                u_int64_t rm_rb_idx = t->leafCache->LRU->dequeue(t->cmb);
-                t->leafCache->RBTREE->remove(t->cmb, rm_rb_idx);
+            u_int64_t lru_id = t->cmb->get_lru_id(left->node_id);
+            // If lru cache existed
+            if(lru_id != 0){
+                // Re-enqueue if it is existed
+                u_int64_t rm_rb_idx = t->leafCache->LRU->remove(t->cmb, left->node_id);
+                t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, rm_rb_idx);
             }
-            // Create red black tree node and enqueue
-            u_int64_t new_rb_idx = t->leafCache->RBTREE->insert(t->cmb, left->node_id);
-            t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, new_rb_idx);
+            else{
+                if(t->leafCache->LRU->full()){
+                    u_int64_t rm_rb_idx = t->leafCache->LRU->dequeue(t->cmb);
+                    t->leafCache->RBTREE->remove(t->cmb, rm_rb_idx);
+                }
+                // Create red black tree node and enqueue
+                u_int64_t new_rb_idx = t->leafCache->RBTREE->insert(t->cmb, left->node_id);
+                t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, new_rb_idx);
+            }
         }
     }
 
@@ -2058,7 +2071,7 @@ u_int64_t LRU_QUEUE::free_pop(CMB* cmb){
 }
 
 void LRU_QUEUE::enqueue(CMB* cmb, RBTree* rbtree, u_int64_t rbtree_id){
-    mylog << "enqueue() : " << "rbtree_id = " << rbtree_id << endl;
+    mylog << "LRU::enqueue() : " << "rbtree_id = " << rbtree_id << endl;
     if(full()){
         u_int64_t rm_rb_idx = dequeue(cmb);
         rbtree->remove(cmb, rm_rb_idx);
@@ -2131,7 +2144,7 @@ void LRU_QUEUE::enqueue(CMB* cmb, RBTree* rbtree, u_int64_t rbtree_id){
 }
 
 u_int64_t LRU_QUEUE::dequeue(CMB* cmb){
-    mylog << "dequeue()" << endl;
+    mylog << "LRU::dequeue()" << endl;
     if(Q_front_idx == 0)
         return 0;
 
@@ -2182,7 +2195,7 @@ u_int64_t LRU_QUEUE::dequeue(CMB* cmb){
 }
 
 u_int64_t LRU_QUEUE::remove(CMB* cmb, u_int64_t node_id){
-    mylog << "remove(): node_id = " << node_id << endl;
+    mylog << "LRU::remove(): node_id = " << node_id << endl;
     if(node_id == 0) return 0;
 
     off_t addr;
@@ -2226,6 +2239,8 @@ u_int64_t LRU_QUEUE::remove(CMB* cmb, u_int64_t node_id){
     num_of_cache--;
     addr = LRU_QUEUE_START_ADDR + ((char*) &num_of_cache - (char*) this);
     cmb->write(addr, &num_of_cache, sizeof(u_int64_t));
+
+    delete buf;
 
     return rbtree_id;
 }
