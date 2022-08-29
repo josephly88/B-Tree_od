@@ -6,7 +6,7 @@
 #include "../../lib/YCSB/ycsb_data.h"
 using namespace std;
 
-typedef struct TYPE{char str[100];} TYPE;
+typedef struct TYPE{char str[104];} TYPE;
 
 int random_num(int base, int max){
     return rand() % max + base;
@@ -40,7 +40,8 @@ int main(int argc, char** argv){
     int end = 0;
     bool create = false;
     MODE mode = COPY_ON_WRITE;
-    int lfcache = false;
+    bool lfcache = false;
+    bool append = false;
 
     if(argc < 2){
         usage();
@@ -77,6 +78,9 @@ int main(int argc, char** argv){
             else if(strcmp(argv[i], "-lfcache") == 0){
                 lfcache = true;
             }
+            else if(strcmp(argv[i], "-append") == 0){
+                append = true;
+            }
             else{
                 tree_file = argv[i];
                 break;
@@ -98,7 +102,7 @@ int main(int argc, char** argv){
     // Create a new tree file
         cout << "Create tree <" << tree_file << ">" << endl;
         mylog << "Create tree <" << tree_file << ">" << endl;
-        t = new BTree<TYPE>(tree_file, degree, mode, lfcache);
+        t = new BTree<TYPE>(tree_file, degree, mode, lfcache, append);
     }
     else{
     // Existed tree file
@@ -107,7 +111,7 @@ int main(int argc, char** argv){
         int fd = open(tree_file, O_RDWR | O_DIRECT);
         t = (BTree<TYPE>*) calloc(1, sizeof(BTree<TYPE>));
         t->tree_read(fd, t);
-        t->reopen(fd, mode, lfcache);
+        t->reopen(fd, mode, lfcache, append);
     }
 
     t->stat();

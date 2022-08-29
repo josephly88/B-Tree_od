@@ -26,21 +26,34 @@ typedef enum {
     RED
 } COLOR;
 
+typedef enum {
+    I,
+    D,
+    U
+} OPR_CODE;
+
 ofstream mylog;
 
 // ## Verification
 int HIT = 0;
 
+// B-Tree
 template <typename T> class BTree;
 template <typename T> class BTreeNode;
 class removeList;
+// CMB
 class CMB;
 class BKMap;
+// Leaf Cache
 class LEAF_CACHE;
 class LRU_QUEUE;
 class LRU_QUEUE_ENTRY;
 class RBTree;
 class RBTreeNode;
+// Append operation
+template <typename T> class APPEND;
+class APPEND_ENTRY;
+template <typename T> class VALUE_POOL;
 
 template <typename T>
 class BTree{
@@ -55,13 +68,15 @@ class BTree{
 	public:
 	    CMB* cmb;
         LEAF_CACHE* leafCache;
+        APPEND<T>* append_map;
 
-		BTree(char* filename, int degree, MODE _mode, bool lfcache = false);
+		BTree(char* filename, int degree, MODE _mode, bool lfcache, bool append);
 		~BTree();
 
-		void reopen(int _fd, MODE _mode, bool lfcache = false);
+		void reopen(int _fd, MODE _mode, bool lfcache, bool append);
 
 		void stat();
+        void memory_map_addr();
 
 		void tree_read(int fd, BTree* tree);
 		void tree_write(int fd, BTree* tree);
@@ -256,7 +271,53 @@ class RBTreeNode{
 };
 
 template <typename T>
-BTree<T>::BTree(char* filename, int degree, MODE _mode, bool lfcache){
+class APPEND{
+    public:
+        VALUE_POOL<T>* value_pool;
+
+        void append_entry(BTree<T>* t, u_int64_t node_id, OPR_CODE OPR, u_int64_t _k, T _v);
+        bool full(CMB* cmb, u_int64_t node_id);
+        void reduction(BTree<T>* t, u_int64_t node_id, BTreeNode<T>* node);
+        u_int64_t search_entry(CMB* cmb, u_int64_t node_id, u_int64_t key);
+
+        u_int64_t get_num(CMB* cmb, u_int64_t node_id);
+        void write_num(CMB* cmb, u_int64_t node_id, u_int64_t num);
+
+        OPR_CODE get_opr(CMB* cmb, u_int64_t node_id, u_int64_t idx);
+        u_int64_t get_key(CMB* cmb, u_int64_t node_id, u_int64_t idx);
+        T get_value(CMB* cmb, u_int64_t node_id, u_int64_t idx);
+        void delete_entries(CMB* cmb, u_int64_t node_id);
+};
+
+class APPEND_ENTRY{
+    public:
+        u_int64_t opr;
+        u_int64_t key;
+        u_int64_t value_idx;
+};
+
+template <typename T>
+class VALUE_POOL{
+    public:
+        u_int64_t free_Stack_idx;
+        u_int64_t free_idx;
+        u_int64_t capacity;
+        u_int64_t num;
+
+        VALUE_POOL(CMB* cmb);
+
+        void stat(CMB* cmb);
+
+        u_int64_t get_free_idx(CMB* cmb);
+        void free_push(CMB* cmb, u_int64_t idx);
+        u_int64_t free_pop(CMB* cmb);
+
+        void get_value(CMB* cmb, u_int64_t idx, T* buf);
+        void write_value(CMB* cmb, u_int64_t idx, T* buf);
+};
+
+template <typename T>
+BTree<T>::BTree(char* filename, int degree, MODE _mode, bool lfcache, bool append){
     mylog << "BTree()" << endl;
 
     if(degree > (int)((PAGE_SIZE - sizeof(BTreeNode<T>) - sizeof(u_int64_t)) / (sizeof(u_int64_t) + sizeof(T))) ){
@@ -272,6 +333,7 @@ BTree<T>::BTree(char* filename, int degree, MODE _mode, bool lfcache){
     root_id = 0;
     mode = _mode;
     leafCache = NULL;
+    append_map = NULL;
     
     char* buf;
     posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
@@ -299,8 +361,15 @@ BTree<T>::BTree(char* filename, int degree, MODE _mode, bool lfcache){
             leafCache->LRU->stat(cmb);
             leafCache->RBTREE = new RBTree(cmb);
             leafCache->RBTREE->stat(cmb);
-        }            
+        }     
+
+        // Append entry Optimization
+        if(append){
+            append_map = new APPEND<T>();
+            append_map->value_pool = new VALUE_POOL<T>(cmb);
+        }       
     }
+
 }
 
 template <typename T>
@@ -313,10 +382,14 @@ BTree<T>::~BTree(){
         delete leafCache->RBTREE;
         delete leafCache;
     } 
+    if(append_map){
+        delete append_map->value_pool;
+        delete append_map;
+    }
 }
 
 template <typename T>
-void BTree<T>::reopen(int _fd, MODE _mode, bool lfcache){
+void BTree<T>::reopen(int _fd, MODE _mode, bool lfcache, bool append){
     mylog << "reopen()" << endl;
     fd = _fd;
     mode = _mode;
@@ -337,6 +410,13 @@ void BTree<T>::reopen(int _fd, MODE _mode, bool lfcache){
             leafCache->RBTREE = (RBTree*) malloc(sizeof(RBTree));
             addr = RED_BLACK_TREE_START_ADDR;
             cmb->read(leafCache->RBTREE, addr, sizeof(RBTree));
+        }
+
+        if(append){
+            append_map = new APPEND<T>();
+            append_map->value_pool = (VALUE_POOL<T>*) malloc(sizeof(VALUE_POOL<T>));
+            off_t addr = VALUE_POOL_START_ADDR;
+            cmb->read(append_map->value_pool, addr, sizeof(VALUE_POOL<T>));
         }
     }
 
@@ -359,6 +439,25 @@ void BTree<T>::stat(){
     mylog << "\tBlock Capacity: " << block_cap << endl;
     mylog << "\tRoot Block ID: " << root_id << endl;
     print_used_block_id();
+}
+
+template <typename T>
+void BTree<T>::memory_map_addr(){
+    cout << "START_ADDR:\t\t\t0x" << hex << START_ADDR << endl;
+    cout << "BLOCK_MAPPING_START_ADDR:\t0x" << hex << BLOCK_MAPPING_START_ADDR << endl;
+    cout << "BLOCK_MAPPING_END_ADDR:\t\t0x" << hex << BLOCK_MAPPING_END_ADDR << endl;
+    cout << "LRU_QUEUE_START_ADDR:\t\t0x" << hex << LRU_QUEUE_START_ADDR << endl;
+    cout << "LRU_QUEUE_BASE_ADDR:\t\t0x" << hex << LRU_QUEUE_BASE_ADDR << endl;
+    cout << "LRU_QUEUE_END_ADDR:\t\t0x" << hex << LRU_QUEUE_END_ADDR << endl;
+    cout << "RED_BLACK_TREE_START_ADDR:\t0x" << hex << RED_BLACK_TREE_START_ADDR << endl;
+    cout << "RED_BLACK_TREE_BASE_ADDR:\t0x" << hex << RED_BLACK_TREE_BASE_ADDR << endl;
+    cout << "RED_BLACK_TREE_END_ADDR:\t0x" << hex << RED_BLACK_TREE_END_ADDR << endl;
+    cout << "APPEND_OPR_START_ADDR:\t\t0x" << hex << APPEND_OPR_START_ADDR << endl;
+    cout << "APPEND_OPR_END_ADDR:\t\t0x" << hex << APPEND_OPR_END_ADDR << endl;
+    cout << "VALUE_POOL_START_ADDR:\t\t0x" << hex << VALUE_POOL_START_ADDR << endl;
+    cout << "VALUE_POOL_BASE_ADDR:\t\t0x" << hex << VALUE_POOL_BASE_ADDR << endl;
+    cout << "VALUE_POOL_END_ADDR:\t\t0x" << hex << VALUE_POOL_END_ADDR << endl; 
+    cout << "END_ADDR:\t\t\t0x" << hex << END_ADDR << endl;
 }
 
 template <typename T>
@@ -743,13 +842,14 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
         }       
 
         node_read(root_id, root);
-        if(root->num_key >= m){  
+        if(root->num_key >= m || (cmb && cmb->get_num_key(root_id) >= m)){  
             int new_root_id;     
 
             if(cmb){
                 new_root_id = cmb->get_new_node_id();
                 cmb->update_node_id(new_root_id, get_free_block_id());
                 cmb->update_lru_id(new_root_id, 0);
+                cmb->update_num_key(new_root_id, 0);
             }
             else
                 new_root_id = get_free_block_id();
@@ -782,6 +882,10 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
             root_id = cmb->get_new_node_id();
             cmb->update_node_id(root_id, get_free_block_id());
             cmb->update_lru_id(root_id, 0);
+            cmb->update_num_key(root_id, 0);
+            if(append_map){
+                append_map->write_num(cmb, root_id, 0);
+            }
         }
         else
             root_id = get_free_block_id();
@@ -924,22 +1028,27 @@ void BTreeNode<T>::display_tree(BTree<T>* t, MODE mode, int level){
     else
         cout << '[' << node_id << "=>" << t->cmb->get_block_id(node_id) << ']' << endl;
 
+    BTreeNode<T>* node = new BTreeNode<T>(0,0,0);
+    t->node_read(node_id, node);
+    if(t->append_map && is_leaf)
+        t->append_map->reduction(t, node_id, node);
+
     int i = 0;
     for(i = 0; i < num_key; i++){
         if(!is_leaf){
-            BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
-            t->node_read(child_id[i], node);
-            node->display_tree(t, mode, level + 1);
-            delete node;
+            BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
+            t->node_read(child_id[i], child);
+            child->display_tree(t, mode, level + 1);
+            delete child;
         }
         for(int j = 0; j < level; j++) cout << '\t';
-        cout << key[i] << endl;;
+        cout << node->key[i] << endl;;
     }
     if(!is_leaf){
-        BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
-        t->node_read(child_id[i], node);
-        node->display_tree(t, mode, level + 1);
-        delete node;
+        BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
+        t->node_read(child_id[i], child);
+        child->display_tree(t, mode, level + 1);
+        delete child;
     }
 }
 
@@ -947,27 +1056,63 @@ template <typename T>
 void BTreeNode<T>::inorder_traversal(BTree<T>* t, ofstream &outFile){
     mylog << "inorder_traversal()" << endl;
 
+    BTreeNode<T>* node = new BTreeNode<T>(0,0,0);
+    t->node_read(node_id, node);
+
+    if(t->append_map && is_leaf){
+        t->append_map->reduction(t, node_id, node);
+    }
+
     int i = 0;
-    for(i = 0; i < num_key; i++){
+    for(i = 0; i < node->num_key; i++){
         if(!is_leaf){
-            BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
-            t->node_read(child_id[i], node);
-            node->inorder_traversal(t, outFile);
-            delete node;
+            BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
+            t->node_read(node->child_id[i], child);
+            child->inorder_traversal(t, outFile);
+            delete child;
         }
-        outFile << key[i] << '\t' << value[i].str << endl;;
+        outFile << node->key[i] << '\t' << node->value[i].str << endl;;
     }
     if(!is_leaf){
-        BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
-        t->node_read(child_id[i], node);
-            node->inorder_traversal(t, outFile);
-            delete node;
+        BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
+        t->node_read(node->child_id[i], child);
+        child->inorder_traversal(t, outFile);
+        delete child;
     }
+
+    delete node;
 }
 
 template <typename T>
 void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id){
     mylog << "search() - key:" << _k << endl;
+
+    if(t->append_map && is_leaf){
+        u_int64_t entry_idx = t->append_map->search_entry(t->cmb, node_id, _k);
+        if(entry_idx != 0){
+            T ret_val = t->append_map->get_value(t->cmb, node_id, entry_idx);
+            memcpy(buf, &ret_val, sizeof(T));
+
+            if(t->leafCache && is_leaf){
+                if(t->leafCache->LRU->full()){
+                    u_int64_t rm_rb_idx = t->leafCache->LRU->dequeue(t->cmb);
+                    t->leafCache->RBTREE->remove(t->cmb, rm_rb_idx);
+                }
+                // Enqueue
+                if(rbtree_id){
+                    // red black tree node already exist (hit)
+                    t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, rbtree_id);
+                }
+                else{
+                    // Create red black tree node and enqueue
+                    u_int64_t new_rb_idx = t->leafCache->RBTREE->insert(t->cmb, node_id);
+                    t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, new_rb_idx);
+                }
+            } 
+
+            return;
+        }
+    }
 
     int i;
     for(i = 0; i < num_key; i++){
@@ -1022,7 +1167,29 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id
 template <typename T>
 u_int64_t BTreeNode<T>::update(BTree<T>* t, u_int64_t _k, T _v, removeList** list, u_int64_t rbtree_id){
     mylog << "update() - key:" << _k << endl;
-    
+
+    if(t->append_map && is_leaf){
+        t->append_map->append_entry(t, node_id, U, _k, _v);
+
+        // Add to the leaf interval cache
+        if(t->leafCache && is_leaf){
+            if(t->leafCache->LRU->full()){
+                u_int64_t rm_rb_idx = t->leafCache->LRU->dequeue(t->cmb);
+                t->leafCache->RBTREE->remove(t->cmb, rm_rb_idx);
+            }
+            // Enqueue
+            if(rbtree_id){
+                // red black tree node already exist (hit)
+                t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, rbtree_id);
+            }
+            else{
+                // Create red black tree node and enqueue
+                u_int64_t new_rb_idx = t->leafCache->RBTREE->insert(t->cmb, node_id);
+                t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, new_rb_idx);
+            }
+        }    
+    }
+
     int i;
     for(i = 0; i < num_key; i++){
         // Key match
@@ -1125,6 +1292,11 @@ u_int64_t BTreeNode<T>::traverse_insert(BTree<T>* t, u_int64_t _k, T _v, removeL
         t->node_read(child_id[i], child);
         if(child->num_key >= m)
             node_id = split(t, child_id[i], node_id, list);
+        if(t->append_map){           
+            if(t->cmb->get_num_key(child_id[i]) >= m)
+                node_id = split(t, child_id[i], node_id, list);
+        }
+            
 
         delete child;
 
@@ -1139,45 +1311,61 @@ u_int64_t BTreeNode<T>::direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeLis
 
     mylog << "direct_insert() - key:" << _k << endl;
 
-    int idx;
-    for(idx = 0; idx < num_key; idx++){
-        if(_k == key[idx])
-            return node_id;     // No two keys are the same
-        else{
-            if(_k < key[idx])
-                break;
+    if(t->append_map && is_leaf){
+        t->append_map->append_entry(t, node_id, I, _k, _v);
+
+        if(t->cmb->get_num_key(node_id) == 0){
+            t->cmb->update_lower(node_id, _k);
+            t->cmb->update_upper(node_id, _k);
         }
-    }
-
-    int i;
-    for(i = num_key; i > idx; i--){
-        key[i] = key[i-1];
-        value[i] = value[i-1];
-        if(!is_leaf) child_id[i+1] = child_id[i];
-    }
-    if(!is_leaf) child_id[i+1] = child_id[i];
-
-    key[idx] = _k;
-    value[idx] = _v;
-    if(node_id1 != 0) child_id[idx] = node_id1;
-    if(node_id2 != 0) child_id[idx+1] = node_id2;
-    num_key++;
-
-    if(t->cmb){
-        *list = new removeList(t->cmb->get_block_id(node_id), *list);
-        t->cmb->update_node_id(node_id, t->get_free_block_id());
-        t->cmb->update_num_key(node_id, num_key);
-        if(idx == 0) t->cmb->update_lower(node_id, key[0]);
-        if(idx == num_key - 1) t->cmb->update_upper(node_id, key[num_key - 1]);
+        else{
+            if(_k < t->cmb->get_lower(node_id)) t->cmb->update_lower(node_id, _k);
+            if(_k > t->cmb->get_upper(node_id)) t->cmb->update_upper(node_id, _k);
+        }
+        u_int64_t num_k = t->cmb->get_num_key(node_id);
+        t->cmb->update_num_key(node_id, num_k+1);
     }
     else{
-        *list = new removeList(node_id, *list);
-        node_id = t->get_free_block_id();
+        int idx;
+        for(idx = 0; idx < num_key; idx++){
+            if(_k == key[idx])
+                return node_id;     // No two keys are the same
+            else{
+                if(_k < key[idx])
+                    break;
+            }
+        }
+
+        int i;
+        for(i = num_key; i > idx; i--){
+            key[i] = key[i-1];
+            value[i] = value[i-1];
+            if(!is_leaf) child_id[i+1] = child_id[i];
+        }
+        if(!is_leaf) child_id[i+1] = child_id[i];
+
+        key[idx] = _k;
+        value[idx] = _v;
+        if(node_id1 != 0) child_id[idx] = node_id1;
+        if(node_id2 != 0) child_id[idx+1] = node_id2;
+        num_key++;
+
+        if(t->cmb){
+            *list = new removeList(t->cmb->get_block_id(node_id), *list);
+            t->cmb->update_node_id(node_id, t->get_free_block_id());
+            t->cmb->update_num_key(node_id, num_key);
+            if(idx == 0) t->cmb->update_lower(node_id, key[0]);
+            if(idx == num_key - 1) t->cmb->update_upper(node_id, key[num_key - 1]);
+        }
+        else{
+            *list = new removeList(node_id, *list);
+            node_id = t->get_free_block_id();
+        }
+
+        t->node_write(node_id, this);
     }
 
-    t->node_write(node_id, this);
-
-    if(t->leafCache && is_leaf && num_key <= m - 1){
+    if(t->leafCache && is_leaf && num_key <= m - 1 && t->cmb->get_num_key(node_id) <= m - 1){
         u_int64_t lru_id = t->cmb->get_lru_id(node_id);
         // If lru cache existed
         if(lru_id != 0){
@@ -1212,9 +1400,12 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
     
     BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
     t->node_read(spt_node_id, node);
+    if(t->append_map){
+        t->append_map->reduction(t, spt_node_id, node);
+    }
 
     BTreeNode<T>* parent = new BTreeNode<T>(0, 0, 0);
-    t->node_read(parent_id, parent);
+    t->node_read(parent_id, parent);  
 
     int new_node_id;
     if(t->cmb){
@@ -1247,6 +1438,11 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
         t->cmb->update_node_id(node->node_id, t->get_free_block_id());
         t->cmb->update_num_key(node->node_id, min_num);
         t->cmb->update_upper(node->node_id, node->key[min_num-1]);
+        
+        if(t->append_map){
+            t->append_map->delete_entries(t->cmb, node->node_id);
+            t->append_map->write_num(t->cmb, new_node_id, 0);
+        }
     }
     else{
         *list = new removeList(node->node_id, *list);
@@ -1414,43 +1610,51 @@ template <typename T>
 u_int64_t BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** list, u_int64_t rbtree_id){
     mylog << "direct_delete() - key:" << _k << endl;
     
-    int i, idx;
-    for(i = 0; i < num_key; i++){
-        if(key[i] == _k) break;
-    }
-    idx = i;
-    
-    if(i == num_key){
-        mylog << "~~Key not found~~" << endl;
-        if(t->leafCache && rbtree_id != 0){
-            t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, rbtree_id);
-        }
-        return 0;
-    } 
-
-    if(i < num_key-1){
-        for(; i < num_key-1; i++){
-            key[i] = key[i+1];
-            value[i] = value[i+1];
-            if(!is_leaf) child_id[i] = child_id[i+1];
-        }
-        if(!is_leaf) child_id[i] = child_id[i+1];
-    }
-    num_key--;
-
-    if(t->cmb){
-        *list = new removeList(t->cmb->get_block_id(node_id), *list);
-        t->cmb->update_node_id(node_id, t->get_free_block_id());
+    if(t->append_map && is_leaf){
+        T empty;
+        t->append_map->append_entry(t, node_id, D, _k, empty);
+        num_key--;
         t->cmb->update_num_key(node_id, num_key);
-        if(idx == 0) t->cmb->update_lower(node_id, key[0]);
-        if(idx == num_key) t->cmb->update_upper(node_id, key[num_key - 1]);
     }
     else{
-        *list = new removeList(node_id, *list);
-        node_id = t->get_free_block_id();
-    }
+        int i, idx;
+        for(i = 0; i < num_key; i++){
+            if(key[i] == _k) break;
+        }
+        idx = i;
+        
+        if(i == num_key){
+            mylog << "~~Key not found~~" << endl;
+            if(t->leafCache && rbtree_id != 0){
+                t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, rbtree_id);
+            }
+            return 0;
+        } 
 
-    t->node_write(node_id, this);
+        if(i < num_key-1){
+            for(; i < num_key-1; i++){
+                key[i] = key[i+1];
+                value[i] = value[i+1];
+                if(!is_leaf) child_id[i] = child_id[i+1];
+            }
+            if(!is_leaf) child_id[i] = child_id[i+1];
+        }
+        num_key--;
+
+        if(t->cmb){
+            *list = new removeList(t->cmb->get_block_id(node_id), *list);
+            t->cmb->update_node_id(node_id, t->get_free_block_id());
+            t->cmb->update_num_key(node_id, num_key);
+            if(idx == 0) t->cmb->update_lower(node_id, key[0]);
+            if(idx == num_key) t->cmb->update_upper(node_id, key[num_key - 1]);
+        }
+        else{
+            *list = new removeList(node_id, *list);
+            node_id = t->get_free_block_id();
+        }
+
+        t->node_write(node_id, this);
+    }
 
     if(t->leafCache && is_leaf && num_key >= min_num){
         u_int64_t lru_id = t->cmb->get_lru_id(node_id);
@@ -1751,14 +1955,14 @@ void CMB::cmb_memcpy(void* dest, void* src, size_t len){
 
 void CMB::remap(off_t offset){
     if( ((bar_addr + offset) & ~MAP_MASK) != map_idx ){
-        //mylog << "remap() - offset:" << offset << endl;
+        //mylog << "remap() - offset:" << offset << dec << endl;
         if(cache_base)
             memcpy(map_base, cache_base, MAP_SIZE);  
 
-        map_idx = (bar_addr + offset) & ~MAP_MASK;
-
         /* Unmap the previous */
-        if (munmap(map_base, MAP_SIZE) == -1) FATAL;
+        if (munmap(map_base, MAP_SIZE) == -1) FATAL;        
+
+        map_idx = (bar_addr + offset) & ~MAP_MASK;
 
         /* Remap a new page */
         map_base = mmap(0, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, map_idx);
@@ -1770,27 +1974,65 @@ void CMB::remap(off_t offset){
 }
 
 void CMB::read(void* buf, off_t offset, int size){
-    //mylog << "CMB.read() - offset:" << offset << endl;
-    remap(offset);
+    //mylog << "CMB.read() - offset:" << hex << offset << dec  << endl;
 
-    void* virt_addr;
-    if(cache_base)
-	    virt_addr = (char*)cache_base + ((offset) & MAP_MASK);	
-    else
-        virt_addr = (char*)map_base + ((offset) & MAP_MASK);
-	cmb_memcpy(buf, virt_addr, size);
+    int total_size = size;
+    int cur_size = size;
+    off_t cur_offset = offset;
+    char* cur_buf = (char*) buf + size;
+
+    while(total_size){
+        cur_offset = offset;
+        cur_size = total_size;
+
+        if(((bar_addr + offset) & ~MAP_MASK) < ((bar_addr + offset + total_size - 1) & ~MAP_MASK)){
+            cur_offset = (offset + total_size - 1) & ~MAP_MASK;
+            cur_size = (offset + total_size) - cur_offset;
+        }
+        cur_buf -= cur_size;
+
+        remap(cur_offset);
+
+        void* virt_addr;
+        if(cache_base)
+            virt_addr = (char*)cache_base + ((cur_offset) & MAP_MASK);	
+        else
+            virt_addr = (char*)map_base + ((cur_offset) & MAP_MASK);
+        cmb_memcpy(cur_buf, virt_addr, cur_size);
+
+        total_size -= cur_size;
+    }
 }
 
 void CMB::write(off_t offset, void* buf, int size){
-    //mylog << "CMB.write() - offset:" << offset << endl;
-    remap(offset);
+    mylog << "CMB.write() - offset:" << hex << offset << dec << ", size = " << size << endl;
 
-    void* virt_addr;
-    if(cache_base)
-	    virt_addr = (char*)cache_base + ((offset) & MAP_MASK);	
-    else
-        virt_addr = (char*)map_base + ((offset) & MAP_MASK);
-    cmb_memcpy(virt_addr, buf, size);
+    int total_size = size;
+    int cur_size = size;
+    off_t cur_offset = offset;
+    char* cur_buf = (char*) buf + size;
+
+    while(total_size){
+        cur_offset = offset;
+        cur_size = total_size;
+
+        if(((bar_addr + offset) & ~MAP_MASK) < ((bar_addr + offset + total_size - 1) & ~MAP_MASK)){
+            cur_offset = (offset + total_size - 1) & ~MAP_MASK;
+            cur_size = (offset + total_size) - cur_offset;
+        }
+        cur_buf -= cur_size;
+
+        remap(cur_offset);
+
+        void* virt_addr;
+        if(cache_base)
+            virt_addr = (char*)cache_base + ((cur_offset) & MAP_MASK);	
+        else
+            virt_addr = (char*)map_base + ((cur_offset) & MAP_MASK);
+        cmb_memcpy(virt_addr, cur_buf, cur_size);
+
+        total_size -= cur_size;
+    }
 }
 
 u_int64_t CMB::get_new_node_id(){
@@ -2008,7 +2250,7 @@ bool LRU_QUEUE::full(){
 }
 
 u_int64_t LRU_QUEUE::get_free_idx(CMB* cmb){
-    mylog << "get_free_idx()" << endl;
+    mylog << "LRU_QUEUE::get_free_idx()" << endl;
     // If the stack is empty
     if(free_Stack_idx == 0){
         off_t ret_idx = free_idx;
@@ -2025,7 +2267,7 @@ u_int64_t LRU_QUEUE::get_free_idx(CMB* cmb){
 }
 
 void LRU_QUEUE::free_push(CMB* cmb, u_int64_t idx){
-    mylog << "free_push(): idx = " << idx << endl;
+    mylog << "LRU_QUEUE::free_push(): idx = " << idx << endl;
     // Set the new head->next as the current head idx
     off_t addr = LRU_QUEUE_BASE_ADDR + idx * sizeof(LRU_QUEUE_ENTRY);
     if(addr >= LRU_QUEUE_END_ADDR){
@@ -2043,7 +2285,7 @@ void LRU_QUEUE::free_push(CMB* cmb, u_int64_t idx){
 }
 
 u_int64_t LRU_QUEUE::free_pop(CMB* cmb){
-    mylog << "free_pop()" << endl;
+    mylog << "LRU_QUEUE::free_pop()" << endl;
     u_int64_t ret, next;
 
     if(free_Stack_idx == 0)
@@ -3045,5 +3287,311 @@ u_int64_t RBTree::succesor(CMB* cmb, u_int64_t idx){
 
     return 0;
 }
+
+template <typename T>
+void APPEND<T>::append_entry(BTree<T>* t, u_int64_t node_id, OPR_CODE OPR, u_int64_t _k, T _v){
+    mylog << "APPEND::append_entry()" << endl;
+
+    if(full(t->cmb, node_id)){
+        // Reduction, write to the node
+        BTreeNode<T>* node = new BTreeNode<T>(0,0,0);
+        t->node_read(node_id, node);
+        reduction(t, node_id, node);
+        t->node_write(node_id, node);
+        t->append_map->delete_entries(t->cmb, node_id);
+        delete node;
+    }
+
+    APPEND_ENTRY* new_entry = new APPEND_ENTRY();
+    new_entry->opr = (u_int64_t) OPR;
+    new_entry->key = _k;
+    if(OPR == I || OPR == U){
+        new_entry->value_idx = value_pool->get_free_idx(t->cmb);
+        value_pool->write_value(t->cmb, new_entry->value_idx, &_v);
+    }
+
+    u_int64_t num = get_num(t->cmb, node_id);
+    off_t addr = APPEND_OPR_START_ADDR + node_id * (sizeof(u_int64_t) + NUM_OF_APPEND * sizeof(APPEND_ENTRY));
+    addr += sizeof(u_int64_t) + num * sizeof(APPEND_ENTRY);
+    t->cmb->write(addr, new_entry, sizeof(APPEND_ENTRY));
+
+    write_num(t->cmb, node_id, num+1);
+
+    delete new_entry;
+}
+
+template <typename T>
+bool APPEND<T>::full(CMB* cmb, u_int64_t node_id){
+    mylog << "APPEND::full() - node_id = " << node_id << endl;
+
+    u_int64_t num = get_num(cmb, node_id);
+    if(num >= NUM_OF_APPEND)
+        return true;
+    else
+        return false;
+}
+
+template <typename T>
+void APPEND<T>::reduction(BTree<T>* t, u_int64_t node_id, BTreeNode<T>* node){
+    mylog << "APPEND::reduction() - node_id = " << node_id << endl;
+
+    u_int64_t entry_num = get_num(t->cmb, node_id);
+    for(u_int64_t idx = 1; idx <= entry_num; idx++){
+        OPR_CODE opr = get_opr(t->cmb, node_id, idx);
+
+        if(opr == I){
+            u_int64_t _k = get_key(t->cmb, node_id, idx);
+            T _v = get_value(t->cmb, node_id, idx);
+
+            int i;
+            bool ins = true ;
+            for(i = 0; i < node->num_key; i++){
+                if(_k == node->key[i]){
+                    ins = false;
+                    break;
+                }
+                else{
+                    if(_k < node->key[i])
+                        break;
+                }
+            }
+            if(ins){
+                for(int j = node->num_key; j > i; j--){
+                    node->key[j] = node->key[j-1];
+                    node->value[j] = node->value[j-1];
+                }
+                node->key[i] = _k;
+                node->value[i] = _v;
+                node->num_key++;
+            }
+        }
+        else if(opr == U){
+            u_int64_t _k = get_key(t->cmb, node_id, idx);
+            T _v = get_value(t->cmb, node_id, idx);
+
+            for(int i = 0; i < node->num_key; i++){
+                if(_k == node->key[i])
+                    node->value[i] = _v;
+                if(_k < node->key[i])
+                    break;
+            }
+        }
+        else{
+            cout << "Incorrect OPR" << endl;
+            mylog << "Incorrect OPR" << endl;
+            exit(1);
+        }
+    }
+}
+
+template <typename T>
+u_int64_t APPEND<T>::search_entry(CMB* cmb, u_int64_t node_id, u_int64_t key){
+    mylog << "APPEND::search_entry() - node_id = " << node_id << endl;
+
+    u_int64_t num = get_num(cmb, node_id);
+    while(num){
+        u_int64_t ret = get_key(cmb, node_id, num);
+        if(key == ret)
+            return num;
+        num--;
+    }
+    return 0;
+}
+
+template <typename T>
+u_int64_t APPEND<T>::get_num(CMB* cmb, u_int64_t node_id){
+    mylog << "APPEND::get_num() - node_id = " << node_id << endl;
+    
+    off_t addr = APPEND_OPR_START_ADDR + node_id * (sizeof(u_int64_t) + NUM_OF_APPEND * sizeof(APPEND_ENTRY));
+    u_int64_t ret;
+    cmb->read(&ret, addr, sizeof(u_int64_t));
+    return ret;
+}
+
+template <typename T>
+void APPEND<T>::write_num(CMB* cmb, u_int64_t node_id, u_int64_t num){
+    mylog << "APPEND::write_num() - node_id = " << node_id << ", num = " << num << endl;
+
+    off_t addr = APPEND_OPR_START_ADDR + node_id * (sizeof(u_int64_t) + NUM_OF_APPEND * sizeof(APPEND_ENTRY));
+    cmb->write(addr, &num, sizeof(u_int64_t));
+}
+
+template <typename T>
+OPR_CODE APPEND<T>::get_opr(CMB* cmb, u_int64_t node_id, u_int64_t idx){
+    mylog << "APPEND::get_opr() - node_id = " << node_id << ", idx = " << idx << endl;
+
+    APPEND_ENTRY ref;
+    u_int64_t ret;
+    off_t addr = APPEND_OPR_START_ADDR + node_id * (sizeof(u_int64_t) + NUM_OF_APPEND * sizeof(APPEND_ENTRY));
+    addr += sizeof(u_int64_t) + (idx-1) * sizeof(APPEND_ENTRY) + ((char*)&ref.opr - (char*)&ref);
+    cmb->read(&ret, addr, sizeof(u_int64_t));
+
+    return (OPR_CODE) ret;
+}
+
+template <typename T>
+u_int64_t APPEND<T>::get_key(CMB* cmb, u_int64_t node_id, u_int64_t idx){
+    mylog << "APPEND::get_key() - node_id = " << node_id << ", idx = " << idx << endl;
+
+    APPEND_ENTRY ref;
+    u_int64_t ret;
+    off_t addr = APPEND_OPR_START_ADDR + node_id * (sizeof(u_int64_t) + NUM_OF_APPEND * sizeof(APPEND_ENTRY));
+    addr += sizeof(u_int64_t) + (idx-1) * sizeof(APPEND_ENTRY) + ((char*)&ref.key - (char*)&ref);
+    cmb->read(&ret, addr, sizeof(u_int64_t));
+
+    return ret;
+}
+
+template <typename T>
+T APPEND<T>::get_value(CMB* cmb, u_int64_t node_id, u_int64_t idx){
+    mylog << "APPEND::get_value() - node_id = " << node_id << ", idx = " << idx << endl;
+
+    APPEND_ENTRY ref;
+    u_int64_t value_idx;
+    T ret;
+    off_t addr = APPEND_OPR_START_ADDR + node_id * (sizeof(u_int64_t) + NUM_OF_APPEND * sizeof(APPEND_ENTRY));
+    addr += sizeof(u_int64_t) + (idx-1) * sizeof(APPEND_ENTRY) + ((char*)&ref.value_idx - (char*)&ref);
+    cmb->read(&value_idx, addr, sizeof(u_int64_t));
+
+    value_pool->get_value(cmb, value_idx, &ret);
+
+    return ret;
+}
+
+template <typename T>
+void APPEND<T>::delete_entries(CMB* cmb, u_int64_t node_id){
+    mylog << "APPEND::delete_entries() - node_id = " << node_id << endl;
+
+    APPEND_ENTRY ref;
+    u_int64_t num = get_num(cmb, node_id);
+    while(num){
+        OPR_CODE opr = get_opr(cmb, node_id, num);
+        if(opr == I or opr == U){
+            u_int64_t value_idx;
+            off_t addr = APPEND_OPR_START_ADDR + node_id * (sizeof(u_int64_t) + NUM_OF_APPEND * sizeof(APPEND_ENTRY));
+            addr += sizeof(u_int64_t) + (num-1) * sizeof(APPEND_ENTRY) + ((char*)&ref.value_idx - (char*)&ref);
+            cmb->read(&value_idx, addr, sizeof(u_int64_t));
+
+            value_pool->free_push(cmb, value_idx);
+        }
+        num--;
+    }
+    write_num(cmb, node_id, 0);
+}
+
+template <typename T>
+VALUE_POOL<T>::VALUE_POOL(CMB* cmb){
+    free_Stack_idx = 0;
+    free_idx = 0;
+    num = 0;
+    capacity = (VALUE_POOL_END_ADDR - VALUE_POOL_BASE_ADDR) / sizeof(T) - 1;
+
+    off_t addr = VALUE_POOL_START_ADDR;
+    cmb->write(addr, this, sizeof(VALUE_POOL<T>));
+}
+
+template <typename T>
+void VALUE_POOL<T>::stat(CMB* cmb){
+    VALUE_POOL<T>* meta = (VALUE_POOL<T>*) malloc(sizeof(VALUE_POOL<T>));
+
+    off_t addr = VALUE_POOL_START_ADDR;
+    cmb->read(meta, addr, sizeof(VALUE_POOL<T>));
+
+    cout << "Free_Stack_idx = " << free_Stack_idx << endl;
+    cout << "free_idx = " << free_idx << endl;
+    cout << "capacity = " << capacity << endl;
+    cout << "num = " << num << endl;
+
+    free(meta);
+}
+
+template <typename T>
+u_int64_t VALUE_POOL<T>::get_free_idx(CMB* cmb){
+    mylog << "VALUE_POOL::get_free_idx()" << endl;
+    // If the stack is empty
+    if(free_Stack_idx == 0){
+        off_t ret_idx = free_idx;
+        free_idx++;
+
+        // Write the new free_idx back
+        off_t addr = VALUE_POOL_START_ADDR + ((char*) &free_idx - (char*) this);
+        cmb->write(addr, &free_idx, sizeof(u_int64_t));
+
+        return ret_idx;
+    }
+    else
+        return free_pop(cmb);
+}
+
+template <typename T>
+void VALUE_POOL<T>::free_push(CMB* cmb, u_int64_t idx){
+    mylog << "VALUE_POOL::free_push(): idx = " << idx << endl;
+    // Set the new head->next as the current head idx
+    off_t addr = VALUE_POOL_BASE_ADDR + idx * sizeof(T);
+    if(addr >= VALUE_POOL_END_ADDR){
+        cout << "Value Pool Limit Exceed" << endl;
+        mylog << "Value Pool Limit Exceed" << endl;
+        exit(1);
+    }
+    cmb->write(addr, &free_Stack_idx, sizeof(u_int64_t));
+
+    // Set the stack head to the new head
+    addr = VALUE_POOL_START_ADDR + ((char*)&free_Stack_idx - (char*)this);
+    cmb->write(addr, &idx, sizeof(u_int64_t)); 
+
+    free_Stack_idx = idx;
+}
+
+template <typename T>
+u_int64_t VALUE_POOL<T>::free_pop(CMB* cmb){
+    mylog << "VALUE_POOL::free_pop()" << endl;
+    u_int64_t ret, next;
+
+    if(free_Stack_idx == 0)
+        return 0;
+
+    // Return value would be the stack head
+    ret = free_Stack_idx;
+    
+    // Read the new stack head from the head idx
+    off_t addr = VALUE_POOL_BASE_ADDR + free_Stack_idx * sizeof(T);
+    if(addr >= VALUE_POOL_END_ADDR){
+        cout << "Value Pool Limit Excced" << endl;
+        mylog << "Value Pool Limit Excced" << endl;
+        exit(1);
+    }
+    cmb->read(&next, addr, sizeof(u_int64_t));
+
+    // Write the new stack head back
+    free_Stack_idx = next;
+
+    addr = VALUE_POOL_START_ADDR + ((char*)&free_Stack_idx - (char*)this);
+    cmb->write(addr, &free_Stack_idx, sizeof(u_int64_t));
+
+    return ret;
+}
+
+template <typename T>
+void VALUE_POOL<T>::get_value(CMB* cmb, u_int64_t idx, T* buf){
+    off_t addr = VALUE_POOL_BASE_ADDR + idx * sizeof(T);
+    if(addr >= VALUE_POOL_END_ADDR){
+        cout << "Value Pool Limit Excced" << endl;
+        mylog << "Value Pool Limit Excced" << endl;
+        exit(1);
+    }
+    cmb->read(buf, addr, sizeof(T));
+}
+
+template <typename T>
+void VALUE_POOL<T>::write_value(CMB* cmb, u_int64_t idx, T* buf){
+    off_t addr = VALUE_POOL_BASE_ADDR + idx * sizeof(T);
+    if(addr >= VALUE_POOL_END_ADDR){
+        cout << "Value Pool Limit Excced" << endl;
+        mylog << "Value Pool Limit Excced" << endl;
+        exit(1);
+    }
+    cmb->write(addr, buf, sizeof(T));
+}
+
 
 #endif /* B_TREE_H */
