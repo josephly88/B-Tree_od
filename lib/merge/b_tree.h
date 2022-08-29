@@ -1292,7 +1292,7 @@ u_int64_t BTreeNode<T>::traverse_insert(BTree<T>* t, u_int64_t _k, T _v, removeL
         t->node_read(child_id[i], child);
         if(child->num_key >= m)
             node_id = split(t, child_id[i], node_id, list);
-        if(t->append_map){           
+        else if(t->append_map && child->is_leaf){           
             if(t->cmb->get_num_key(child_id[i]) >= m)
                 node_id = split(t, child_id[i], node_id, list);
         }
@@ -1400,7 +1400,7 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
     
     BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
     t->node_read(spt_node_id, node);
-    if(t->append_map){
+    if(t->append_map && node->is_leaf){
         t->append_map->reduction(t, spt_node_id, node);
     }
 
@@ -1439,7 +1439,7 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
         t->cmb->update_num_key(node->node_id, min_num);
         t->cmb->update_upper(node->node_id, node->key[min_num-1]);
         
-        if(t->append_map){
+        if(t->append_map && node->is_leaf){
             t->append_map->delete_entries(t->cmb, node->node_id);
             t->append_map->write_num(t->cmb, new_node_id, 0);
         }
@@ -3377,8 +3377,8 @@ void APPEND<T>::reduction(BTree<T>* t, u_int64_t node_id, BTreeNode<T>* node){
             }
         }
         else{
-            cout << "Incorrect OPR" << endl;
-            mylog << "Incorrect OPR" << endl;
+            cout << "Incorrect OPR: " << opr << endl;
+            mylog << "Incorrect OPR: " << opr << endl;
             exit(1);
         }
     }
