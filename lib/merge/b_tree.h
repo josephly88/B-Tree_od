@@ -1169,34 +1169,44 @@ u_int64_t BTreeNode<T>::update(BTree<T>* t, u_int64_t _k, T _v, removeList** lis
     mylog << "update() - key:" << _k << endl;
 
     if(t->append_map && is_leaf){
-        t->append_map->append_entry(t, node_id, U, _k, _v);
+        u_int64_t entry_idx = t->append_map->search_entry(t->cmb, node_id, _k);
+        if(entry_idx != 0){
+            OPR_CODE last_opr = t->append_map->get_opr(t->cmb, node_id, entry_idx);
+            if(last_opr != D){
+                t->append_map->append_entry(t, node_id, U, _k, _v);
+            }
 
-        // Add to the leaf interval cache
-        if(t->leafCache && is_leaf){
-            if(t->leafCache->LRU->full()){
-                u_int64_t rm_rb_idx = t->leafCache->LRU->dequeue(t->cmb);
-                t->leafCache->RBTREE->remove(t->cmb, rm_rb_idx);
-            }
-            // Enqueue
-            if(rbtree_id){
-                // red black tree node already exist (hit)
-                t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, rbtree_id);
-            }
-            else{
-                // Create red black tree node and enqueue
-                u_int64_t new_rb_idx = t->leafCache->RBTREE->insert(t->cmb, node_id);
-                t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, new_rb_idx);
-            }
-        }    
+            // Add to the leaf interval cache
+            if(t->leafCache && is_leaf){
+                if(t->leafCache->LRU->full()){
+                    u_int64_t rm_rb_idx = t->leafCache->LRU->dequeue(t->cmb);
+                    t->leafCache->RBTREE->remove(t->cmb, rm_rb_idx);
+                }
+                // Enqueue
+                if(rbtree_id){
+                    // red black tree node already exist (hit)
+                    t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, rbtree_id);
+                }
+                else{
+                    // Create red black tree node and enqueue
+                    u_int64_t new_rb_idx = t->leafCache->RBTREE->insert(t->cmb, node_id);
+                    t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, new_rb_idx);
+                }
+            }    
 
-        return node_id;
+            return node_id;                
+        } 
     }
-    else{
-        int i;
-        for(i = 0; i < num_key; i++){
-            // Key match
-            if(_k == key[i]){
+
+    int i;
+    for(i = 0; i < num_key; i++){
+        // Key match
+        if(_k == key[i]){
+            if(t->append_map && is_leaf)
+                t->append_map->append_entry(t, node_id, U, _k, _v);
+            else{
                 value[i] = _v;
+
                 if(t->cmb){
                     *list = new removeList(t->cmb->get_block_id(node_id), *list);
                     t->cmb->update_node_id(node_id, t->get_free_block_id());
@@ -1207,55 +1217,55 @@ u_int64_t BTreeNode<T>::update(BTree<T>* t, u_int64_t _k, T _v, removeList** lis
                 }                
 
                 t->node_write(node_id, this);
-
-                // Add to the leaf interval cache
-                if(t->leafCache && is_leaf){
-                    if(t->leafCache->LRU->full()){
-                        u_int64_t rm_rb_idx = t->leafCache->LRU->dequeue(t->cmb);
-                        t->leafCache->RBTREE->remove(t->cmb, rm_rb_idx);
-                    }
-                    // Enqueue
-                    if(rbtree_id){
-                        // red black tree node already exist (hit)
-                        t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, rbtree_id);
-                    }
-                    else{
-                        // Create red black tree node and enqueue
-                        u_int64_t new_rb_idx = t->leafCache->RBTREE->insert(t->cmb, node_id);
-                        t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, new_rb_idx);
-                    }
-                }                
-
-                return node_id;
-            }
-            if(_k < key[i])
-                break;        
-        }
-
-        if(is_leaf)
-            return 0; // Not found
-        else{
-            BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
-            t->node_read(child_id[i], child);
-            int dup_child_id = child->update(t, _k, _v, list);
-
-            if(dup_child_id == 0){
-                delete child;
-                return 0;
             }
 
-            // Only copy-on-write would propagate
-            if(dup_child_id != child_id[i]){
-                child_id[i] = dup_child_id;
-                *list = new removeList(node_id, *list);
-                node_id = t->get_free_block_id();
-                t->node_write(node_id, this);
-            }
-
-            delete child;
+            // Add to the leaf interval cache
+            if(t->leafCache && is_leaf){
+                if(t->leafCache->LRU->full()){
+                    u_int64_t rm_rb_idx = t->leafCache->LRU->dequeue(t->cmb);
+                    t->leafCache->RBTREE->remove(t->cmb, rm_rb_idx);
+                }
+                // Enqueue
+                if(rbtree_id){
+                    // red black tree node already exist (hit)
+                    t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, rbtree_id);
+                }
+                else{
+                    // Create red black tree node and enqueue
+                    u_int64_t new_rb_idx = t->leafCache->RBTREE->insert(t->cmb, node_id);
+                    t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, new_rb_idx);
+                }
+            }                
 
             return node_id;
         }
+        if(_k < key[i])
+            break;        
+    }
+
+    if(is_leaf)
+        return 0; // Not found
+    else{
+        BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
+        t->node_read(child_id[i], child);
+        int dup_child_id = child->update(t, _k, _v, list);
+
+        if(dup_child_id == 0){
+            delete child;
+            return 0;
+        }
+
+        // Only copy-on-write would propagate
+        if(dup_child_id != child_id[i]){
+            child_id[i] = dup_child_id;
+            *list = new removeList(node_id, *list);
+            node_id = t->get_free_block_id();
+            t->node_write(node_id, this);
+        }
+
+        delete child;
+
+        return node_id;
     }
 }
 
@@ -1771,6 +1781,10 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
         t->node_read(child_id[idx], left);
         t->node_read(child_id[idx+1], right);
         trans_node_id = (right->is_leaf) ? 0 : right->child_id[0];
+        if(t->append_map && left->is_leaf){
+            t->append_map->reduction(t, child_id[idx], left);
+            t->append_map->reduction(t, child_id[idx+1], right);
+        }
             // Insert parent's kv to left
         left->key[left->num_key] = key[idx];
         left->value[left->num_key] = value[idx];
@@ -1790,7 +1804,13 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             *list = new removeList(t->cmb->get_block_id(node_id), *list);
             t->cmb->update_node_id(left->node_id, t->get_free_block_id());
             t->cmb->update_num_key(left->node_id, left->num_key);
+            t->cmb->update_lower(left->node_id, left->key[0]);
             t->cmb->update_upper(left->node_id, left->key[left->num_key-1]);
+
+            if(t->append_map && left->is_leaf){
+                t->append_map->delete_entries(t->cmb, left->node_id);
+                t->append_map->delete_entries(t->cmb, right->node_id);
+            }
         }
         else{
             *list = new removeList(left->node_id, *list);
@@ -3378,6 +3398,22 @@ void APPEND<T>::reduction(BTree<T>* t, u_int64_t node_id, BTreeNode<T>* node){
                 if(_k < node->key[i])
                     break;
             }
+        }
+        else if(opr == D){
+            u_int64_t _k = get_key(t->cmb, node_id, idx);
+
+            int i;
+            for(i = 0; i < node->num_key; i++)
+                if(node->key[i] == _k) break;
+            if(i == node->num_key)
+                continue;
+            else if(i < node->num_key - 1){
+                for(; i < node->num_key-1; i++){
+                    node->key[i] = node->key[i+1];
+                    node->value[i] = node->value[i+1];
+                }
+            }
+            node->num_key--;            
         }
         else{
             cout << "Incorrect OPR: " << opr << endl;
