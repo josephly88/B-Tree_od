@@ -1034,10 +1034,10 @@ void BTreeNode<T>::display_tree(BTree<T>* t, MODE mode, int level){
         t->append_map->reduction(t, node_id, node);
 
     int i = 0;
-    for(i = 0; i < num_key; i++){
+    for(i = 0; i < node->num_key; i++){
         if(!is_leaf){
             BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
-            t->node_read(child_id[i], child);
+            t->node_read(node->child_id[i], child);
             child->display_tree(t, mode, level + 1);
             delete child;
         }
@@ -1046,7 +1046,7 @@ void BTreeNode<T>::display_tree(BTree<T>* t, MODE mode, int level){
     }
     if(!is_leaf){
         BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
-        t->node_read(child_id[i], child);
+        t->node_read(node->child_id[i], child);
         child->display_tree(t, mode, level + 1);
         delete child;
     }
@@ -1188,71 +1188,74 @@ u_int64_t BTreeNode<T>::update(BTree<T>* t, u_int64_t _k, T _v, removeList** lis
                 t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, new_rb_idx);
             }
         }    
+
+        return node_id;
     }
-
-    int i;
-    for(i = 0; i < num_key; i++){
-        // Key match
-        if(_k == key[i]){
-            value[i] = _v;
-            if(t->cmb){
-                *list = new removeList(t->cmb->get_block_id(node_id), *list);
-                t->cmb->update_node_id(node_id, t->get_free_block_id());
-            }
-            else{
-                *list = new removeList(node_id, *list);
-                node_id = t->get_free_block_id();
-            }                
-
-            t->node_write(node_id, this);
-
-            // Add to the leaf interval cache
-            if(t->leafCache && is_leaf){
-                if(t->leafCache->LRU->full()){
-                    u_int64_t rm_rb_idx = t->leafCache->LRU->dequeue(t->cmb);
-                    t->leafCache->RBTREE->remove(t->cmb, rm_rb_idx);
-                }
-                // Enqueue
-                if(rbtree_id){
-                    // red black tree node already exist (hit)
-                    t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, rbtree_id);
+    else{
+        int i;
+        for(i = 0; i < num_key; i++){
+            // Key match
+            if(_k == key[i]){
+                value[i] = _v;
+                if(t->cmb){
+                    *list = new removeList(t->cmb->get_block_id(node_id), *list);
+                    t->cmb->update_node_id(node_id, t->get_free_block_id());
                 }
                 else{
-                    // Create red black tree node and enqueue
-                    u_int64_t new_rb_idx = t->leafCache->RBTREE->insert(t->cmb, node_id);
-                    t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, new_rb_idx);
-                }
-            }                
+                    *list = new removeList(node_id, *list);
+                    node_id = t->get_free_block_id();
+                }                
+
+                t->node_write(node_id, this);
+
+                // Add to the leaf interval cache
+                if(t->leafCache && is_leaf){
+                    if(t->leafCache->LRU->full()){
+                        u_int64_t rm_rb_idx = t->leafCache->LRU->dequeue(t->cmb);
+                        t->leafCache->RBTREE->remove(t->cmb, rm_rb_idx);
+                    }
+                    // Enqueue
+                    if(rbtree_id){
+                        // red black tree node already exist (hit)
+                        t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, rbtree_id);
+                    }
+                    else{
+                        // Create red black tree node and enqueue
+                        u_int64_t new_rb_idx = t->leafCache->RBTREE->insert(t->cmb, node_id);
+                        t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, new_rb_idx);
+                    }
+                }                
+
+                return node_id;
+            }
+            if(_k < key[i])
+                break;        
+        }
+
+        if(is_leaf)
+            return 0; // Not found
+        else{
+            BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
+            t->node_read(child_id[i], child);
+            int dup_child_id = child->update(t, _k, _v, list);
+
+            if(dup_child_id == 0){
+                delete child;
+                return 0;
+            }
+
+            // Only copy-on-write would propagate
+            if(dup_child_id != child_id[i]){
+                child_id[i] = dup_child_id;
+                *list = new removeList(node_id, *list);
+                node_id = t->get_free_block_id();
+                t->node_write(node_id, this);
+            }
+
+            delete child;
 
             return node_id;
         }
-        if(_k < key[i])
-            break;        
-    }
-
-    if(is_leaf)
-        return 0; // Not found
-    else{
-        BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
-        t->node_read(child_id[i], child);
-        int dup_child_id = child->update(t, _k, _v, list);
-
-        if(dup_child_id == 0){
-            delete child;
-            return 0;
-        }
-
-        // Only copy-on-write would propagate
-        if(dup_child_id != child_id[i]){
-            child_id[i] = dup_child_id;
-            *list = new removeList(node_id, *list);
-            node_id = t->get_free_block_id();
-            t->node_write(node_id, this);
-        }
-
-        delete child;
-
-        return node_id;
     }
 }
 
@@ -2005,7 +2008,7 @@ void CMB::read(void* buf, off_t offset, int size){
 }
 
 void CMB::write(off_t offset, void* buf, int size){
-    mylog << "CMB.write() - offset:" << hex << offset << dec << ", size = " << size << endl;
+    //mylog << "CMB.write() - offset:" << hex << offset << dec << ", size = " << size << endl;
 
     int total_size = size;
     int cur_size = size;
