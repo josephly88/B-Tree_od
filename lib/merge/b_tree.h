@@ -1515,6 +1515,11 @@ u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** 
     
     int i;
     bool found = false;
+
+    if(t->append_map && is_leaf){
+        t->append_map->reduction(t, node_id, this);
+    }
+
     for(i = 0; i < num_key; i++){
         if(_k <= key[i]){
             if(_k == key[i]) found = true;
@@ -1522,7 +1527,7 @@ u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** 
         }
     }
 
-    if(is_leaf){            
+    if(is_leaf){
         if(found)
             return direct_delete(t, _k, list);
         else
@@ -1537,8 +1542,21 @@ u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** 
             BTreeNode<T>* succ = new BTreeNode<T>(0, 0, 0);
             t->node_read(succ_id, succ);
 
-            if(succ->num_key > min_num){
+            bool borrow_from_succ = false;
+            if(t->append_map){
+                if(t->cmb->get_num_key(succ_id) > min_num)
+                    borrow_from_succ = true;
+            }                
+            else{
+                if(succ->num_key > min_num)
+                    borrow_from_succ = true;
+            }
+
+            if(borrow_from_succ){
                 mylog << "borrow_from_succesor() - node id:" << node->node_id << endl;
+                if(t->append_map)
+                    t->append_map->reduction(t, succ_id, succ);
+
                 // Borrow from succ
                 key[i] = succ->key[0];
                 value[i] = succ->value[0];
@@ -1564,6 +1582,8 @@ u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** 
                 int pred_id = node->get_pred(t);
                 BTreeNode<T>* pred = new BTreeNode<T>(0, 0, 0);  
                 t->node_read(pred_id, pred);
+                if(t->append_map)
+                    t->append_map->reduction(t, pred_id, pred);
 
                 mylog << "borrow_from_predecesor() - node id:" << node->node_id << endl;
                 // Borrow from pred
@@ -1624,26 +1644,66 @@ u_int64_t BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** li
     mylog << "direct_delete() - key:" << _k << endl;
     
     if(t->append_map && is_leaf){
+        u_int64_t entry_idx = t->append_map->search_entry(t->cmb, node_id, _k);
+        if(entry_idx != 0){
+            OPR_CODE last_opr = t->append_map->get_opr(t->cmb, node_id, entry_idx);
+            mylog << "## last_opr = " << last_opr << endl;
+            if(last_opr != D){
+                T empty;
+                t->append_map->append_entry(t, node_id, D, _k, empty);
+                t->cmb->update_num_key(node_id, t->cmb->get_num_key(node_id) - 1);                
+            }
+
+            if(t->leafCache && is_leaf && t->cmb->get_num_key(node_id) >= min_num){
+                    u_int64_t lru_id = t->cmb->get_lru_id(node_id);
+                    // If lru cache existed
+                    if(lru_id != 0){
+                        // Re-enqueue if it is existed
+                        u_int64_t rm_rb_idx = t->leafCache->LRU->remove(t->cmb, node_id);
+                        t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, rm_rb_idx);
+                    }
+                    else{
+                        if(t->leafCache->LRU->full()){
+                            u_int64_t rm_rb_idx = t->leafCache->LRU->dequeue(t->cmb);
+                            t->leafCache->RBTREE->remove(t->cmb, rm_rb_idx);
+                        }
+                        // Enqueue
+                        if(rbtree_id){
+                            // red black tree node already exist (hit)
+                            t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, rbtree_id);
+                        }
+                        else{
+                            // Create red black tree node and enqueue
+                            u_int64_t new_rb_idx = t->leafCache->RBTREE->insert(t->cmb, node_id);
+                            t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, new_rb_idx);
+                        }
+                    }
+                }
+                
+                return node_id;
+        }        
+    }
+
+    int i, idx;
+    for(i = 0; i < num_key; i++){
+        if(key[i] == _k) break;
+    }
+    idx = i;
+    
+    if(i == num_key){
+        mylog << "~~Key not found~~" << endl;
+        if(t->leafCache && rbtree_id != 0){
+            t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, rbtree_id);
+        }
+        return 0;
+    } 
+
+    if(i < num_key && t->append_map && is_leaf){
         T empty;
         t->append_map->append_entry(t, node_id, D, _k, empty);
-        num_key--;
-        t->cmb->update_num_key(node_id, num_key);
+        t->cmb->update_num_key(node_id, t->cmb->get_num_key(node_id) - 1);
     }
     else{
-        int i, idx;
-        for(i = 0; i < num_key; i++){
-            if(key[i] == _k) break;
-        }
-        idx = i;
-        
-        if(i == num_key){
-            mylog << "~~Key not found~~" << endl;
-            if(t->leafCache && rbtree_id != 0){
-                t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, rbtree_id);
-            }
-            return 0;
-        } 
-
         if(i < num_key-1){
             for(; i < num_key-1; i++){
                 key[i] = key[i+1];
@@ -1704,7 +1764,13 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
     BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
     t->node_read(child_id[idx], node);
 
-    if(node->num_key >= min_num){
+    if(t->append_map && node->is_leaf){
+        if(t->cmb->get_num_key(child_id[idx]) >= min_num){
+            delete node;
+            return node_id;
+        }
+    }
+    else if(node->num_key >= min_num){
         delete node;
         return node_id;
     }
@@ -1719,152 +1785,275 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
         t->node_read(child_id[idx + 1], right);
     int trans_node_id;
 
-    if(idx - 1 >= 0 && left->num_key > min_num){
-        mylog << "borrow_from_left_sibling() - node id:" << child_id[idx] << endl;
-        //Borrowing from left
-        t->node_read(child_id[idx-1], left);
-        t->node_read(child_id[idx], right);
-        trans_node_id = (left->is_leaf) ? 0 : left->child_id[left->num_key];
-            // Insert to right
-        child_id[idx] = right->direct_insert(t, key[idx-1], value[idx-1], list, trans_node_id);
-            // Borrow from left
-        key[idx-1] = left->key[left->num_key - 1];
-        value[idx-1] = left->value[left->num_key - 1];
-            // Delete from left
-        child_id[idx-1] = left->direct_delete(t, key[idx-1], list);
+    bool child_is_leaf = (idx - 1 >= 0) ? left->is_leaf : right->is_leaf;
+    if(t->append_map && child_is_leaf){
+        if(idx - 1 >= 0 && t->cmb->get_num_key(left->node_id) > min_num){
+            mylog << "borrow_from_left_sibling() - node id:" << child_id[idx] << endl;
+            t->node_read(child_id[idx-1], left);   
+            t->append_map->reduction(t, left->node_id, left);
 
-        if(t->cmb){
+            // Append insert to right
+            t->append_map->append_entry(t, child_id[idx], I, key[idx-1], value[idx-1]);
+            t->cmb->update_num_key(child_id[idx], t->cmb->get_num_key(child_id[idx]) + 1);
+            t->cmb->update_lower(child_id[idx], key[idx-1]);
+
+            // Borrow from left to parent
+            key[idx-1] = left->key[left->num_key - 1];
+            value[idx-1] = left->value[left->num_key - 1];
+            
             *list = new removeList(t->cmb->get_block_id(node_id), *list);
             t->cmb->update_node_id(node_id, t->get_free_block_id());
-            t->cmb->update_num_key(node_id, num_key);
-            t->cmb->update_lower(node_id, key[0]);
-        }
-        else{
-            *list = new removeList(node_id, *list);
-            node_id = t->get_free_block_id();
-        }
+            if(idx - 1 == 0) t->cmb->update_lower(node_id, key[0]);
+            if(idx == num_key) t->cmb->update_upper(node_id, key[num_key-1]);
 
-        t->node_write(node_id, this);          
-    }
-    else if(idx + 1 <= num_key && right->num_key > min_num){
-        mylog << "borrow_from_rigtt_sibling() - node id:" << child_id[idx] << endl;
-        //Borrowing from right
-        t->node_read(child_id[idx], left);
-        t->node_read(child_id[idx+1], right);
-        trans_node_id = (right->is_leaf) ? 0 : right->child_id[0];
-            // Insert to left
-        child_id[idx] = left->direct_insert(t, key[idx], value[idx], list, 0, trans_node_id);
-            // Borrow from right
-        key[idx] = right->key[0];
-        value[idx] = right->value[0];
-            // Delete from left
-        child_id[idx+1] = right->direct_delete(t, key[idx], list);
-        
-        if(t->cmb){
+            t->node_write(node_id, this);   
+
+            // Append delete to left
+            T empty;
+            t->append_map->append_entry(t, left->node_id, D, left->key[left->num_key-1], empty);            
+
+            left->num_key -= 1;
+            t->cmb->update_num_key(left->node_id, left->num_key);
+            t->cmb->update_upper(left->node_id, left->key[left->num_key-1]);             
+        }
+        else if(idx + 1 <= num_key && t->cmb->get_num_key(right->node_id) > min_num){
+            mylog << "borrow_from_right_sibling() - node id:" << child_id[idx] << endl;
+            t->node_read(child_id[idx+1], right);
+            t->append_map->reduction(t, right->node_id, right);
+
+            // Append insert to left
+            t->append_map->append_entry(t, child_id[idx], I, key[idx], value[idx]);
+            t->cmb->update_num_key(child_id[idx], t->cmb->get_num_key(child_id[idx]) + 1);
+            t->cmb->update_upper(child_id[idx], key[idx]);
+
+            // Borrow from right to parent
+            key[idx] = right->key[0];
+            value[idx] = right->value[0];
+            
             *list = new removeList(t->cmb->get_block_id(node_id), *list);
             t->cmb->update_node_id(node_id, t->get_free_block_id());
-            t->cmb->update_num_key(node_id, num_key);
-            t->cmb->update_upper(node_id, key[0]);
+            if(idx == 0) t->cmb->update_lower(node_id, key[0]);
+            if(idx == num_key-1) t->cmb->update_upper(node_id, key[num_key-1]);
+
+            t->node_write(node_id, this);  
+
+            // Append delete to right
+            T empty;
+            t->append_map->append_entry(t, right->node_id, D, right->key[0], empty);            
+
+            right->num_key -= 1;
+            t->cmb->update_num_key(right->node_id, right->num_key);
+            t->cmb->update_upper(right->node_id, right->key[1]);          
         }
         else{
-            *list = new removeList(node_id, *list);
-            node_id = t->get_free_block_id();
-        }
+            mylog << "merge() - node id:" << child_id[idx] << endl;
+            if(idx == t->cmb->get_num_key(node_id)) idx -= 1;
+            mylog << "  ## HERE" << endl;
+            t->node_read(child_id[idx], left);
+            t->append_map->reduction(t, left->node_id, left);
+            t->node_read(child_id[idx+1], right);
+            t->append_map->reduction(t, right->node_id, right);
+                // Insert parent's kv to left
+            left->key[left->num_key] = key[idx];
+            left->value[left->num_key] = value[idx];
+            left->num_key++;
+                // Insert right to left
+            for(int i = 0; i < right->num_key; i++){
+                left->key[left->num_key] = right->key[i];
+                left->value[left->num_key] = right->value[i];
+                if(!right->is_leaf) 
+                    left->child_id[left->num_key+1] = right->child_id[i+1];
+                left->num_key++;  
+            }
 
-        t->node_write(node_id, this);         
-    }   
-    else{
-        mylog << "merge() - node id:" << child_id[idx] << endl;
-
-        //Merge with right unless idx = num_key
-        if(idx == num_key) idx -= 1;
-        t->node_read(child_id[idx], left);
-        t->node_read(child_id[idx+1], right);
-        trans_node_id = (right->is_leaf) ? 0 : right->child_id[0];
-        if(t->append_map && left->is_leaf){
-            t->append_map->reduction(t, child_id[idx], left);
-            t->append_map->reduction(t, child_id[idx+1], right);
-        }
-            // Insert parent's kv to left
-        left->key[left->num_key] = key[idx];
-        left->value[left->num_key] = value[idx];
-        if(!left->is_leaf)
-            left->child_id[left->num_key+1] = right->child_id[0];
-        left->num_key++;
-            // Insert right to left
-        for(int i = 0; i < right->num_key; i++){
-            left->key[left->num_key] = right->key[i];
-            left->value[left->num_key] = right->value[i];
-            if(!right->is_leaf) 
-                left->child_id[left->num_key+1] = right->child_id[i+1];
-            left->num_key++;  
-        }
-            // Store left node
-        if(t->cmb){
-            *list = new removeList(t->cmb->get_block_id(node_id), *list);
+            *list = new removeList(t->cmb->get_block_id(left->node_id), *list);
             t->cmb->update_node_id(left->node_id, t->get_free_block_id());
             t->cmb->update_num_key(left->node_id, left->num_key);
             t->cmb->update_lower(left->node_id, left->key[0]);
             t->cmb->update_upper(left->node_id, left->key[left->num_key-1]);
+            t->append_map->delete_entries(t->cmb, left->node_id);
+            t->node_write(left->node_id, left);
 
-            if(t->append_map && left->is_leaf){
-                t->append_map->delete_entries(t->cmb, left->node_id);
-                t->append_map->delete_entries(t->cmb, right->node_id);
-            }
-        }
-        else{
-            *list = new removeList(left->node_id, *list);
-            left->node_id = t->get_free_block_id();
-        }
-        t->node_write(left->node_id, left);
-            // Delete the parent's kv
-        node_id = direct_delete(t, key[idx], list);
-        child_id[idx] = left->node_id;
-
-        if(t->cmb){
+            node_id = direct_delete(t, key[idx], list);
+            child_id[idx] = left->node_id;
             *list = new removeList(t->cmb->get_block_id(node_id), *list);
             t->cmb->update_node_id(node_id, t->get_free_block_id());
-        }
-        else{
-            *list = new removeList(node_id, *list);
-            node_id = t->get_free_block_id();
-        }
-
-        t->node_write(node_id, this);
-
-        if(t->cmb)
+            t->node_write(node_id, this);
+            
             *list = new removeList(t->cmb->get_block_id(right->node_id), *list);
-        else
-            *list = new removeList(right->node_id, *list);
+            t->append_map->delete_entries(t->cmb, right->node_id);     
 
-        // Remove the leaf cache of right if it is in the queue
-        if(t->leafCache && right->is_leaf){
-            u_int64_t lru_id = t->cmb->get_lru_id(right->node_id);
-            // If lru cache existed
-            if(lru_id != 0){
-                // Re-enqueue if it is existed
-                u_int64_t rm_rb_idx = t->leafCache->LRU->remove(t->cmb, right->node_id);
-                t->leafCache->RBTREE->remove(t->cmb, rm_rb_idx);
-            }
-        }
-
-        // Update or Create a new cache for left
-        if(t->leafCache && left->is_leaf && left->num_key >= min_num){
-            u_int64_t lru_id = t->cmb->get_lru_id(left->node_id);
-            // If lru cache existed
-            if(lru_id != 0){
-                // Re-enqueue if it is existed
-                u_int64_t rm_rb_idx = t->leafCache->LRU->remove(t->cmb, left->node_id);
-                t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, rm_rb_idx);
-            }
-            else{
-                if(t->leafCache->LRU->full()){
-                    u_int64_t rm_rb_idx = t->leafCache->LRU->dequeue(t->cmb);
+            // Remove the leaf cache of right if it is in the queue
+            if(t->leafCache && right->is_leaf){
+                u_int64_t lru_id = t->cmb->get_lru_id(right->node_id);
+                // If lru cache existed
+                if(lru_id != 0){
+                    // Re-enqueue if it is existed
+                    u_int64_t rm_rb_idx = t->leafCache->LRU->remove(t->cmb, right->node_id);
                     t->leafCache->RBTREE->remove(t->cmb, rm_rb_idx);
                 }
-                // Create red black tree node and enqueue
-                u_int64_t new_rb_idx = t->leafCache->RBTREE->insert(t->cmb, left->node_id);
-                t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, new_rb_idx);
+            }
+
+            // Update or Create a new cache for left
+            if(t->leafCache && left->is_leaf && left->num_key >= min_num){
+                u_int64_t lru_id = t->cmb->get_lru_id(left->node_id);
+                // If lru cache existed
+                if(lru_id != 0){
+                    // Re-enqueue if it is existed
+                    u_int64_t rm_rb_idx = t->leafCache->LRU->remove(t->cmb, left->node_id);
+                    t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, rm_rb_idx);
+                }
+                else{
+                    if(t->leafCache->LRU->full()){
+                        u_int64_t rm_rb_idx = t->leafCache->LRU->dequeue(t->cmb);
+                        t->leafCache->RBTREE->remove(t->cmb, rm_rb_idx);
+                    }
+                    // Create red black tree node and enqueue
+                    u_int64_t new_rb_idx = t->leafCache->RBTREE->insert(t->cmb, left->node_id);
+                    t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, new_rb_idx);
+                }
+            }
+        }
+    }
+    else{
+        if(idx - 1 >= 0 && left->num_key > min_num){
+            mylog << "borrow_from_left_sibling() - node id:" << child_id[idx] << endl;
+            //Borrowing from left
+            t->node_read(child_id[idx-1], left);        
+            t->node_read(child_id[idx], right);
+            trans_node_id = (left->is_leaf) ? 0 : left->child_id[left->num_key];
+                // Insert to right
+            child_id[idx] = right->direct_insert(t, key[idx-1], value[idx-1], list, trans_node_id);
+                // Borrow from left
+            key[idx-1] = left->key[left->num_key - 1];
+            value[idx-1] = left->value[left->num_key - 1];
+                // Delete from left
+            child_id[idx-1] = left->direct_delete(t, key[idx-1], list);
+
+            if(t->cmb){
+                *list = new removeList(t->cmb->get_block_id(node_id), *list);
+                t->cmb->update_node_id(node_id, t->get_free_block_id());
+                if(idx - 1 == 0) t->cmb->update_lower(node_id, key[0]);
+                if(idx == num_key) t->cmb->update_upper(node_id, key[num_key-1]);
+            }
+            else{
+                *list = new removeList(node_id, *list);
+                node_id = t->get_free_block_id();
+            }
+
+            t->node_write(node_id, this);   
+        }
+        else if(idx + 1 <= num_key && right->num_key > min_num){
+            mylog << "borrow_from_right_sibling() - node id:" << child_id[idx] << endl;
+            //Borrowing from right
+            t->node_read(child_id[idx], left);
+            t->node_read(child_id[idx+1], right);
+            trans_node_id = (right->is_leaf) ? 0 : right->child_id[0];
+                // Insert to left
+            child_id[idx] = left->direct_insert(t, key[idx], value[idx], list, 0, trans_node_id);
+                // Borrow from right
+            key[idx] = right->key[0];
+            value[idx] = right->value[0];
+                // Delete from left
+            child_id[idx+1] = right->direct_delete(t, key[idx], list);
+            
+            if(t->cmb){
+                *list = new removeList(t->cmb->get_block_id(node_id), *list);
+                t->cmb->update_node_id(node_id, t->get_free_block_id());
+                if(idx == 0) t->cmb->update_lower(node_id, key[0]);
+                if(idx == num_key-1) t->cmb->update_upper(node_id, key[num_key-1]);
+            }
+            else{
+                *list = new removeList(node_id, *list);
+                node_id = t->get_free_block_id();
+            }
+
+            t->node_write(node_id, this);         
+        }   
+        else{
+            mylog << "merge() - node id:" << child_id[idx] << endl;
+
+            //Merge with right unless idx = num_key
+            if(idx == num_key) idx -= 1;
+            t->node_read(child_id[idx], left);
+            t->node_read(child_id[idx+1], right);
+            trans_node_id = (right->is_leaf) ? 0 : right->child_id[0];
+                // Insert parent's kv to left
+            left->key[left->num_key] = key[idx];
+            left->value[left->num_key] = value[idx];
+            if(!left->is_leaf)
+                left->child_id[left->num_key+1] = right->child_id[0];
+            left->num_key++;
+                // Insert right to left
+            for(int i = 0; i < right->num_key; i++){
+                left->key[left->num_key] = right->key[i];
+                left->value[left->num_key] = right->value[i];
+                if(!right->is_leaf) 
+                    left->child_id[left->num_key+1] = right->child_id[i+1];
+                left->num_key++;  
+            }
+                // Store left node
+            if(t->cmb){
+                *list = new removeList(t->cmb->get_block_id(left->node_id), *list);
+                t->cmb->update_node_id(left->node_id, t->get_free_block_id());
+                t->cmb->update_num_key(left->node_id, left->num_key);
+                t->cmb->update_lower(left->node_id, left->key[0]);
+                t->cmb->update_upper(left->node_id, left->key[left->num_key-1]);
+            }
+            else{
+                *list = new removeList(left->node_id, *list);
+                left->node_id = t->get_free_block_id();
+            }
+            t->node_write(left->node_id, left);
+                // Delete the parent's kv
+            node_id = direct_delete(t, key[idx], list);
+            child_id[idx] = left->node_id;
+
+            if(t->cmb){
+                *list = new removeList(t->cmb->get_block_id(node_id), *list);
+                t->cmb->update_node_id(node_id, t->get_free_block_id());
+            }
+            else{
+                *list = new removeList(node_id, *list);
+                node_id = t->get_free_block_id();
+            }
+
+            t->node_write(node_id, this);
+
+            if(t->cmb)
+                *list = new removeList(t->cmb->get_block_id(right->node_id), *list);
+            else
+                *list = new removeList(right->node_id, *list);
+
+            // Remove the leaf cache of right if it is in the queue
+            if(t->leafCache && right->is_leaf){
+                u_int64_t lru_id = t->cmb->get_lru_id(right->node_id);
+                // If lru cache existed
+                if(lru_id != 0){
+                    // Re-enqueue if it is existed
+                    u_int64_t rm_rb_idx = t->leafCache->LRU->remove(t->cmb, right->node_id);
+                    t->leafCache->RBTREE->remove(t->cmb, rm_rb_idx);
+                }
+            }
+
+            // Update or Create a new cache for left
+            if(t->leafCache && left->is_leaf && left->num_key >= min_num){
+                u_int64_t lru_id = t->cmb->get_lru_id(left->node_id);
+                // If lru cache existed
+                if(lru_id != 0){
+                    // Re-enqueue if it is existed
+                    u_int64_t rm_rb_idx = t->leafCache->LRU->remove(t->cmb, left->node_id);
+                    t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, rm_rb_idx);
+                }
+                else{
+                    if(t->leafCache->LRU->full()){
+                        u_int64_t rm_rb_idx = t->leafCache->LRU->dequeue(t->cmb);
+                        t->leafCache->RBTREE->remove(t->cmb, rm_rb_idx);
+                    }
+                    // Create red black tree node and enqueue
+                    u_int64_t new_rb_idx = t->leafCache->RBTREE->insert(t->cmb, left->node_id);
+                    t->leafCache->LRU->enqueue(t->cmb, t->leafCache->RBTREE, new_rb_idx);
+                }
             }
         }
     }
@@ -3345,11 +3534,11 @@ void APPEND<T>::append_entry(BTree<T>* t, u_int64_t node_id, OPR_CODE OPR, u_int
 
 template <typename T>
 bool APPEND<T>::full(CMB* cmb, u_int64_t node_id){
-    mylog << "APPEND::full() - node_id = " << node_id << endl;
-
     u_int64_t num = get_num(cmb, node_id);
-    if(num >= NUM_OF_APPEND)
+    if(num >= NUM_OF_APPEND){
+        mylog << "APPEND::full() - node_id = " << node_id << endl;
         return true;
+    }        
     else
         return false;
 }
