@@ -84,7 +84,7 @@ for FILE in op_file_ls:
             idx = binary_search(dataset, token[1], 0, len(dataset))
             # 0 means deleted
             dataset[idx][2] = 0
-        print(" #op: " + str(i), end="\r")
+        print(" #op: " + str(i+1), end="\r")
         i = i+1
     op_file.close()
 
