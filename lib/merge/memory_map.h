@@ -2,7 +2,7 @@
 #define MEMORY_MAP_H
 
 #define PAGE_SIZE                       16384UL
-#define MAP_SIZE                        16384UL //(1 << 29) // 512MB
+#define MAP_SIZE                        (1 << 29) // 512MB
 #define MAP_MASK                        (MAP_SIZE - 1)
 
 #define CMB_ADDR                        0xC0000000
