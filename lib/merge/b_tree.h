@@ -2663,18 +2663,19 @@ u_int64_t RBTree::insert(CMB* cmb, u_int64_t node_id, u_int64_t LRU_id){
             cur_node = &pool[cur_idx];
 
             cur_lower = cmb->get_lower(cur_node->node_id);
-            cur_upper = cmb->get_upper(cur_node->node_id);
-
             if(upper < cur_lower){
                 child_idx = cur_node->left_child_idx;
-            }                
-            else if(lower > cur_upper){
-                child_idx = cur_node->right_child_idx;
             }
             else{
-                cout << "Overlapping intervals" << endl;
-                mylog << "Overlapping intervals" << endl;
-                exit(1);
+                cur_upper = cmb->get_upper(cur_node->node_id);
+                if(lower > cur_upper){
+                    child_idx = cur_node->right_child_idx;
+                }
+                else{
+                    cout << "Overlapping intervals" << endl;
+                    mylog << "Overlapping intervals" << endl;
+                    exit(1);
+                }
             }
 
             if(child_idx != 0){
@@ -2976,16 +2977,17 @@ u_int64_t RBTree::search_by_key(CMB* cmb, u_int64_t key){
         cur_node = &pool[cur_idx];
 
         cur_lower = cmb->get_lower(cur_node->node_id);
-        cur_upper = cmb->get_upper(cur_node->node_id);
-
-        if(key >= cur_lower && key <= cur_upper){
-            return cur_idx;
-        }
-        else if(key < cur_lower){
+        if(key < cur_lower){
             cur_idx = cur_node->left_child_idx;
         }
         else{
-            cur_idx = cur_node->right_child_idx;
+            cur_upper = cmb->get_upper(cur_node->node_id);
+            if(key > cur_upper){
+                cur_idx = cur_node->right_child_idx;
+            }
+            else{
+                return cur_idx;
+            }
         }
     }
 
@@ -3008,8 +3010,6 @@ u_int64_t RBTree::search_by_node_id(CMB* cmb, u_int64_t node_id){
         }
         else{
             cur_lower = cmb->get_lower(cur_node->node_id);
-            cur_upper = cmb->get_upper(cur_node->node_id);
-
             if(upper < cur_lower){
                 cur_idx = cur_node->left_child_idx;
             }
