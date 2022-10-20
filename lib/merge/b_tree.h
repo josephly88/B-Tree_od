@@ -2078,20 +2078,15 @@ void CMB::remap(off_t offset){
 void CMB::read(void* buf, off_t offset, int size){
     mylog << "CMB.read() - offset:" << hex << offset << dec  << endl;
 
-    int total_size = size;
-    int cur_size = size;
+    int remain_size = size;
     off_t cur_offset = offset;
-    char* cur_buf = (char*) buf + size;
 
-    while(total_size){
-        cur_offset = offset;
-        cur_size = total_size;
+    while(remain_size){
+        int cp_size = remain_size;
 
-        if(((bar_addr + offset) & ~MAP_MASK) < ((bar_addr + offset + total_size - 1) & ~MAP_MASK)){
-            cur_offset = (offset + total_size - 1) & ~MAP_MASK;
-            cur_size = (offset + total_size) - cur_offset;
+        if(((bar_addr + cur_offset) & ~MAP_MASK) < ((bar_addr + cur_offset + remain_size - 1) & ~MAP_MASK)){
+            cp_size = (((bar_addr + cur_offset) & ~MAP_MASK) + MAP_SIZE - 1) - (bar_addr + cur_offset); 
         }
-        cur_buf -= cur_size;
 
         remap(cur_offset);
 
@@ -2100,29 +2095,26 @@ void CMB::read(void* buf, off_t offset, int size){
             virt_addr = (char*)cache_base + ((cur_offset) & MAP_MASK);	
         else
             virt_addr = (char*)map_base + ((cur_offset) & MAP_MASK);
-        cmb_memcpy(cur_buf, virt_addr, cur_size);
 
-        total_size -= cur_size;
+        cmb_memcpy(((char*) buf + cur_offset - offset), virt_addr, cp_size);
+
+        remain_size -= cp_size;
+        cur_offset = ((bar_addr + cur_offset) & ~MAP_MASK) + MAP_SIZE;
     }
 }
 
 void CMB::write(off_t offset, void* buf, int size){
     //mylog << "CMB.write() - offset:" << hex << offset << dec << ", size = " << size << endl;
 
-    int total_size = size;
-    int cur_size = size;
+    int remain_size = size;
     off_t cur_offset = offset;
-    char* cur_buf = (char*) buf + size;
 
-    while(total_size){
-        cur_offset = offset;
-        cur_size = total_size;
+    while(remain_size){
+        int cp_size = remain_size;
 
-        if(((bar_addr + offset) & ~MAP_MASK) < ((bar_addr + offset + total_size - 1) & ~MAP_MASK)){
-            cur_offset = (offset + total_size - 1) & ~MAP_MASK;
-            cur_size = (offset + total_size) - cur_offset;
+        if(((bar_addr + cur_offset) & ~MAP_MASK) < ((bar_addr + cur_offset + remain_size - 1) & ~MAP_MASK)){
+            cp_size = (((bar_addr + cur_offset) & ~MAP_MASK) + MAP_SIZE - 1) - (bar_addr + cur_offset); 
         }
-        cur_buf -= cur_size;
 
         remap(cur_offset);
 
@@ -2131,9 +2123,11 @@ void CMB::write(off_t offset, void* buf, int size){
             virt_addr = (char*)cache_base + ((cur_offset) & MAP_MASK);	
         else
             virt_addr = (char*)map_base + ((cur_offset) & MAP_MASK);
-        cmb_memcpy(virt_addr, cur_buf, cur_size);
 
-        total_size -= cur_size;
+        cmb_memcpy(virt_addr, ((char*) buf + cur_offset - offset), cp_size);
+
+        remain_size -= cp_size;
+        cur_offset = ((bar_addr + cur_offset) & ~MAP_MASK) + MAP_SIZE;
     }
 }
 
