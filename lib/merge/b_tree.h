@@ -144,7 +144,7 @@ class CMB{
 	int fd;
     off_t bar_addr;
 	void* map_base;
-    off_t map_idx;
+    u_int64_t map_idx;
     void* cache_base;
     MODE mode;
 
@@ -461,18 +461,20 @@ void BTree<T>::stat(){
 
 template <typename T>
 void BTree<T>::memory_map_addr(){
-    cout << "START_ADDR:\t\t\t0x" << hex << START_ADDR << endl;
-    cout << "BLOCK_MAPPING_START_ADDR:\t0x" << hex << BLOCK_MAPPING_START_ADDR << endl;
-    cout << "BLOCK_MAPPING_END_ADDR:\t\t0x" << hex << BLOCK_MAPPING_END_ADDR << endl;
-    cout << "LRU_QUEUE_START_ADDR:\t\t0x" << hex << LRU_QUEUE_START_ADDR << endl;
-    cout << "LRU_QUEUE_BASE_ADDR:\t\t0x" << hex << LRU_QUEUE_BASE_ADDR << endl;
-    cout << "LRU_QUEUE_END_ADDR:\t\t0x" << hex << LRU_QUEUE_END_ADDR << endl;
-    cout << "APPEND_OPR_START_ADDR:\t\t0x" << hex << APPEND_OPR_START_ADDR << endl;
-    cout << "APPEND_OPR_END_ADDR:\t\t0x" << hex << APPEND_OPR_END_ADDR << endl;
-    cout << "VALUE_POOL_START_ADDR:\t\t0x" << hex << VALUE_POOL_START_ADDR << endl;
-    cout << "VALUE_POOL_BASE_ADDR:\t\t0x" << hex << VALUE_POOL_BASE_ADDR << endl;
-    cout << "VALUE_POOL_END_ADDR:\t\t0x" << hex << VALUE_POOL_END_ADDR << endl; 
-    cout << "END_ADDR:\t\t\t0x" << hex << END_ADDR << endl;
+    cout << hex;
+    cout << "START_ADDR:\t\t\t0x" << START_ADDR << endl;
+    cout << "BLOCK_MAPPING_START_ADDR:\t0x" << BLOCK_MAPPING_START_ADDR << endl;
+    cout << "BLOCK_MAPPING_END_ADDR:\t\t0x" << BLOCK_MAPPING_END_ADDR << endl;
+    cout << "LRU_QUEUE_START_ADDR:\t\t0x" << LRU_QUEUE_START_ADDR << endl;
+    cout << "LRU_QUEUE_BASE_ADDR:\t\t0x" << LRU_QUEUE_BASE_ADDR << endl;
+    cout << "LRU_QUEUE_END_ADDR:\t\t0x" << LRU_QUEUE_END_ADDR << endl;
+    cout << "APPEND_OPR_START_ADDR:\t\t0x" << APPEND_OPR_START_ADDR << endl;
+    cout << "APPEND_OPR_END_ADDR:\t\t0x" << APPEND_OPR_END_ADDR << endl;
+    cout << "VALUE_POOL_START_ADDR:\t\t0x" << VALUE_POOL_START_ADDR << endl;
+    cout << "VALUE_POOL_BASE_ADDR:\t\t0x" << VALUE_POOL_BASE_ADDR << endl;
+    cout << "VALUE_POOL_END_ADDR:\t\t0x" << VALUE_POOL_END_ADDR << endl; 
+    cout << "END_ADDR:\t\t\t0x" << END_ADDR << endl;
+    cout << dec;
 }
 
 template <typename T>
@@ -2055,8 +2057,10 @@ void CMB::cmb_memcpy(void* dest, void* src, size_t len){
 }
 
 void CMB::remap(off_t offset){
+    mylog << "  ## CMB::remap offset : " << offset << endl;
+    
     if( ((bar_addr + offset) & ~MAP_MASK) != map_idx ){
-        mylog << "remap() - offset:" << hex << offset << dec << " map_idx : " << map_idx << "->" << ((bar_addr + offset) & ~MAP_MASK) << endl;
+        mylog << "remap() - offset:" << offset << " map_idx : " << map_idx << "->" << ((bar_addr + offset) & ~MAP_MASK) << endl;
         if(cache_base)
             memcpy(map_base, cache_base, MAP_SIZE);  
 
@@ -2075,7 +2079,7 @@ void CMB::remap(off_t offset){
 }
 
 void CMB::read(void* buf, off_t offset, int size){
-    // mylog << "CMB.read() - offset:" << hex << offset << dec  << endl;
+    mylog << "CMB.read() - offset:" << offset << ", size = " << size << endl;
 
     int remain_size = size;
     off_t cur_offset = offset;
@@ -2087,6 +2091,7 @@ void CMB::read(void* buf, off_t offset, int size){
             cp_size = (((bar_addr + cur_offset) & ~MAP_MASK) + MAP_SIZE - 1) - (bar_addr + cur_offset); 
         }
 
+        mylog << "  ## CMB::read cur_offset : " << cur_offset << endl;
         remap(cur_offset);
 
         void* virt_addr;
@@ -2098,12 +2103,12 @@ void CMB::read(void* buf, off_t offset, int size){
         cmb_memcpy(((char*) buf + cur_offset - offset), virt_addr, cp_size);
 
         remain_size -= cp_size;
-        cur_offset = ((bar_addr + cur_offset) & ~MAP_MASK) + MAP_SIZE;
+        cur_offset += cp_size;
     }
 }
 
 void CMB::write(off_t offset, void* buf, int size){
-    //mylog << "CMB.write() - offset:" << hex << offset << dec << ", size = " << size << endl;
+    mylog << "CMB.write() - offset:" << offset << ", size = " << size << endl;
 
     int remain_size = size;
     off_t cur_offset = offset;
@@ -2115,6 +2120,7 @@ void CMB::write(off_t offset, void* buf, int size){
             cp_size = (((bar_addr + cur_offset) & ~MAP_MASK) + MAP_SIZE - 1) - (bar_addr + cur_offset); 
         }
 
+        mylog << "  ## CMB::write cur_offset : " << cur_offset << endl;
         remap(cur_offset);
 
         void* virt_addr;
@@ -2126,7 +2132,7 @@ void CMB::write(off_t offset, void* buf, int size){
         cmb_memcpy(virt_addr, ((char*) buf + cur_offset - offset), cp_size);
 
         remain_size -= cp_size;
-        cur_offset = ((bar_addr + cur_offset) & ~MAP_MASK) + MAP_SIZE;
+        cur_offset += cp_size;
     }
 }
 
@@ -2591,6 +2597,8 @@ u_int64_t LRU_QUEUE::get_rb_tree_id(CMB* cmb, u_int64_t idx){
     }
     cmb->read(&rb_id, addr, sizeof(u_int64_t));
 
+    delete ref;
+
     return rb_id;
 }
 
@@ -2605,6 +2613,8 @@ void LRU_QUEUE::update_rb_tree_id(CMB* cmb, u_int64_t idx, u_int64_t rb_id){
         exit(1);
     }
     cmb->write(addr, &rb_id, sizeof(u_int64_t));
+
+    delete ref;
 }
 
 RBTree::RBTree(){
