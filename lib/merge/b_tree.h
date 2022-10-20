@@ -2057,7 +2057,6 @@ void CMB::cmb_memcpy(void* dest, void* src, size_t len){
 void CMB::remap(off_t offset){
     if( ((bar_addr + offset) & ~MAP_MASK) != map_idx ){
         mylog << "remap() - offset:" << hex << offset << dec << " map_idx : " << map_idx << "->" << ((bar_addr + offset) & ~MAP_MASK) << endl;
-        mylog << "  ## offset = " << hex << offset << dec << endl;
         if(cache_base)
             memcpy(map_base, cache_base, MAP_SIZE);  
 
@@ -2076,7 +2075,7 @@ void CMB::remap(off_t offset){
 }
 
 void CMB::read(void* buf, off_t offset, int size){
-    mylog << "CMB.read() - offset:" << hex << offset << dec  << endl;
+    // mylog << "CMB.read() - offset:" << hex << offset << dec  << endl;
 
     int remain_size = size;
     off_t cur_offset = offset;
