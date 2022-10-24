@@ -185,15 +185,18 @@ class LEAF_CACHE{
     public:
         LRU_QUEUE* LRU;
         RBTree* RBTREE;
+        u_int64_t hit_lru_id;
+        u_int64_t hit_rb_id;
 
-        u_int64_t rbtree_search_by_key(CMB* cmb, u_int64_t key);
-        u_int64_t rbtree_search_by_node_id(CMB* cmb, u_int64_t node_id);
+        void rbtree_search_by_key(CMB* cmb, u_int64_t key);
+        void rbtree_search_by_node_id(CMB* cmb, u_int64_t node_id);
         u_int64_t get_node_id(u_int64_t rb_id);
         u_int64_t get_lru_id(u_int64_t rb_id);
 
         void lru_enqueue(CMB* cmb, u_int64_t node_id);
         void lru_dequeue(CMB* cmb);
         void lru_remove(CMB* cmb, u_int64_t lru_id);
+        void lru_reenqueue(CMB* cmb, u_int64_t lru_id);
 };
 
 class LRU_QUEUE{
@@ -710,15 +713,11 @@ void BTree<T>::search(u_int64_t _k, T* buf){
 
     if(root_id){
         // Interval to Leaf Optimization
-        u_int64_t hit_idx;
-
         if(leafCache){
-            u_int64_t hit_idx = leafCache->rbtree_search_by_key(cmb, _k);
+            leafCache->rbtree_search_by_key(cmb, _k);
 
-            if(hit_idx != 0){
-                u_int64_t hit_node_id = leafCache->get_node_id(hit_idx);
-                u_int64_t lru_id = leafCache->get_lru_id(hit_idx);
-                leafCache->lru_remove(cmb, lru_id);
+            if(leafCache->hit_rb_id != 0){
+                u_int64_t hit_node_id = leafCache->get_node_id(leafCache->hit_rb_id);
                 // Hit
                 // Remove the cache from the queue, then Read the value
                 // ##
@@ -749,12 +748,10 @@ void BTree<T>::update(u_int64_t _k, T _v){
         removeList* rmlist = NULL;
 
         if(leafCache){
-            u_int64_t hit_idx = leafCache->rbtree_search_by_key(cmb, _k);
+            leafCache->rbtree_search_by_key(cmb, _k);
 
-            if(hit_idx != 0){
-                u_int64_t hit_node_id = leafCache->get_node_id(hit_idx);
-                u_int64_t lru_id = leafCache->get_lru_id(hit_idx);
-                leafCache->lru_remove(cmb, lru_id);
+            if(leafCache->hit_rb_id != 0){
+                u_int64_t hit_node_id = leafCache->get_node_id(leafCache->hit_rb_id);
                 // Hit
                 // Remove the cache from the queue, then Update the value 
                 // ##
@@ -815,12 +812,10 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
         removeList* rmlist = NULL;
 
         if(leafCache){
-            u_int64_t hit_idx = leafCache->rbtree_search_by_key(cmb, _k);
+            leafCache->rbtree_search_by_key(cmb, _k);
 
-            if(hit_idx != 0){
-                u_int64_t hit_node_id = leafCache->get_node_id(hit_idx);
-                u_int64_t lru_id = leafCache->get_lru_id(hit_idx);
-                leafCache->lru_remove(cmb, lru_id);
+            if(leafCache->hit_rb_id != 0){
+                u_int64_t hit_node_id = leafCache->get_node_id(leafCache->hit_rb_id);
 
                 if(cmb->get_num_key(hit_node_id) < m - 1){
                     //Hit and no split
@@ -925,12 +920,10 @@ void BTree<T>::deletion(u_int64_t _k){
         removeList* rmlist = NULL;
 
         if(leafCache){
-            u_int64_t hit_idx = leafCache->rbtree_search_by_key(cmb, _k);
+            leafCache->rbtree_search_by_key(cmb, _k);
 
-            if(hit_idx != 0){
-                u_int64_t hit_node_id = leafCache->get_node_id(hit_idx);
-                u_int64_t lru_id = leafCache->get_lru_id(hit_idx);
-                leafCache->lru_remove(cmb, lru_id);
+            if(leafCache->hit_rb_id != 0){
+                u_int64_t hit_node_id = leafCache->get_node_id(leafCache->hit_rb_id);
 
                 if(cmb->get_num_key(hit_node_id) > min_num){
                     //Hit and no merge
@@ -1111,7 +1104,12 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id
             memcpy(buf, &ret_val, sizeof(T));
 
             if(t->leafCache && is_leaf){
-                t->leafCache->lru_enqueue(t->cmb, node_id);
+                if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == node_id){
+                    t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
+                }
+                else{
+                    t->leafCache->lru_enqueue(t->cmb, node_id);
+                }
             } 
 
             return;
@@ -1126,7 +1124,12 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id
 
             // Add to the leaf interval cache
             if(t->leafCache && is_leaf){
-                t->leafCache->lru_enqueue(t->cmb, node_id);
+                if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == node_id){
+                    t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
+                }
+                else{
+                    t->leafCache->lru_enqueue(t->cmb, node_id);
+                }
             }                
 
             return;
@@ -1169,7 +1172,12 @@ u_int64_t BTreeNode<T>::update(BTree<T>* t, u_int64_t _k, T _v, removeList** lis
 
             // Add to the leaf interval cache
             if(t->leafCache && is_leaf){
-                t->leafCache->lru_enqueue(t->cmb, node_id);
+                if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == node_id){
+                    t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
+                }
+                else{
+                    t->leafCache->lru_enqueue(t->cmb, node_id);
+                }
             }    
 
             return node_id;                
@@ -1199,7 +1207,12 @@ u_int64_t BTreeNode<T>::update(BTree<T>* t, u_int64_t _k, T _v, removeList** lis
 
             // Add to the leaf interval cache
             if(t->leafCache && is_leaf){
-                t->leafCache->lru_enqueue(t->cmb, node_id);
+                if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == node_id){
+                    t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
+                }
+                else{
+                    t->leafCache->lru_enqueue(t->cmb, node_id);
+                }
             }                
 
             return node_id;
@@ -1344,13 +1357,18 @@ u_int64_t BTreeNode<T>::direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeLis
     }
 
     if(t->leafCache && is_leaf && num_key <= m - 1 && t->cmb->get_num_key(node_id) <= m - 1){
-        u_int64_t rb_id = t->leafCache->rbtree_search_by_key(t->cmb, _k);
-        if(rb_id){
-            // rbtree node exist => lru cache exist
-            u_int64_t lru_id = t->leafCache->get_lru_id(rb_id);
-            t->leafCache->lru_remove(t->cmb, lru_id);
+        if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == node_id){
+            t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
         }
-        t->leafCache->lru_enqueue(t->cmb, node_id);
+        else{
+            t->leafCache->rbtree_search_by_node_id(t->cmb, node_id);
+            if(t->leafCache->hit_lru_id != 0){
+                t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
+            }
+            else{
+                t->leafCache->lru_enqueue(t->cmb, node_id);
+            }
+        }
     }
 
     return node_id;
@@ -1421,13 +1439,18 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
 
     // Update or Create a new cache for node
     if(t->leafCache && node->is_leaf && node->num_key <= m - 1){
-        u_int64_t rb_id = t->leafCache->rbtree_search_by_key(t->cmb, node->key[0]);
-        if(rb_id){
-            // rbtree node exist => lru cache exist
-            u_int64_t lru_id = t->leafCache->get_lru_id(rb_id);
-            t->leafCache->lru_remove(t->cmb, lru_id);
+        if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == node_id){
+            t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
         }
-        t->leafCache->lru_enqueue(t->cmb, node->node_id);
+        else{
+            t->leafCache->rbtree_search_by_node_id(t->cmb, node->node_id);
+            if(t->leafCache->hit_lru_id != 0){
+                t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
+            }
+            else{
+                t->leafCache->lru_enqueue(t->cmb, node->node_id);
+            }
+        }
     }
 
     // Update or Create a new cache for new node
@@ -1591,13 +1614,18 @@ u_int64_t BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** li
             }
 
             if(t->leafCache && is_leaf && t->cmb->get_num_key(node_id) >= min_num){
-                u_int64_t rb_id = t->leafCache->rbtree_search_by_node_id(t->cmb, node_id);
-                if(rb_id){
-                    // rbtree node exist => lru cache exist
-                    u_int64_t lru_id = t->leafCache->get_lru_id(rb_id);
-                    t->leafCache->lru_remove(t->cmb, lru_id);
+                if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == node_id){
+                    t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
                 }
-                t->leafCache->lru_enqueue(t->cmb, node_id);
+                else{
+                    t->leafCache->rbtree_search_by_node_id(t->cmb, node_id);
+                    if(t->leafCache->hit_lru_id != 0){
+                        t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
+                    }
+                    else{
+                        t->leafCache->lru_enqueue(t->cmb, node_id);
+                    }
+                }
             }
             
             return node_id;
@@ -1614,13 +1642,18 @@ u_int64_t BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** li
         mylog << "~~Key not found~~" << endl;
 
         if(t->leafCache && is_leaf && num_key >= min_num){
-            u_int64_t rb_id = t->leafCache->rbtree_search_by_node_id(t->cmb, node_id);
-            if(rb_id){
-                // rbtree node exist => lru cache exist
-                u_int64_t lru_id = t->leafCache->get_lru_id(rb_id);
-                t->leafCache->lru_remove(t->cmb, lru_id);
+            if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == node_id){
+                t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
             }
-            t->leafCache->lru_enqueue(t->cmb, node_id);
+            else{
+                t->leafCache->rbtree_search_by_node_id(t->cmb, node_id);
+                if(t->leafCache->hit_lru_id != 0){
+                    t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
+                }
+                else{
+                    t->leafCache->lru_enqueue(t->cmb, node_id);
+                }
+            }
         }
 
         return 0;
@@ -1658,13 +1691,18 @@ u_int64_t BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** li
     }
 
     if(t->leafCache && is_leaf && num_key >= min_num){
-        u_int64_t rb_id = t->leafCache->rbtree_search_by_node_id(t->cmb, node_id);
-        if(rb_id){
-            // rbtree node exist => lru cache exist
-            u_int64_t lru_id = t->leafCache->get_lru_id(rb_id);
-            t->leafCache->lru_remove(t->cmb, lru_id);
+        if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == node_id){
+            t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
         }
-        t->leafCache->lru_enqueue(t->cmb, node_id);
+        else{
+            t->leafCache->rbtree_search_by_node_id(t->cmb, node_id);
+            if(t->leafCache->hit_lru_id != 0){
+                t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
+            }
+            else{
+                t->leafCache->lru_enqueue(t->cmb, node_id);
+            }
+        }
     }
 
     return node_id;
@@ -1796,23 +1834,31 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
 
             // Remove the leaf cache of right if it is in the queue
             if(t->leafCache && right->is_leaf){
-                u_int64_t rb_id = t->leafCache->rbtree_search_by_node_id(t->cmb, right->node_id);
-                if(rb_id){
-                    // rbtree node exist => lru cache exist
-                    u_int64_t lru_id = t->leafCache->get_lru_id(rb_id);
-                    t->leafCache->lru_remove(t->cmb, lru_id);
+                if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == right->node_id){
+                    t->leafCache->lru_remove(t->cmb, t->leafCache->hit_lru_id);
+                }
+                else{
+                    t->leafCache->rbtree_search_by_node_id(t->cmb, right->node_id);
+                    if(t->leafCache->hit_lru_id != 0){
+                        t->leafCache->lru_remove(t->cmb, t->leafCache->hit_lru_id);
+                    }
                 }
             }
 
             // Update or Create a new cache for left
             if(t->leafCache && left->is_leaf && left->num_key >= min_num){
-                u_int64_t rb_id = t->leafCache->rbtree_search_by_node_id(t->cmb, left->node_id);
-                if(rb_id){
-                    // rbtree node exist => lru cache exist
-                    u_int64_t lru_id = t->leafCache->get_lru_id(rb_id);
-                    t->leafCache->lru_remove(t->cmb, lru_id);
+                if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == left->node_id){
+                    t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
                 }
-                t->leafCache->lru_enqueue(t->cmb, left->node_id);
+                else{
+                    t->leafCache->rbtree_search_by_node_id(t->cmb, left->node_id);
+                    if(t->leafCache->hit_lru_id != 0){
+                        t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
+                    }
+                    else{
+                        t->leafCache->lru_enqueue(t->cmb, left->node_id);
+                    }
+                }
             }
         }
     }
@@ -1928,23 +1974,31 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
 
             // Remove the leaf cache of right if it is in the queue
             if(t->leafCache && right->is_leaf){
-                u_int64_t rb_id = t->leafCache->rbtree_search_by_node_id(t->cmb, right->node_id);
-                if(rb_id){
-                    // rbtree node exist => lru cache exist
-                    u_int64_t lru_id = t->leafCache->get_lru_id(rb_id);
-                    t->leafCache->lru_remove(t->cmb, lru_id);
+                if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == right->node_id){
+                    t->leafCache->lru_remove(t->cmb, t->leafCache->hit_lru_id);
+                }
+                else{
+                    t->leafCache->rbtree_search_by_node_id(t->cmb, right->node_id);
+                    if(t->leafCache->hit_lru_id != 0){
+                        t->leafCache->lru_remove(t->cmb, t->leafCache->hit_lru_id);
+                    }
                 }
             }
 
             // Update or Create a new cache for left
             if(t->leafCache && left->is_leaf && left->num_key >= min_num){
-                u_int64_t rb_id = t->leafCache->rbtree_search_by_node_id(t->cmb, left->node_id);
-                if(rb_id){
-                    // rbtree node exist => lru cache exist
-                    u_int64_t lru_id = t->leafCache->get_lru_id(rb_id);
-                    t->leafCache->lru_remove(t->cmb, lru_id);
+                if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == left->node_id){
+                    t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
                 }
-                t->leafCache->lru_enqueue(t->cmb, left->node_id);
+                else{
+                    t->leafCache->rbtree_search_by_node_id(t->cmb, left->node_id);
+                    if(t->leafCache->hit_lru_id != 0){
+                        t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
+                    }
+                    else{
+                        t->leafCache->lru_enqueue(t->cmb, left->node_id);
+                    }
+                }
             }
         }
     }
@@ -2058,7 +2112,7 @@ void CMB::cmb_memcpy(void* dest, void* src, size_t len){
 
 void CMB::remap(off_t offset){    
     if( ((bar_addr + offset) & ~MAP_MASK) != map_idx ){
-        mylog << "remap() - offset:" << offset << " map_idx : " << map_idx << "->" << ((bar_addr + offset) & ~MAP_MASK) << endl;
+        // mylog << "remap() - offset:" << offset << " map_idx : " << map_idx << "->" << ((bar_addr + offset) & ~MAP_MASK) << endl;
         if(cache_base)
             memcpy(map_base, cache_base, MAP_SIZE);  
 
@@ -2077,7 +2131,7 @@ void CMB::remap(off_t offset){
 }
 
 void CMB::read(void* buf, off_t offset, int size){
-    mylog << "CMB.read() - offset:" << offset << ", size = " << size << endl;
+    //mylog << "CMB.read() - offset:" << offset << ", size = " << size << endl;
 
     int remain_size = size;
     off_t cur_offset = offset;
@@ -2105,7 +2159,7 @@ void CMB::read(void* buf, off_t offset, int size){
 }
 
 void CMB::write(off_t offset, void* buf, int size){
-    mylog << "CMB.write() - offset:" << offset << ", size = " << size << endl;
+    //mylog << "CMB.write() - offset:" << offset << ", size = " << size << endl;
 
     int remain_size = size;
     off_t cur_offset = offset;
@@ -2262,14 +2316,21 @@ void CMB::update_upper(u_int64_t node_id, u_int64_t value){
 	write(addr, &value, sizeof(u_int64_t));
 }
 
-u_int64_t LEAF_CACHE::rbtree_search_by_key(CMB* cmb, u_int64_t key){
-    u_int64_t rb_id = RBTREE->search_by_key(cmb, key);
-    return rb_id;
+void LEAF_CACHE::rbtree_search_by_key(CMB* cmb, u_int64_t key){
+    hit_lru_id = 0;
+    hit_rb_id = 0;
+    
+    hit_rb_id = RBTREE->search_by_key(cmb, key);
+    if(hit_rb_id) hit_lru_id = get_lru_id(hit_rb_id);
+        
 }
 
-u_int64_t LEAF_CACHE::rbtree_search_by_node_id(CMB* cmb, u_int64_t node_id){
-    u_int64_t rb_id = RBTREE->search_by_node_id(cmb, node_id);
-    return rb_id;
+void LEAF_CACHE::rbtree_search_by_node_id(CMB* cmb, u_int64_t node_id){
+    hit_lru_id = 0;
+    hit_rb_id = 0;
+
+    hit_rb_id = RBTREE->search_by_node_id(cmb, node_id);
+    if(hit_rb_id) hit_lru_id = get_lru_id(hit_rb_id);
 }
 
 u_int64_t LEAF_CACHE::get_node_id(u_int64_t rb_id){
@@ -2281,6 +2342,7 @@ u_int64_t LEAF_CACHE::get_lru_id(u_int64_t rb_id){
 }
 
 void LEAF_CACHE::lru_enqueue(CMB* cmb, u_int64_t node_id){
+    mylog << "LEAF_CACHE::lru_enqueue() - node_id = " << node_id << endl;
     if(LRU->full()){
         lru_dequeue(cmb);
     }
@@ -2290,15 +2352,30 @@ void LEAF_CACHE::lru_enqueue(CMB* cmb, u_int64_t node_id){
 }
 
 void LEAF_CACHE::lru_dequeue(CMB* cmb){
+    mylog << "LEAF_CACHE::lru_dequeue()" << endl;
     u_int64_t rb_id = LRU->get_rb_tree_id(cmb, LRU->Q_front_idx);
     LRU->dequeue(cmb);
     RBTREE->remove(cmb, rb_id);
 }
 
 void LEAF_CACHE::lru_remove(CMB* cmb, u_int64_t lru_id){
+    mylog << "LEAF_CACHE::lru_remove() - lru_id = " << lru_id << endl;
     u_int64_t rb_id = LRU->get_rb_tree_id(cmb, lru_id);
     LRU->remove(cmb, lru_id);
     RBTREE->remove(cmb, rb_id);
+}
+
+void LEAF_CACHE::lru_reenqueue(CMB* cmb, u_int64_t lru_id){
+    mylog << "LEAF_CACHE::lru_reenqueue() - lru_id = " << lru_id << endl;
+    LRU_QUEUE_ENTRY* buf = new LRU_QUEUE_ENTRY;
+
+    LRU->read(cmb, lru_id, buf);
+    LRU->remove(cmb, lru_id);
+    u_int64_t new_id = LRU->enqueue(cmb, buf->RBTREE_idx, buf->node_id);
+    if(new_id != lru_id)
+        RBTREE->pool[buf->RBTREE_idx].LRU_id = new_id;
+
+    delete buf;
 }
 
 LRU_QUEUE::LRU_QUEUE(CMB* cmb){
@@ -2329,14 +2406,16 @@ void LRU_QUEUE::stat(CMB* cmb){
     cout << "capacity = " << meta->capacity << endl;
     cout << "num_of_cache = " << meta->num_of_cache << endl;
 
+    int num = 0;
     u_int64_t cur_idx = meta->Q_front_idx;
     cout << "< [LRU_ID] RBTree_ID -> Node_ID : Lower-Upper >" << endl;
     while(cur_idx){
+        num++;
         off_t addr = LRU_QUEUE_BASE_ADDR + cur_idx * sizeof(LRU_QUEUE_ENTRY);
         LRU_QUEUE_ENTRY* entry = new LRU_QUEUE_ENTRY();
         read(cmb, cur_idx, entry);
 
-        cout << "< [" << cur_idx << "] " << entry->RBTREE_idx << "->" << entry->node_id << ": " << cmb->get_lower(entry->node_id) << "-" << cmb->get_upper(entry->node_id) << " > - ";
+        cout << "<" << "(" << num << ".)"<< "[" << cur_idx << "] " << entry->RBTREE_idx << "->" << entry->node_id << ": " << cmb->get_lower(entry->node_id) << "-" << cmb->get_upper(entry->node_id) << " > - ";
 
         cur_idx = entry->nextQ;
         delete entry;
@@ -2534,7 +2613,6 @@ void LRU_QUEUE::remove(CMB* cmb, u_int64_t lru_id){
 
     LRU_QUEUE_ENTRY* buf = new LRU_QUEUE_ENTRY();
     read(cmb, lru_id, buf);
-    u_int64_t rbtree_id = buf->RBTREE_idx;
 
     if(Q_front_idx != lru_id){
         // Set the last->next = cur->next
