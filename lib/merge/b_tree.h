@@ -7,6 +7,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <time.h>
+#include <chrono>
 #include "memory_map.h"
 
 using namespace std;
@@ -36,6 +38,10 @@ ofstream mylog;
 
 // ## Verification
 int HIT = 0;
+
+// Evaluation Break Down
+chrono::duration<double, micro> flash_diff;
+chrono::duration<double, micro> cmb_diff;
 
 // B-Tree
 template <typename T> class BTree;
@@ -533,9 +539,15 @@ void BTree<T>::node_read(u_int64_t node_id, BTreeNode<T>* node){
         return;
     }
 
+    
+
     char* buf;
     posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
+
+    auto start = chrono::high_resolution_clock::now();
     pread(fd, buf, PAGE_SIZE, block_id * PAGE_SIZE);
+    auto end = std::chrono::high_resolution_clock::now();
+    flash_diff += end - start;
 
     char* ptr = buf;
     memcpy((void*)node, ptr, sizeof(BTreeNode<T>));
@@ -594,7 +606,10 @@ void BTree<T>::node_write(u_int64_t node_id, BTreeNode<T>* node){
     memcpy(ptr, node->child_id, (node->m + 1) * sizeof(u_int64_t));
     ptr += (node->m + 1) * sizeof(u_int64_t);
 
+    auto start = chrono::high_resolution_clock::now();
     pwrite(fd, buf, PAGE_SIZE, block_id * PAGE_SIZE);
+    auto end = std::chrono::high_resolution_clock::now();
+    flash_diff += end - start;
 
     free(buf);
 }
@@ -2106,8 +2121,12 @@ void CMB::cmb_memcpy(void* dest, void* src, size_t len){
 
     u_int64_t* d = (u_int64_t*) dest;
     u_int64_t* s = (u_int64_t*) src;
+
+    auto start = chrono::high_resolution_clock::now();
     for(int i = 0; i < len / sizeof(u_int64_t); i++)
         *d++ = *s++;
+    auto end = std::chrono::high_resolution_clock::now();
+    cmb_diff += end - start;    
 }
 
 void CMB::remap(off_t offset){    

@@ -1,7 +1,5 @@
 #include <iostream>
-#include <time.h>
 #include <sys/stat.h>
-#include <chrono>
 #include "../../lib/merge/b_tree.h"
 #include "../../lib/YCSB/ycsb_data.h"
 using namespace std;
@@ -160,6 +158,9 @@ int main(int argc, char** argv){
             if(i >= end)
                 break;
 
+            flash_diff = chrono::microseconds{0};
+            cmb_diff = chrono::microseconds{0};
+
             if(op == 'i'){
                 // Insert data
                 cout << '\r' << "OP#" << i+1 << " - Insert : " << key << " >> " << val.str;
@@ -168,7 +169,7 @@ int main(int argc, char** argv){
                 t->insertion(key, val);
                 auto end = std::chrono::high_resolution_clock::now();
                 chrono::duration<double, micro> diff = end - start;
-                op_file << "i\t" << key << "\t" << val.str << "\t" << diff.count() << endl;
+                op_file << "i\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << flash_diff.count() << "\t" << cmb_diff.count() << endl;
             }
             else if(op == 'r'){
                 // Read data
@@ -180,7 +181,7 @@ int main(int argc, char** argv){
                 cout << " >> " << val.str;
                 mylog << " >> " << val.str << endl;
                 chrono::duration<double, micro> diff = end - start;
-                op_file << "r\t" << key << "\t" << val.str << "\t" << diff.count() << endl;
+                op_file << "r\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << flash_diff.count() << "\t" << cmb_diff.count() << endl;
             }
             else if(op == 'u'){
                 // Update data
@@ -190,7 +191,7 @@ int main(int argc, char** argv){
                 t->update(key, val);
                 auto end = std::chrono::high_resolution_clock::now();
                 chrono::duration<double, micro> diff = end - start;
-                op_file << "u\t" << key << "\t" << val.str << "\t" << diff.count() << endl;
+                op_file << "u\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << flash_diff.count() << "\t" << cmb_diff.count() << endl;
             }
             else if(op == 'd'){
                 // Delete data
@@ -200,7 +201,7 @@ int main(int argc, char** argv){
                 t->deletion(key);
                 auto end = std::chrono::high_resolution_clock::now();
                 chrono::duration<double, micro> diff = end - start;
-                op_file << "d\t" << key << "\t" << diff.count() << endl;
+                op_file << "d\t" << key << "\t" << diff.count() << "\t" << flash_diff.count() << "\t" << cmb_diff.count() << endl;
             }
             else{
                 continue;
