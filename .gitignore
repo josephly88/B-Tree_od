@@ -4,8 +4,9 @@ tree
 playground
 fake_cmb
 *.dat
-data/*.txt
+data/*
 *.png
 run/merge/dup*
 run/merge/tmp.sh
 run/merge/checkpoint
+run/merge/Loaded
