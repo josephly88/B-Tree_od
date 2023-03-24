@@ -43,6 +43,12 @@ int HIT = 0;
 chrono::duration<double, micro> flash_diff;
 chrono::duration<double, micro> cmb_diff;
 
+int breakdown_state = 0;
+chrono::duration<double, micro> tmp_diff;
+chrono::duration<double, micro> trav_diff;
+chrono::duration<double, micro> op_diff;
+chrono::duration<double, micro> cow_diff;
+
 // B-Tree
 template <typename T> class BTree;
 template <typename T> class BTreeNode;
@@ -84,11 +90,11 @@ class BTree{
 		void stat();
         void memory_map_addr();
 
-		void tree_read(int fd, BTree* tree);
-		void tree_write(int fd, BTree* tree);
+		void tree_read(int fd, BTree* tree, int bkdown = 0);
+		void tree_write(int fd, BTree* tree, int bkdown = 0);
 
-		void node_read(u_int64_t block_id, BTreeNode<T>* node);
-		void node_write(u_int64_t block_id, BTreeNode<T>* node);
+		void node_read(u_int64_t block_id, BTreeNode<T>* node, int bkdown = 0);
+		void node_write(u_int64_t block_id, BTreeNode<T>* node, int bkdown = 0);
 
 		u_int64_t get_free_block_id();
 		void set_block_id(u_int64_t block_id, bool bit);
@@ -487,26 +493,56 @@ void BTree<T>::memory_map_addr(){
 }
 
 template <typename T>
-void BTree<T>::tree_read(int fd, BTree* tree){ 
+void BTree<T>::tree_read(int fd, BTree* tree, int bkdown){ 
     mylog << "tree_read()" << endl;
 
     char* buf;
     posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
+
+    auto start = chrono::high_resolution_clock::now();
     pread(fd, buf, PAGE_SIZE, 1 * PAGE_SIZE);
+    auto end = std::chrono::high_resolution_clock::now();
+    flash_diff += end - start;
+
+    switch (bkdown){
+        case 1:
+            trav_diff += end - start;
+            break;
+        case 2:
+            op_diff += end - start;
+            break;
+        case 3:
+            cow_diff += end - start;
+    }
     
     memcpy((void*)tree, buf, sizeof(BTree));
     free(buf);
 }
 
 template <typename T>
-void BTree<T>::tree_write(int fd, BTree* tree){
+void BTree<T>::tree_write(int fd, BTree* tree, int bkdown){
     mylog << "tree_write()" << endl;
 
     // Read before write to maintain the same block bitmap
 
     char* buf;
     posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
+
+    auto start = chrono::high_resolution_clock::now();
     pread(fd, buf, PAGE_SIZE, 1 * PAGE_SIZE);
+    auto end = std::chrono::high_resolution_clock::now();
+    flash_diff += end - start;
+
+    switch (bkdown){
+        case 1:
+            trav_diff += end - start;
+            break;
+        case 2:
+            op_diff += end - start;
+            break;
+        case 3:
+            cow_diff += end - start;
+    }
     
     memcpy(buf, tree, sizeof(BTree));
     pwrite(fd, buf, PAGE_SIZE, 1 * PAGE_SIZE);
@@ -514,7 +550,7 @@ void BTree<T>::tree_write(int fd, BTree* tree){
 }
 
 template <typename T>
-void BTree<T>::node_read(u_int64_t node_id, BTreeNode<T>* node){
+void BTree<T>::node_read(u_int64_t node_id, BTreeNode<T>* node, int bkdown){
     mylog << "node_read() - node_id:" << node_id << endl;
 
     if(node_id == 0){
@@ -537,9 +573,7 @@ void BTree<T>::node_read(u_int64_t node_id, BTreeNode<T>* node){
         cout << " error : attempt to read block id = " << block_id << endl;
         mylog << " error : attempt to read block id = " << block_id << endl;
         return;
-    }
-
-    
+    }    
 
     char* buf;
     posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
@@ -548,6 +582,19 @@ void BTree<T>::node_read(u_int64_t node_id, BTreeNode<T>* node){
     pread(fd, buf, PAGE_SIZE, block_id * PAGE_SIZE);
     auto end = std::chrono::high_resolution_clock::now();
     flash_diff += end - start;
+    switch (bkdown){
+        case 1:
+            trav_diff += tmp_diff;
+            tmp_diff = end - start;
+            break;
+        case 2:
+            op_diff += tmp_diff;
+            op_diff += end - start;
+            tmp_diff = chrono::microseconds{0};
+            break;
+        case 3:
+            cow_diff += end - start;
+    }
 
     char* ptr = buf;
     memcpy((void*)node, ptr, sizeof(BTreeNode<T>));
@@ -569,7 +616,7 @@ void BTree<T>::node_read(u_int64_t node_id, BTreeNode<T>* node){
 }
 
 template <typename T>
-void BTree<T>::node_write(u_int64_t node_id, BTreeNode<T>* node){
+void BTree<T>::node_write(u_int64_t node_id, BTreeNode<T>* node, int bkdown){
     mylog << "node_write() - node_id:" << node_id << endl;
 
     if(node_id == 0){
@@ -610,6 +657,16 @@ void BTree<T>::node_write(u_int64_t node_id, BTreeNode<T>* node){
     pwrite(fd, buf, PAGE_SIZE, block_id * PAGE_SIZE);
     auto end = std::chrono::high_resolution_clock::now();
     flash_diff += end - start;
+    switch (bkdown){
+        case 1:
+            trav_diff += end - start;
+            break;
+        case 2:
+            op_diff += end - start;
+            break;
+        case 3:
+            cow_diff += end - start;
+    }
 
     free(buf);
 }
@@ -858,7 +915,7 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
         }
 
         BTreeNode<T>* root = new BTreeNode<T>(0, 0, 0);
-        node_read(root_id, root);
+        node_read(root_id, root, 1);
         int dup_node_id = root->traverse_insert(this, _k, _v, &rmlist);
 
         if(dup_node_id == 0){
@@ -868,10 +925,10 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
 
         if(dup_node_id != root_id){
             root_id = dup_node_id;
-            tree_write(fd, this);
+            tree_write(fd, this, 3);
         }       
 
-        node_read(root_id, root);
+        node_read(root_id, root, 2);
         if(root->num_key >= m || (cmb && cmb->get_num_key(root_id) >= m)){  
             int new_root_id;     
 
@@ -884,11 +941,11 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
                 new_root_id = get_free_block_id();
 
             BTreeNode<T>* new_root = new BTreeNode<T>(m, false, new_root_id);
-            node_write(new_root_id, new_root);
+            node_write(new_root_id, new_root, 2);
 
             root_id = root->split(this, root_id, new_root_id, &rmlist);
 
-            tree_write(fd, this);
+            tree_write(fd, this, 2);
 
             delete new_root;    
         }
@@ -918,10 +975,10 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
         else
             root_id = get_free_block_id();
 
-        tree_write(fd, this);
+        tree_write(fd, this, 2);
 
         BTreeNode<T>* root = new BTreeNode<T>(m, true, root_id);
-        node_write(root_id, root);
+        node_write(root_id, root, 2);
         delete root;
         insertion(_k, _v);
     }
@@ -1279,7 +1336,7 @@ u_int64_t BTreeNode<T>::traverse_insert(BTree<T>* t, u_int64_t _k, T _v, removeL
         }
         
         BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
-        t->node_read(child_id[i], child);
+        t->node_read(child_id[i], child, 1);
         int dup_child_id = child->traverse_insert(t, _k, _v, list);
 
         if(dup_child_id == 0){
@@ -1292,10 +1349,10 @@ u_int64_t BTreeNode<T>::traverse_insert(BTree<T>* t, u_int64_t _k, T _v, removeL
             child_id[i] = dup_child_id;
             *list = new removeList(node_id, *list);
             node_id = t->get_free_block_id();
-            t->node_write(node_id, this);
+            t->node_write(node_id, this, 3);
         }
                 
-        t->node_read(child_id[i], child);
+        t->node_read(child_id[i], child, 2);
         if(child->num_key >= m)
             node_id = split(t, child_id[i], node_id, list);
         else if(t->append_map && child->is_leaf){           
@@ -1368,7 +1425,7 @@ u_int64_t BTreeNode<T>::direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeLis
             node_id = t->get_free_block_id();
         }
 
-        t->node_write(node_id, this);
+        t->node_write(node_id, this, 2);
     }
 
     if(t->leafCache && is_leaf && num_key <= m - 1 && t->cmb->get_num_key(node_id) <= m - 1){
@@ -1394,13 +1451,13 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
     mylog << "split() - node id:" << spt_node_id << " parent node id:" << parent_id << endl;
     
     BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
-    t->node_read(spt_node_id, node);
+    t->node_read(spt_node_id, node, 2);
     if(t->append_map && node->is_leaf){
         t->append_map->reduction(t, spt_node_id, node);
     }
 
     BTreeNode<T>* parent = new BTreeNode<T>(0, 0, 0);
-    t->node_read(parent_id, parent);  
+    t->node_read(parent_id, parent, 2);  
 
     int new_node_id;
     if(t->cmb){
@@ -1449,8 +1506,8 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
     node->parent_id = dup_par_id;
     new_node->parent_id = dup_par_id;
 
-    t->node_write(node->node_id, node);
-    t->node_write(new_node_id, new_node);
+    t->node_write(node->node_id, node, 2);
+    t->node_write(new_node_id, new_node, 2);
 
     // Update or Create a new cache for node
     if(t->leafCache && node->is_leaf && node->num_key <= m - 1){

@@ -40,6 +40,7 @@ int main(int argc, char** argv){
     MODE mode = COPY_ON_WRITE;
     bool lfcache = false;
     bool append = false;
+    bool breakdown = false;
 
     if(argc < 2){
         usage();
@@ -78,6 +79,9 @@ int main(int argc, char** argv){
             }
             else if(strcmp(argv[i], "-append") == 0){
                 append = true;
+            }
+            else if(strcmp(argv[i], "-breakdown") == 0){
+                breakdown = true;
             }
             else{
                 tree_file = argv[i];
@@ -161,6 +165,13 @@ int main(int argc, char** argv){
             flash_diff = chrono::microseconds{0};
             cmb_diff = chrono::microseconds{0};
 
+            if(breakdown){
+                tmp_diff = chrono::microseconds{0};
+                trav_diff = chrono::microseconds{0};
+                op_diff = chrono::microseconds{0};
+                cow_diff = chrono::microseconds{0};
+            }
+
             if(op == 'i'){
                 // Insert data
                 cout << '\r' << "OP#" << i+1 << " - Insert : " << key << " >> " << val.str;
@@ -169,7 +180,10 @@ int main(int argc, char** argv){
                 t->insertion(key, val);
                 auto end = std::chrono::high_resolution_clock::now();
                 chrono::duration<double, micro> diff = end - start;
-                op_file << "i\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << flash_diff.count() << "\t" << cmb_diff.count() << endl;
+                if(!breakdown)
+                    op_file << "i\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << flash_diff.count() << "\t" << cmb_diff.count() << endl;
+                else
+                    op_file << "i\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << trav_diff.count() << "\t" << op_diff.count() << "\t" << cow_diff.count() << endl;
             }
             else if(op == 'r'){
                 // Read data
