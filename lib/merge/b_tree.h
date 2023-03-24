@@ -659,10 +659,13 @@ void BTree<T>::node_write(u_int64_t node_id, BTreeNode<T>* node, int bkdown){
     flash_diff += end - start;
     switch (bkdown){
         case 1:
-            trav_diff += end - start;
+            trav_diff += tmp_diff;
+            tmp_diff = end - start;
             break;
         case 2:
+            op_diff += tmp_diff;
             op_diff += end - start;
+            tmp_diff = chrono::microseconds{0};
             break;
         case 3:
             cow_diff += end - start;
