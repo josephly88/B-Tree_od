@@ -807,7 +807,7 @@ void BTree<T>::search(u_int64_t _k, T* buf){
         }
 
         BTreeNode<T>* root = new BTreeNode<T>(0, 0, 0);
-        node_read(root_id, root);
+        node_read(root_id, root, 1);
         root->search(this, _k, buf);
         delete root;
     }
@@ -1197,6 +1197,9 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id
             // Key match
             memcpy(buf, &value[i], sizeof(T));
 
+            op_diff += tmp_diff;
+            tmp_diff = chrono::microseconds{0};
+
             // Add to the leaf interval cache
             if(t->leafCache && is_leaf){
                 if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == node_id){
@@ -1212,7 +1215,7 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id
         if(_k < key[i]){
             if(!is_leaf){
                 BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
-                t->node_read(child_id[i], child);
+                t->node_read(child_id[i], child, 1);
                 child->search(t, _k, buf);
                 delete child;
             }
@@ -1225,7 +1228,7 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id
 
     if(!is_leaf){
         BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
-        t->node_read(child_id[i], child);
+        t->node_read(child_id[i], child, 1);
         child->search(t, _k, buf);
         delete child;
     }
