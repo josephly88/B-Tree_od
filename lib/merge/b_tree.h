@@ -36,6 +36,8 @@ typedef enum {
 
 ofstream mylog;
 
+bool needsplit;
+
 // ## Verification
 int HIT = 0;
 
@@ -883,6 +885,8 @@ template <typename T>
 void BTree<T>::insertion(u_int64_t _k, T _v){
     mylog << "insertion() - key:" << _k << endl;
 
+    needsplit = false;
+
     if(root_id){
         removeList* rmlist = NULL;
 
@@ -931,8 +935,7 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
             tree_write(fd, this, 3);
         }       
 
-        node_read(root_id, root, 2);
-        if(root->num_key >= m || (cmb && cmb->get_num_key(root_id) >= m)){  
+        if(needsplit){
             int new_root_id;     
 
             if(cmb){
@@ -1357,9 +1360,8 @@ u_int64_t BTreeNode<T>::traverse_insert(BTree<T>* t, u_int64_t _k, T _v, removeL
             node_id = t->get_free_block_id();
             t->node_write(node_id, this, 3);
         }
-                
-        t->node_read(child_id[i], child, 2);
-        if(child->num_key >= m)
+
+        if(needsplit){}
             node_id = split(t, child_id[i], node_id, list);
         else if(t->append_map && child->is_leaf){           
             if(t->cmb->get_num_key(child_id[i]) >= m)
@@ -1393,6 +1395,7 @@ u_int64_t BTreeNode<T>::direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeLis
         }
         u_int64_t num_k = t->cmb->get_num_key(node_id);
         t->cmb->update_num_key(node_id, num_k+1);
+        if(num_k >= m) needsplit = true;
     }
     else{
         int idx;
@@ -1418,6 +1421,7 @@ u_int64_t BTreeNode<T>::direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeLis
         if(node_id1 != 0) child_id[idx] = node_id1;
         if(node_id2 != 0) child_id[idx+1] = node_id2;
         num_key++;
+        if(num_key >= m) needsplit = true;
 
         if(t->cmb){
             *list = new removeList(t->cmb->get_block_id(node_id), *list);
@@ -1455,6 +1459,8 @@ u_int64_t BTreeNode<T>::direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeLis
 template <typename T>
 u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t parent_id, removeList** list){
     mylog << "split() - node id:" << spt_node_id << " parent node id:" << parent_id << endl;
+
+    needsplit = false;
     
     BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
     t->node_read(spt_node_id, node, 2);
