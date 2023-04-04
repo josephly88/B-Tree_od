@@ -1361,7 +1361,7 @@ u_int64_t BTreeNode<T>::traverse_insert(BTree<T>* t, u_int64_t _k, T _v, removeL
             t->node_write(node_id, this, 3);
         }
 
-        if(needsplit){}
+        if(needsplit)
             node_id = split(t, child_id[i], node_id, list);
         else if(t->append_map && child->is_leaf){           
             if(t->cmb->get_num_key(child_id[i]) >= m)
