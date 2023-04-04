@@ -195,7 +195,10 @@ int main(int argc, char** argv){
                 cout << " >> " << val.str;
                 mylog << " >> " << val.str << endl;
                 chrono::duration<double, micro> diff = end - start;
-                op_file << "r\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << flash_diff.count() << "\t" << cmb_diff.count() << endl;
+                if(!breakdown)
+                    op_file << "r\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << flash_diff.count() << "\t" << cmb_diff.count() << endl;
+                else
+                    op_file << "r\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << trav_diff.count() << "\t" << op_diff.count() << "\t" << cow_diff.count() << endl;
             }
             else if(op == 'u'){
                 // Update data
