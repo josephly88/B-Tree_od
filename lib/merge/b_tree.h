@@ -76,6 +76,7 @@ class BTree{
 	int fd;
 	int block_size;
 	int block_cap;
+    int height;
     MODE mode;
 		
 	public:
@@ -357,6 +358,7 @@ BTree<T>::BTree(char* filename, int degree, MODE _mode, bool lfcache, bool appen
     mode = _mode;
     leafCache = NULL;
     append_map = NULL;
+    height = 0;
     
     char* buf;
     posix_memalign((void**)&buf, PAGE_SIZE, PAGE_SIZE);
@@ -900,6 +902,9 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
         }       
 
         if(needsplit){
+            height++;
+            cout << endl << "Tree height => " << height << endl;
+
             int new_root_id;     
 
             if(cmb){
@@ -954,6 +959,10 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
         node_write(root_id, root);
         op_diff += tmp_diff;
         delete root;
+        
+        height++;
+        cout << endl << "Tree height => " << height << endl;
+
         insertion(_k, _v);
     }
 }
