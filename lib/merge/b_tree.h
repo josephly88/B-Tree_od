@@ -45,10 +45,10 @@ int HIT = 0;
 chrono::duration<double, micro> flash_diff;
 chrono::duration<double, micro> cmb_diff;
 
-chrono::duration<double, micro> tmp_diff;
-chrono::duration<double, micro> trav_diff;
-chrono::duration<double, micro> op_diff;
-chrono::duration<double, micro> cow_diff;
+size_t tmp_diff;
+size_t trav_size;
+size_t op_size;
+size_t cow_size;
 
 // B-Tree
 template <typename T> class BTree;
@@ -507,8 +507,7 @@ void BTree<T>::tree_read(int fd, BTree* tree){
     auto end = std::chrono::high_resolution_clock::now();
     flash_diff += end - start;
 
-    tmp_diff = chrono::microseconds{0};
-    tmp_diff = end - start;
+    tmp_diff = PAGE_SIZE;
     
     memcpy((void*)tree, buf, sizeof(BTree));
     free(buf);
@@ -528,8 +527,7 @@ void BTree<T>::tree_write(int fd, BTree* tree){
     auto end = std::chrono::high_resolution_clock::now();
     flash_diff += end - start;
 
-    tmp_diff = chrono::microseconds{0};
-    tmp_diff = end - start;
+    tmp_diff = 0;
     
     memcpy(buf, tree, sizeof(BTree));
     pwrite(fd, buf, PAGE_SIZE, 1 * PAGE_SIZE);
@@ -570,8 +568,7 @@ void BTree<T>::node_read(u_int64_t node_id, BTreeNode<T>* node){
     auto end = std::chrono::high_resolution_clock::now();
     flash_diff += end - start;
 
-    tmp_diff = chrono::microseconds{0};
-    tmp_diff = end - start;
+    tmp_diff = 0;
 
     char* ptr = buf;
     memcpy((void*)node, ptr, sizeof(BTreeNode<T>));
@@ -635,8 +632,7 @@ void BTree<T>::node_write(u_int64_t node_id, BTreeNode<T>* node){
     auto end = std::chrono::high_resolution_clock::now();
     flash_diff += end - start;
 
-    tmp_diff = chrono::microseconds{0};
-    tmp_diff = end - start;
+    tmp_diff = 0;
 
     free(buf);
 }
@@ -898,7 +894,7 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
         if(dup_node_id != root_id){
             root_id = dup_node_id;
             tree_write(fd, this);
-            cow_diff += tmp_diff;
+            cow_size += tmp_diff;
         }       
 
         if(needsplit){
@@ -917,12 +913,12 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
 
             BTreeNode<T>* new_root = new BTreeNode<T>(m, false, new_root_id);
             node_write(new_root_id, new_root);
-            op_diff += tmp_diff;
+            op_size += tmp_diff;
 
             root_id = root->split(this, root_id, new_root_id, &rmlist);
 
             tree_write(fd, this);
-            op_diff += tmp_diff;
+            op_size += tmp_diff;
 
             delete new_root;    
         }
@@ -953,11 +949,11 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
             root_id = get_free_block_id();
 
         tree_write(fd, this);
-        op_diff += tmp_diff;
+        op_size += tmp_diff;
 
         BTreeNode<T>* root = new BTreeNode<T>(m, true, root_id);
         node_write(root_id, root);
-        op_diff += tmp_diff;
+        op_size += tmp_diff;
         delete root;
         
         height++;
@@ -1174,7 +1170,7 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id
     int i;
     for(i = 0; i < num_key; i++){
         if(_k == key[i]){
-            op_diff += tmp_diff;
+            op_size += tmp_diff;
 
             // Key match
             memcpy(buf, &value[i], sizeof(T));
@@ -1192,7 +1188,7 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id
             return;
         }
         if(_k < key[i]){
-            trav_diff += tmp_diff;
+            op_size += tmp_diff;
 
             if(!is_leaf){
                 BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
@@ -1208,7 +1204,7 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id
     }
 
     if(!is_leaf){
-        trav_diff += tmp_diff;
+        op_size += tmp_diff;
 
         BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
         t->node_read(child_id[i], child);
@@ -1313,11 +1309,11 @@ u_int64_t BTreeNode<T>::traverse_insert(BTree<T>* t, u_int64_t _k, T _v, removeL
     mylog << "traverse_insert() - key:" << _k << endl;
     
     if(is_leaf){
-        op_diff += tmp_diff;
+        op_size += tmp_diff;
         return direct_insert(t, _k, _v, list);
     }        
     else{
-        trav_diff += tmp_diff;
+        trav_size += tmp_diff;
         
         int i;
         for(i = 0; i < num_key; i++){
@@ -1342,7 +1338,7 @@ u_int64_t BTreeNode<T>::traverse_insert(BTree<T>* t, u_int64_t _k, T _v, removeL
             *list = new removeList(node_id, *list);
             node_id = t->get_free_block_id();
             t->node_write(node_id, this);
-            cow_diff += tmp_diff;
+            cow_size += tmp_diff;
         }
 
         if(needsplit)
@@ -1420,7 +1416,7 @@ u_int64_t BTreeNode<T>::direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeLis
         }
 
         t->node_write(node_id, this);
-        op_diff += tmp_diff;
+        op_size += tmp_diff;
     }
 
     if(t->leafCache && is_leaf && num_key <= m - 1 && t->cmb->get_num_key(node_id) <= m - 1){
@@ -1449,14 +1445,14 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
     
     BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
     t->node_read(spt_node_id, node);
-    op_diff += tmp_diff;
+    op_size += tmp_diff;
     if(t->append_map && node->is_leaf){
         t->append_map->reduction(t, spt_node_id, node);
     }
 
     BTreeNode<T>* parent = new BTreeNode<T>(0, 0, 0);
     t->node_read(parent_id, parent);  
-    op_diff += tmp_diff;
+    op_size += tmp_diff;
 
     int new_node_id;
     if(t->cmb){
@@ -1506,9 +1502,9 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
     new_node->parent_id = dup_par_id;
 
     t->node_write(node->node_id, node);
-    op_diff += tmp_diff;
+    op_size += tmp_diff;
     t->node_write(new_node_id, new_node);
-    op_diff += tmp_diff;
+    op_size += tmp_diff;
 
     // Update or Create a new cache for node
     if(t->leafCache && node->is_leaf && node->num_key <= m - 1){

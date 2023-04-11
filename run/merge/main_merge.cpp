@@ -166,10 +166,10 @@ int main(int argc, char** argv){
             cmb_diff = chrono::microseconds{0};
 
             if(breakdown){
-                tmp_diff = chrono::microseconds{0};
-                trav_diff = chrono::microseconds{0};
-                op_diff = chrono::microseconds{0};
-                cow_diff = chrono::microseconds{0};
+                tmp_diff = 0;
+                trav_size = 0;
+                op_size = 0;
+                cow_size = 0;
             }
 
             if(op == 'i'){
@@ -183,7 +183,7 @@ int main(int argc, char** argv){
                 if(!breakdown)
                     op_file << "i\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << flash_diff.count() << "\t" << cmb_diff.count() << endl;
                 else
-                    op_file << "i\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << trav_diff.count() << "\t" << op_diff.count() << "\t" << cow_diff.count() << endl;
+                    op_file << "i\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << trav_size << "\t" << op_size << "\t" << cow_size << endl;
             }
             else if(op == 'r'){
                 // Read data
@@ -198,7 +198,7 @@ int main(int argc, char** argv){
                 if(!breakdown)
                     op_file << "r\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << flash_diff.count() << "\t" << cmb_diff.count() << endl;
                 else
-                    op_file << "r\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << trav_diff.count() << "\t" << op_diff.count() << "\t" << cow_diff.count() << endl;
+                    op_file << "r\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << trav_size << "\t" << op_size << "\t" << cow_size << endl;
             }
             else if(op == 'u'){
                 // Update data
