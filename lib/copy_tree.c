@@ -21,7 +21,7 @@ int main(int argc, char** argv){
     int fd, tfd;
 
     // Open files
-    if((fd = open("/dev/nvme0n60340736", O_RDWR | O_SYNC)) == -1) FATAL;
+    if((fd = open("/dev/nvme0n1", O_RDWR | O_SYNC)) == -1) FATAL;
     if((tfd = open(argv[1], O_RDWR|O_CREAT, 0644)) == -1) FATAL;
     char command[100] = " truncate -s 20GiB ";
     strcat(command, argv[1]);
