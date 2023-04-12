@@ -527,7 +527,7 @@ void BTree<T>::tree_write(int fd, BTree* tree){
     auto end = std::chrono::high_resolution_clock::now();
     flash_diff += end - start;
 
-    tmp_diff = 0;
+    tmp_diff = PAGE_SIZE;
     
     memcpy(buf, tree, sizeof(BTree));
     pwrite(fd, buf, PAGE_SIZE, 1 * PAGE_SIZE);
@@ -568,7 +568,7 @@ void BTree<T>::node_read(u_int64_t node_id, BTreeNode<T>* node){
     auto end = std::chrono::high_resolution_clock::now();
     flash_diff += end - start;
 
-    tmp_diff = 0;
+    tmp_diff = PAGE_SIZE;
 
     char* ptr = buf;
     memcpy((void*)node, ptr, sizeof(BTreeNode<T>));
@@ -632,7 +632,7 @@ void BTree<T>::node_write(u_int64_t node_id, BTreeNode<T>* node){
     auto end = std::chrono::high_resolution_clock::now();
     flash_diff += end - start;
 
-    tmp_diff = 0;
+    tmp_diff = PAGE_SIZE;
 
     free(buf);
 }
