@@ -1188,7 +1188,7 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id
             return;
         }
         if(_k < key[i]){
-            op_size += tmp_diff;
+            trav_size += tmp_diff;
 
             if(!is_leaf){
                 BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
@@ -1204,7 +1204,7 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id
     }
 
     if(!is_leaf){
-        op_size += tmp_diff;
+        trav_size += tmp_diff;
 
         BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
         t->node_read(child_id[i], child);
