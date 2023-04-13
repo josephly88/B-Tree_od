@@ -2,7 +2,7 @@
 
 #include <stdexcept>
 
-BTree::BTree(const char* filename, bool create_new_tree) : fd_(-1), root_(0), tree_exist_(false), height_(0) {
+BTree::BTree(const char* filename, bool create_new_tree) :  root_(0), tree_exist_(false), height_(0), fd_(-1) {
     int flags = O_RDWR | O_DIRECT;
 
     fd_ = open(filename, flags, 0644);
@@ -264,6 +264,7 @@ int BTree::insert_non_full(BTreeNode& node, uint64_t key, const char* value) {
             split_child(node, i);
         }
 
+        // Seems Problematic
         write_node(child_node.id, child_node);
         return child_key_count;
     }
