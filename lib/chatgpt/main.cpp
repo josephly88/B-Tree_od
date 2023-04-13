@@ -15,9 +15,11 @@ int main() {
         std::memset(value, 0, sizeof(value));
         std::sprintf(value, "value%d", i);
         tree.insert(key, value);
+        
+        tree.print_btree();
+        std::cout << std::endl;
     }
 
-    tree.print_btree();
 
     return 0;
 }

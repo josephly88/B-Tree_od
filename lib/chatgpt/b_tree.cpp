@@ -82,6 +82,11 @@ void BTree::read_metadata() {
 }
 
 void BTree::write_node(int node_id, const BTreeNode& node) {
+    if (node_id <= 0) {
+        fprintf(stderr, "Error: write_node() received an invalid node_id.\n");
+        exit(EXIT_FAILURE);
+    }
+
     off_t offset = node_id * BLOCK_SIZE;
     ssize_t num_bytes = pwrite(fd_, &node, sizeof(BTreeNode), offset);
 
@@ -92,6 +97,11 @@ void BTree::write_node(int node_id, const BTreeNode& node) {
 }
 
 void BTree::read_node(int node_id, BTreeNode& node) const {
+    if (node_id <= 0) {
+        fprintf(stderr, "Error: read_node() received an invalid node_id.\n");
+        exit(EXIT_FAILURE);
+    }
+
     off_t offset = node_id * BLOCK_SIZE;
     ssize_t bytes_read = pread(fd_, &node, sizeof(BTreeNode), offset);
     
@@ -147,7 +157,8 @@ void BTree::print_node(const BTreeNode& node, int level) {
     std::cout << '[' << node.id << ']' << std::endl;
 
     // Print keys and child nodes
-    for(int key_index = 0; key_index < node.count; key_index++) {
+    int key_index;
+    for(key_index = 0; key_index < node.count; key_index++) {
         if(!node.leaf) {
             // Print child node
             BTreeNode child;
@@ -159,17 +170,16 @@ void BTree::print_node(const BTreeNode& node, int level) {
         for(int level_index = 0; level_index < level; level_index++) {
             std::cout << '\t';
         }
-        std::cout << node.keys[key_index] << "(" << node.values[key_index] << ")" << std::endl;
+        std::cout << node.keys[key_index] << " (" << node.values[key_index] << ")" << std::endl;
     }
 
     // Print last child node, if applicable
     if(!node.leaf) {
         BTreeNode child;
-        read_node(node.children[node.count], child);
+        read_node(node.children[key_index], child);
         print_node(child, level + 1);
     }
 }
-
 
 void BTree::insert(uint64_t key, const char* value) {
     // Check if fd_ is valid
@@ -219,9 +229,6 @@ void BTree::insert(uint64_t key, const char* value) {
 
         write_metadata();
     }
-
-    // Write the updated root node to disk
-    write_node(root_, root_node);
 }
 
 int BTree::insert_non_full(BTreeNode& node, uint64_t key, const char* value) {

@@ -17,6 +17,7 @@ all: $(EXEC)
 
 $(EXEC): $(OBJS)
 	$(CC) $(CFLAGS) $(OBJS) -o $(EXEC)
+	$(RM) $(OBJS)
 
 %.o: %.cpp b_tree.h
 	$(CC) $(CFLAGS) -c $< -o $@
