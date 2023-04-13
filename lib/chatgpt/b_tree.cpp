@@ -106,7 +106,6 @@ void BTree::read_node(int node_id, BTreeNode& node) const {
         fprintf(stderr, "Error: read_node() received an invalid node_id.\n");
         exit(EXIT_FAILURE);
     }
-
     off_t offset = node_id * BLOCK_SIZE;
     ssize_t bytes_read = pread(fd_, &node, sizeof(BTreeNode), offset);
     
