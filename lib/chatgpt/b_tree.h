@@ -7,9 +7,9 @@
 #include <unistd.h>
 #include <string.h>
 
-const int VALUE_SIZE = 104;
+const int VALUE_SIZE = 70;
 
-const int BLOCK_SIZE = 712;
+const int BLOCK_SIZE = 512;
 const int MAX_KEYS = (BLOCK_SIZE - sizeof(unsigned int) - sizeof(bool) - sizeof(int) - sizeof(uint32_t)) / (sizeof(uint64_t) + VALUE_SIZE + sizeof(uint32_t));
 const int MIN_KEYS = (MAX_KEYS + 1) / 2 - 1;
 const int MAX_CHILDREN = MAX_KEYS + 1;

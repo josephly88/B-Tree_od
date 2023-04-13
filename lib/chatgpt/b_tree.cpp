@@ -23,6 +23,8 @@ BTree::BTree(const char* filename, bool create_new_tree) :  root_(0), tree_exist
             exit(EXIT_FAILURE);
         }
     }
+
+    std::cout << "MAX_KEYS = " << MAX_KEYS << std::endl;
 }
 
 BTree::~BTree() {
