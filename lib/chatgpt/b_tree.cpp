@@ -12,10 +12,12 @@ BTree::BTree(const char* filename, bool create_new_tree) :  root_(0), tree_exist
     }
 
     if (create_new_tree) {
+        std::cout << "Creating new BTree." << std::endl;
         memset(bitmap_, 0, sizeof(bitmap_));
 
         write_metadata();
     } else {
+        std::cout << "Loading existing BTree." << std::endl;
         read_metadata();
 
         if (root_ == 0) {
@@ -25,6 +27,7 @@ BTree::BTree(const char* filename, bool create_new_tree) :  root_(0), tree_exist
     }
 
     std::cout << "MAX_KEYS = " << MAX_KEYS << std::endl;
+    std::cout << "----------------------------------------" << std::endl;
 }
 
 BTree::~BTree() {
@@ -214,7 +217,7 @@ void BTree::insert(uint64_t key, const char* value) {
     read_node(root_, root_node);
 
     // Call the recursive insert_non_full function to insert the key-value pair
-    root_node.count = insert_non_full(root_node, key, value);
+    insert_non_full(root_node, key, value);
 
     // If the root node is full, split it into two nodes and create a new root node
     if (root_node.count == MAX_KEYS) {
@@ -233,7 +236,7 @@ void BTree::insert(uint64_t key, const char* value) {
     }
 }
 
-int BTree::insert_non_full(BTreeNode& node, uint64_t key, const char* value) {
+void BTree::insert_non_full(BTreeNode& node, uint64_t key, const char* value) {
     int i = node.count - 1;
 
     if (node.leaf) {
@@ -247,7 +250,6 @@ int BTree::insert_non_full(BTreeNode& node, uint64_t key, const char* value) {
         strncpy(node.values[i+1], value, VALUE_SIZE);
         node.count++;
         write_node(node.id, node);
-        return node.count;
     }
     else {
         // Find the child node to insert the key
@@ -259,16 +261,12 @@ int BTree::insert_non_full(BTreeNode& node, uint64_t key, const char* value) {
         BTreeNode child_node;
         read_node(node.children[i], child_node);
 
-        int child_key_count = insert_non_full(child_node, key, value);
+        insert_non_full(child_node, key, value);
 
-        if (child_key_count == MAX_KEYS) {
+        if (child_node.count == MAX_KEYS) {
             // Split the child node if it is full
             split_child(node, i);
         }
-
-        // Seems Problematic
-        write_node(child_node.id, child_node);
-        return child_key_count;
     }
 }
 
@@ -292,6 +290,8 @@ void BTree::split_child(BTreeNode& parent, int i) {
         }
     }
 
+    write_node(right_child.id, right_child);
+
     // Update the child node's count and write it back to the disk
     child_node.count = MAX_KEYS - MIN_KEYS - 1;
     write_node(child_node.id, child_node);
@@ -311,8 +311,6 @@ void BTree::split_child(BTreeNode& parent, int i) {
     }
     parent.children[i+1] = right_child.id;
 
-    // Write the new child node and parent node to the disk
-    write_node(right_child.id, right_child);
     write_node(parent.id, parent);
 }
 

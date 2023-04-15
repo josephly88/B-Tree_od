@@ -59,7 +59,7 @@ private:
     void print_node(const BTreeNode& node, int level);
 
     // for insertion
-    int insert_non_full(BTreeNode& node, uint64_t key, const char* value);
+    void insert_non_full(BTreeNode& node, uint64_t key, const char* value);
     void split_child(BTreeNode& node, int child_index);
 
     int find_child(const BTreeNode& node, uint64_t key) const;
