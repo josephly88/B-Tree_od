@@ -54,6 +54,7 @@ private:
     void read_node(int node_id, BTreeNode& node) const;
     // Node usage bitmap I/O
     int allocate_node();
+    void deallocate_node(int node_id);
 
     // Verification
     void print_node(const BTreeNode& node, int level);

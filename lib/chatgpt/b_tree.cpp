@@ -144,6 +144,20 @@ int BTree::allocate_node() {
     throw std::runtime_error("Failed to allocate node");
 }
 
+void BTree::deallocate_node(int node_id) {
+    int bitmap_index = (node_id - 1) / 8;
+    int bit_index = (node_id - 1) % 8;
+
+    // Find the byte containing the bit to be cleared
+    uint8_t byte = bitmap_[bitmap_index];
+    // Clear the bit corresponding to the node_id
+    byte &= ~(1 << bit_index);
+    // Write the updated byte back to the bitmap
+    bitmap_[bitmap_index] = byte;
+    // Write the bitmap to disk
+    write_metadata();
+}
+
 void BTree::print_btree() {
     if(tree_exist_ == false) {
         std::cout << "Empty tree" << std::endl;
