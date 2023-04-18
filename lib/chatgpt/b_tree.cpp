@@ -186,6 +186,27 @@ void BTree::print_node(const BTreeNode& node, int level) {
     }
 }
 
+int BTree::binary_search(const uint64_t* arr, int low, int high, uint64_t key) {
+    int last_low = -1;
+    while (low <= high) {
+        int mid = (low + high) / 2;
+
+        if (arr[mid] == key) {
+            // Key already exists in the tree
+            return mid;
+        }
+        else if (key < arr[mid]) {
+            high = mid - 1;
+        }
+        else {
+            last_low = mid;
+            low = mid + 1;
+        }
+    }
+    // Key does not exist in the tree, return the index of predecessor
+    return last_low;
+}
+
 void BTree::insert(uint64_t key, const char* value) {
     // Check if fd_ is valid
     if (fd_ < 0) {
@@ -253,10 +274,7 @@ void BTree::insert_non_full(BTreeNode& node, uint64_t key, const char* value) {
     }
     else {
         // Find the child node to insert the key
-        while (i >= 0 && key < node.keys[i]) {
-            i--;
-        }
-        i++;
+        i = binary_search(node.keys, 0, node.count - 1, key) + 1;
 
         BTreeNode child_node;
         read_node(node.children[i], child_node);

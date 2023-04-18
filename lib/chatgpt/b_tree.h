@@ -58,6 +58,9 @@ private:
     // Verification
     void print_node(const BTreeNode& node, int level);
 
+    // Binary search
+    int binary_search(const uint64_t* arr, int low, int high, uint64_t key);
+
     // for insertion
     void insert_non_full(BTreeNode& node, uint64_t key, const char* value);
     void split_child(BTreeNode& node, int child_index);

@@ -7,7 +7,7 @@ int main() {
     BTree tree("my_tree.dat", true); // create a new tree
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_int_distribution<> distrib(1, 100);
+    std::uniform_int_distribution<> distrib(1, 1000);
 
     for (int i = 0; i < 30; i++) {
         int key = distrib(gen);
