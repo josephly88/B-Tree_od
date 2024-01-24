@@ -66,7 +66,7 @@ private:
     int binary_search(const uint64_t* arr, int low, int high, uint64_t key);
 
     // for insertion
-    void insert_non_full(BTreeNode& node, uint64_t key, const char* value);
+    void insert_recursive(BTreeNode& node, uint64_t key, const char* value);
     void split_child(BTreeNode& node, int child_index);
 
     int find_child(const BTreeNode& node, uint64_t key) const;

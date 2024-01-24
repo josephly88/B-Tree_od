@@ -251,8 +251,8 @@ void BTree::insert(uint64_t key, const char* value) {
     BTreeNode root_node;
     read_node(root_, root_node);
 
-    // Call the recursive insert_non_full function to insert the key-value pair
-    insert_non_full(root_node, key, value);
+    // Call the recursive insert function to insert the key-value pair
+    insert_recursive(root_node, key, value);
 
     // If the root node is full, split it into two nodes and create a new root node
     if (root_node.count == MAX_KEYS) {
@@ -271,7 +271,7 @@ void BTree::insert(uint64_t key, const char* value) {
     }
 }
 
-void BTree::insert_non_full(BTreeNode& node, uint64_t key, const char* value) {
+void BTree::insert_recursive(BTreeNode& node, uint64_t key, const char* value) {
     int i = node.count - 1;
 
     if (node.leaf) {
@@ -293,7 +293,7 @@ void BTree::insert_non_full(BTreeNode& node, uint64_t key, const char* value) {
         BTreeNode child_node;
         read_node(node.children[i], child_node);
 
-        insert_non_full(child_node, key, value);
+        insert_recursive(child_node, key, value);
 
         if (child_node.count == MAX_KEYS) {
             // Split the child node if it is full
