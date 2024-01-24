@@ -7,11 +7,14 @@
 #include <unistd.h>
 #include <string.h>
 
+// in byte
 const int VALUE_SIZE = 70;
-
+// in byte
 const int BLOCK_SIZE = 512;
-const int MAX_KEYS = (BLOCK_SIZE - sizeof(unsigned int) - sizeof(bool) - sizeof(int) - sizeof(uint32_t)) / (sizeof(uint64_t) + VALUE_SIZE + sizeof(uint32_t));
-const int MIN_KEYS = (MAX_KEYS + 1) / 2 - 1;
+// Excluding all KVs and child ptrs
+const int METADATA_BTreeNode = (int)(sizeof(unsigned int) + sizeof(bool) + sizeof(int));
+const int MAX_KEYS = (BLOCK_SIZE - METADATA_BTreeNode - sizeof(uint32_t)) / (sizeof(uint64_t) + VALUE_SIZE + sizeof(uint32_t));
+const int MIN_KEYS = (MAX_KEYS % 2 == 0) ? (MAX_KEYS / 2 - 1) : MAX_KEYS / 2;
 const int MAX_CHILDREN = MAX_KEYS + 1;
 const int MIN_CHILDREN = MIN_KEYS + 1;
 
