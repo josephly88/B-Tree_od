@@ -46,9 +46,10 @@ chrono::duration<double, micro> flash_diff;
 chrono::duration<double, micro> cmb_diff;
 
 size_t tmp_diff;
-size_t trav_size;
+size_t kv_size;
 size_t op_size;
 size_t cow_size;
+char structural_change;
 
 // B-Tree
 template <typename T> class BTree;
@@ -1188,8 +1189,6 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id
             return;
         }
         if(_k < key[i]){
-            trav_size += tmp_diff;
-
             if(!is_leaf){
                 BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
                 t->node_read(child_id[i], child);
@@ -1204,8 +1203,6 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id
     }
 
     if(!is_leaf){
-        trav_size += tmp_diff;
-
         BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
         t->node_read(child_id[i], child);
         child->search(t, _k, buf);
@@ -1313,8 +1310,6 @@ u_int64_t BTreeNode<T>::traverse_insert(BTree<T>* t, u_int64_t _k, T _v, removeL
         return direct_insert(t, _k, _v, list);
     }        
     else{
-        trav_size += tmp_diff;
-        
         int i;
         for(i = 0; i < num_key; i++){
             if(_k == key[i])
@@ -1341,8 +1336,9 @@ u_int64_t BTreeNode<T>::traverse_insert(BTree<T>* t, u_int64_t _k, T _v, removeL
             cow_size += tmp_diff;
         }
 
-        if(needsplit)
+        if(needsplit){
             node_id = split(t, child_id[i], node_id, list);
+        }
         else if(t->append_map && child->is_leaf){           
             if(t->cmb->get_num_key(child_id[i]) >= m)
                 node_id = split(t, child_id[i], node_id, list);
@@ -1442,6 +1438,7 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
     mylog << "split() - node id:" << spt_node_id << " parent node id:" << parent_id << endl;
 
     needsplit = false;
+    structural_change = 'T';
     
     BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
     t->node_read(spt_node_id, node);
@@ -1795,6 +1792,7 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
     }
 
     mylog << "rebalance() - node id:" << child_id[idx] << endl;
+    structural_change = 'T';
 
     BTreeNode<T>* left = new BTreeNode<T>(0, 0, 0);
     if(idx - 1 >= 0)
