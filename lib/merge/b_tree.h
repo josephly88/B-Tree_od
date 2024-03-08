@@ -742,8 +742,10 @@ void BTree<T>::inorder_traversal(char* filename){
         root->inorder_traversal(this, outFile);
         delete root;
     }
-    else
+    else{
+        ofstream outFile(filename);
         mylog << " The tree is empty! " << endl;
+    }
 }
 
 template <typename T>
@@ -1018,6 +1020,9 @@ void BTree<T>::deletion(u_int64_t _k){
 
         node_read(root_id, root);
         if(root->num_key == 0){
+            height--;
+            cout << endl << "Tree height => " << height << endl;
+
             if(cmb)
                 rmlist = new removeList(cmb->get_block_id(root_id), rmlist);
             else
