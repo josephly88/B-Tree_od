@@ -1016,6 +1016,7 @@ void BTree<T>::deletion(u_int64_t _k){
         if(root_id != dup_node_id){
             root_id = dup_node_id;
             tree_write(fd, this);
+            cow_size += tmp_diff;
         }            
 
         node_read(root_id, root);
@@ -1034,6 +1035,7 @@ void BTree<T>::deletion(u_int64_t _k){
                 root_id = root->child_id[0];
             }
             tree_write(fd, this);
+            op_size += tmp_diff; 
         } 
         
         if(rmlist){
@@ -1311,7 +1313,6 @@ u_int64_t BTreeNode<T>::traverse_insert(BTree<T>* t, u_int64_t _k, T _v, removeL
     mylog << "traverse_insert() - key:" << _k << endl;
     
     if(is_leaf){
-        op_size += tmp_diff;
         return direct_insert(t, _k, _v, list);
     }        
     else{
@@ -1447,14 +1448,12 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
     
     BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
     t->node_read(spt_node_id, node);
-    op_size += tmp_diff;
     if(t->append_map && node->is_leaf){
         t->append_map->reduction(t, spt_node_id, node);
     }
 
     BTreeNode<T>* parent = new BTreeNode<T>(0, 0, 0);
     t->node_read(parent_id, parent);  
-    op_size += tmp_diff;
 
     int new_node_id;
     if(t->cmb){
@@ -1603,6 +1602,7 @@ u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** 
                     node_id = t->get_free_block_id();
                 }
                 t->node_write(node_id, this);
+                op_size += tmp_diff;
                 i = i + 1;
             }
             else{
@@ -1635,6 +1635,7 @@ u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** 
                 }
 
                 t->node_write(node_id, this);
+                op_size += tmp_diff;
                 
                 delete pred;
             }
@@ -1661,6 +1662,7 @@ u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** 
                 *list = new removeList(node_id, *list);
                 node_id = t->get_free_block_id();
                 t->node_write(node_id, this);
+                cow_size += tmp_diff;
             }
 
             delete child;
@@ -1759,6 +1761,7 @@ u_int64_t BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** li
         }
 
         t->node_write(node_id, this);
+        op_size += tmp_diff;
     }
 
     if(t->leafCache && is_leaf && num_key >= min_num){
@@ -1829,6 +1832,7 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             if(idx == num_key) t->cmb->update_upper(node_id, key[num_key-1]);
 
             t->node_write(node_id, this);   
+            op_size += tmp_diff;
 
             // Append delete to left
             T empty;
@@ -1858,6 +1862,7 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             if(idx == num_key-1) t->cmb->update_upper(node_id, key[num_key-1]);
 
             t->node_write(node_id, this);  
+            op_size += tmp_diff;
 
             // Append delete to right
             T empty;
@@ -1894,12 +1899,14 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             t->cmb->update_upper(left->node_id, left->key[left->num_key-1]);
             t->append_map->delete_entries(t->cmb, left->node_id);
             t->node_write(left->node_id, left);
+            op_size += tmp_diff;
 
             node_id = direct_delete(t, key[idx], list);
             child_id[idx] = left->node_id;
             *list = new removeList(t->cmb->get_block_id(node_id), *list);
             t->cmb->update_node_id(node_id, t->get_free_block_id());
             t->node_write(node_id, this);
+            op_size += tmp_diff;
             
             *list = new removeList(t->cmb->get_block_id(right->node_id), *list);
             t->append_map->delete_entries(t->cmb, right->node_id);     
@@ -1961,6 +1968,7 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             }
 
             t->node_write(node_id, this);
+            op_size += tmp_diff;
         }
         else if(idx + 1 <= num_key && right->num_key > min_num){
             mylog << "borrow_from_right_sibling() - node id:" << child_id[idx] << endl;
@@ -1988,6 +1996,7 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             }
 
             t->node_write(node_id, this);       
+            op_size += tmp_diff;
         }   
         else{
             mylog << "merge() - node id:" << child_id[idx] << endl;
@@ -2024,6 +2033,7 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
                 left->node_id = t->get_free_block_id();
             }
             t->node_write(left->node_id, left);
+            op_size += tmp_diff;
                 // Delete the parent's kv
             node_id = direct_delete(t, key[idx], list);
             child_id[idx] = left->node_id;
@@ -2038,6 +2048,7 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             }
 
             t->node_write(node_id, this);
+            op_size += tmp_diff;
 
             if(t->cmb)
                 *list = new removeList(t->cmb->get_block_id(right->node_id), *list);

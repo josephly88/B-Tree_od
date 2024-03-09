@@ -40,7 +40,7 @@ int main(int argc, char** argv){
     MODE mode = COPY_ON_WRITE;
     bool lfcache = false;
     bool append = false;
-    bool size_breakdown = false;
+    bool writeSize = false;
 
     if(argc < 2){
         usage();
@@ -80,8 +80,8 @@ int main(int argc, char** argv){
             else if(strcmp(argv[i], "-append") == 0){
                 append = true;
             }
-            else if(strcmp(argv[i], "-breakdown") == 0){
-                size_breakdown = true;
+            else if(strcmp(argv[i], "-writesize") == 0){
+                writeSize = true;
             }
             else{
                 tree_file = argv[i];
@@ -165,7 +165,7 @@ int main(int argc, char** argv){
             flash_diff = chrono::microseconds{0};
             cmb_diff = chrono::microseconds{0};
 
-            if(size_breakdown){
+            if(writeSize){
                 tmp_diff = 0;
                 kv_size = 8 + 104;
                 op_size = 0;
@@ -181,7 +181,7 @@ int main(int argc, char** argv){
                 t->insertion(key, val);
                 auto end = std::chrono::high_resolution_clock::now();
                 chrono::duration<double, micro> diff = end - start;
-                if(!size_breakdown)
+                if(!writeSize)
                     op_file << "i\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << flash_diff.count() << "\t" << cmb_diff.count() << endl;
                 else
                     op_file << "i\t" << key << "\t" << val.str << "\t\t\t" << diff.count() << "\t" << kv_size << "\t" << op_size << "\t" << cow_size << "\t" << structural_change << endl;
@@ -196,7 +196,7 @@ int main(int argc, char** argv){
                 cout << " >> " << val.str;
                 mylog << " >> " << val.str << endl;
                 chrono::duration<double, micro> diff = end - start;
-                if(!size_breakdown)
+                if(!writeSize)
                     op_file << "r\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << flash_diff.count() << "\t" << cmb_diff.count() << endl;
                 else
                     op_file << "r\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << kv_size << "\t" << op_size << "\t" << cow_size << endl;
@@ -219,7 +219,7 @@ int main(int argc, char** argv){
                 t->deletion(key);
                 auto end = std::chrono::high_resolution_clock::now();
                 chrono::duration<double, micro> diff = end - start;
-                if(!size_breakdown)
+                if(!writeSize)
                     op_file << "d\t" << key << "\t" << diff.count() << "\t" << flash_diff.count() << "\t" << cmb_diff.count() << endl;
                 else
                     op_file << "i\t" << key << "\t\t\t" << diff.count() << "\t" << kv_size << "\t" << op_size << "\t" << cow_size << "\t" << structural_change << endl;

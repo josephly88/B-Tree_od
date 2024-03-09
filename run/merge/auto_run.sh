@@ -43,7 +43,7 @@ for m in "${mode[@]}"; do
             arg="-cmb -lfcache"
         elif [ $m = "Both" ]
         then
-            arg="-cmb -append -lfcache"
+            arg="-cmb -append"
         fi
 
         if [ $w = "micro_i" ]
