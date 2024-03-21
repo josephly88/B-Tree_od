@@ -6,12 +6,11 @@
 #define MAP_MASK                        (MAP_SIZE - 1)
 
 #define CMB_ADDR                        0xC0000000
-#define NUM_OF_CACHE                    50000
 #define NUM_OF_APPEND                   10
 
-#define START_ADDR                      0x00000040  // 64 B
+#define NEXT_FREE_NODE_ID_ADDR          0x00000000
 
-#define BLOCK_MAPPING_START_ADDR        START_ADDR
+#define BLOCK_MAPPING_START_ADDR        0x00000040   // 64B
 #define BLOCK_MAPPING_END_ADDR          0x004FFFFF   // 5 MB
 
 #define APPEND_OPR_START_ADDR           BLOCK_MAPPING_END_ADDR + 1

@@ -172,18 +172,12 @@ class CMB{
         // Meta data
         u_int64_t get_num_key(u_int64_t node_id);
         void update_num_key(u_int64_t node_id, u_int64_t value);
-        u_int64_t get_lower(u_int64_t node_id);
-        void update_lower(u_int64_t node_id, u_int64_t value);
-        u_int64_t get_upper(u_int64_t node_id);
-        void update_upper(u_int64_t node_id, u_int64_t value);
 };
 
 class BKMap{
     public:
         u_int64_t block_id;
         u_int64_t num_key;
-        u_int64_t lower;
-        u_int64_t upper;
 };
 
 template <typename T>
@@ -268,7 +262,7 @@ BTree<T>::BTree(char* filename, int degree, MODE _mode, bool append){
         // Map CMB
         cmb = new CMB(mode);    
         u_int64_t first_node_id = 1;
-        cmb->write(0, &first_node_id, sizeof(u_int64_t));
+        cmb->write(NEXT_FREE_NODE_ID_ADDR, &first_node_id, sizeof(u_int64_t));
 
         // Append entry Optimization
         if(append){
@@ -333,7 +327,6 @@ void BTree<T>::stat(){
 template <typename T>
 void BTree<T>::memory_map_addr(){
     cout << hex;
-    cout << "START_ADDR:\t\t\t0x" << START_ADDR << endl;
     cout << "BLOCK_MAPPING_START_ADDR:\t0x" << BLOCK_MAPPING_START_ADDR << endl;
     cout << "BLOCK_MAPPING_END_ADDR:\t\t0x" << BLOCK_MAPPING_END_ADDR << endl;
     cout << "APPEND_OPR_START_ADDR:\t\t0x" << APPEND_OPR_START_ADDR << endl;
@@ -1067,14 +1060,6 @@ u_int64_t BTreeNode<T>::direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeLis
     if(t->append_map && is_leaf){
         t->append_map->append_entry(t, node_id, I, _k, _v);
 
-        if(t->cmb->get_num_key(node_id) == 0){
-            t->cmb->update_lower(node_id, _k);
-            t->cmb->update_upper(node_id, _k);
-        }
-        else{
-            if(_k < t->cmb->get_lower(node_id)) t->cmb->update_lower(node_id, _k);
-            if(_k > t->cmb->get_upper(node_id)) t->cmb->update_upper(node_id, _k);
-        }
         u_int64_t num_k = t->cmb->get_num_key(node_id);
         t->cmb->update_num_key(node_id, num_k+1);
         if(num_k >= m) needsplit = true;
@@ -1109,8 +1094,6 @@ u_int64_t BTreeNode<T>::direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeLis
             *list = new removeList(t->cmb->get_block_id(node_id), *list);
             t->cmb->update_node_id(node_id, t->get_free_block_id());
             t->cmb->update_num_key(node_id, num_key);
-            t->cmb->update_lower(node_id, key[0]);
-            t->cmb->update_upper(node_id, key[num_key - 1]);
         }
         else{
             *list = new removeList(node_id, *list);
@@ -1164,12 +1147,9 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
         *list = new removeList(t->cmb->get_block_id(node->node_id), *list);
         
         t->cmb->update_num_key(new_node_id, new_node->num_key);
-        t->cmb->update_lower(new_node_id, new_node->key[0]);
-        t->cmb->update_upper(new_node_id, new_node->key[new_node->num_key-1]);
 
         t->cmb->update_node_id(node->node_id, t->get_free_block_id());
         t->cmb->update_num_key(node->node_id, min_num);
-        t->cmb->update_upper(node->node_id, node->key[min_num-1]);
         
         if(t->append_map && node->is_leaf){
             t->append_map->delete_entries(t->cmb, node->node_id);
@@ -1256,10 +1236,6 @@ u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** 
                 if(t->cmb){
                     *list = new removeList(t->cmb->get_block_id(node_id), *list);
                     t->cmb->update_node_id(node_id, t->get_free_block_id());
-                    if(i == 0) t->cmb->update_lower(node_id, key[0]);
-                    if(i == num_key-1) t->cmb->update_upper(node_id, key[num_key-1]);
-
-                    t->cmb->update_lower(succ_id, succ->key[1]);
                 }
                 else{
                     *list = new removeList(node_id, *list);
@@ -1288,10 +1264,6 @@ u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** 
                 if(t->cmb){
                     *list = new removeList(t->cmb->get_block_id(node_id), *list);
                     t->cmb->update_node_id(node_id, t->get_free_block_id());
-                    if(i == 0) t->cmb->update_lower(node_id, key[0]);
-                    if(i == num_key-1) t->cmb->update_upper(node_id, key[num_key-1]);
-
-                    t->cmb->update_upper(pred_id, pred->key[pred->num_key - 2]);
                 }
                 else{
                     *list = new removeList(node_id, *list);
@@ -1386,8 +1358,6 @@ u_int64_t BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** li
             *list = new removeList(t->cmb->get_block_id(node_id), *list);
             t->cmb->update_node_id(node_id, t->get_free_block_id());
             t->cmb->update_num_key(node_id, num_key);
-            if(idx == 0) t->cmb->update_lower(node_id, key[0]);
-            if(idx == num_key) t->cmb->update_upper(node_id, key[num_key - 1]);
         }
         else{
             *list = new removeList(node_id, *list);
@@ -1439,7 +1409,6 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             // Append insert to right
             t->append_map->append_entry(t, child_id[idx], I, key[idx-1], value[idx-1]);
             t->cmb->update_num_key(child_id[idx], t->cmb->get_num_key(child_id[idx]) + 1);
-            t->cmb->update_lower(child_id[idx], key[idx-1]);
 
             // Borrow from left to parent
             key[idx-1] = left->key[left->num_key - 1];
@@ -1447,8 +1416,6 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             
             *list = new removeList(t->cmb->get_block_id(node_id), *list);
             t->cmb->update_node_id(node_id, t->get_free_block_id());
-            if(idx - 1 == 0) t->cmb->update_lower(node_id, key[0]);
-            if(idx == num_key) t->cmb->update_upper(node_id, key[num_key-1]);
 
             t->node_write(node_id, this);   
             op_size += tmp_diff;
@@ -1459,7 +1426,6 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
 
             left->num_key -= 1;
             t->cmb->update_num_key(left->node_id, left->num_key);
-            t->cmb->update_upper(left->node_id, left->key[left->num_key-1]);             
         }
         else if(idx + 1 <= num_key && t->cmb->get_num_key(right->node_id) > min_num){
             mylog << "borrow_from_right_sibling() - node id:" << child_id[idx] << endl;
@@ -1469,7 +1435,6 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             // Append insert to left
             t->append_map->append_entry(t, child_id[idx], I, key[idx], value[idx]);
             t->cmb->update_num_key(child_id[idx], t->cmb->get_num_key(child_id[idx]) + 1);
-            t->cmb->update_upper(child_id[idx], key[idx]);
 
             // Borrow from right to parent
             key[idx] = right->key[0];
@@ -1477,8 +1442,6 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             
             *list = new removeList(t->cmb->get_block_id(node_id), *list);
             t->cmb->update_node_id(node_id, t->get_free_block_id());
-            if(idx == 0) t->cmb->update_lower(node_id, key[0]);
-            if(idx == num_key-1) t->cmb->update_upper(node_id, key[num_key-1]);
 
             t->node_write(node_id, this);  
             op_size += tmp_diff;
@@ -1489,7 +1452,6 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
 
             right->num_key -= 1;
             t->cmb->update_num_key(right->node_id, right->num_key);
-            t->cmb->update_lower(right->node_id, right->key[1]);          
         }
         else{
             mylog << "merge() - node id:" << child_id[idx] << endl;
@@ -1514,8 +1476,6 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             *list = new removeList(t->cmb->get_block_id(left->node_id), *list);
             t->cmb->update_node_id(left->node_id, t->get_free_block_id());
             t->cmb->update_num_key(left->node_id, left->num_key);
-            t->cmb->update_lower(left->node_id, left->key[0]);
-            t->cmb->update_upper(left->node_id, left->key[left->num_key-1]);
             t->append_map->delete_entries(t->cmb, left->node_id);
             t->node_write(left->node_id, left);
             op_size += tmp_diff;
@@ -1550,8 +1510,6 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             if(t->cmb){
                 *list = new removeList(t->cmb->get_block_id(node_id), *list);
                 t->cmb->update_node_id(node_id, t->get_free_block_id());
-                if(idx - 1 == 0) t->cmb->update_lower(node_id, key[0]);
-                if(idx == num_key) t->cmb->update_upper(node_id, key[num_key-1]);
             }
             else{
                 *list = new removeList(node_id, *list);
@@ -1578,8 +1536,6 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             if(t->cmb){
                 *list = new removeList(t->cmb->get_block_id(node_id), *list);
                 t->cmb->update_node_id(node_id, t->get_free_block_id());
-                if(idx == 0) t->cmb->update_lower(node_id, key[0]);
-                if(idx == num_key-1) t->cmb->update_upper(node_id, key[num_key-1]);
             }
             else{
                 *list = new removeList(node_id, *list);
@@ -1616,8 +1572,6 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
                 *list = new removeList(t->cmb->get_block_id(left->node_id), *list);
                 t->cmb->update_node_id(left->node_id, t->get_free_block_id());
                 t->cmb->update_num_key(left->node_id, left->num_key);
-                t->cmb->update_lower(left->node_id, left->key[0]);
-                t->cmb->update_upper(left->node_id, left->key[left->num_key-1]);
             }
             else{
                 *list = new removeList(left->node_id, *list);
@@ -1839,7 +1793,7 @@ u_int64_t CMB::get_new_node_id(){
     mylog << "get_new_node_id()" << endl;
 
     u_int64_t new_node_id;
-    read(&new_node_id, BLOCK_MAPPING_START_ADDR, sizeof(u_int64_t));
+    read(&new_node_id, NEXT_FREE_NODE_ID_ADDR, sizeof(u_int64_t));
 
     u_int64_t next_node_id = new_node_id + 1;
     if(next_node_id > (BLOCK_MAPPING_END_ADDR - BLOCK_MAPPING_START_ADDR) / sizeof(u_int64_t)){
@@ -1847,7 +1801,7 @@ u_int64_t CMB::get_new_node_id(){
         mylog << "CMB Block Mapping Limit Exceeded" << endl;
         exit(1);
     }
-    write(BLOCK_MAPPING_START_ADDR, &next_node_id, sizeof(u_int64_t));
+    write(NEXT_FREE_NODE_ID_ADDR, &next_node_id, sizeof(u_int64_t));
 
     return new_node_id;
 }
@@ -1900,62 +1854,6 @@ void CMB::update_num_key(u_int64_t node_id, u_int64_t value){
     mylog << "update_num_key() - node id:" << node_id << " value:" << value << endl;
     BKMap ref;
     off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.num_key - (char*)&ref);
-    if(addr > BLOCK_MAPPING_END_ADDR){
-        cout << "CMB Block Mapping Write Out of Range" << endl;
-        mylog << "CMB Block Mapping Write Out of Range" << endl;
-        exit(1);
-    }
-
-	write(addr, &value, sizeof(u_int64_t));
-}
-
-u_int64_t CMB::get_lower(u_int64_t node_id){
-    mylog << "get_lower() - node id:" << node_id << endl;
-    BKMap ref;
-    off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.lower - (char*)&ref);
-    if(addr > BLOCK_MAPPING_END_ADDR){
-        cout << "CMB Block Mapping Read Out of Range" << endl;
-        mylog << "CMB Block Mapping Read Out of Range" << endl;
-        exit(1);
-    }
-
-    u_int64_t readval;
-	read(&readval, addr, sizeof(u_int64_t));
-    return readval;
-}
-
-void CMB::update_lower(u_int64_t node_id, u_int64_t value){
-    mylog << "update_lower() - node id:" << node_id << " value:" << value << endl;
-    BKMap ref;
-    off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.lower - (char*)&ref);
-    if(addr > BLOCK_MAPPING_END_ADDR){
-        cout << "CMB Block Mapping Write Out of Range" << endl;
-        mylog << "CMB Block Mapping Write Out of Range" << endl;
-        exit(1);
-    }
-
-	write(addr, &value, sizeof(u_int64_t));
-}
-
-u_int64_t CMB::get_upper(u_int64_t node_id){
-    mylog << "get_upper() - node id:" << node_id << endl;
-    BKMap ref;
-    off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.upper - (char*)&ref);
-    if(addr > BLOCK_MAPPING_END_ADDR){
-        cout << "CMB Block Mapping Read Out of Range" << endl;
-        mylog << "CMB Block Mapping Read Out of Range" << endl;
-        exit(1);
-    }
-
-    u_int64_t readval;
-	read(&readval, addr, sizeof(u_int64_t));
-    return readval;
-}
-
-void CMB::update_upper(u_int64_t node_id, u_int64_t value){
-    mylog << "update_upper() - node id:" << node_id << " value:" << value << endl;
-    BKMap ref;
-    off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.upper - (char*)&ref);
     if(addr > BLOCK_MAPPING_END_ADDR){
         cout << "CMB Block Mapping Write Out of Range" << endl;
         mylog << "CMB Block Mapping Write Out of Range" << endl;
