@@ -38,9 +38,6 @@ ofstream mylog;
 
 bool needsplit;
 
-// ## Verification
-int HIT = 0;
-
 // Evaluation Break Down
 chrono::duration<double, micro> flash_diff;
 chrono::duration<double, micro> cmb_diff;
@@ -58,12 +55,6 @@ class removeList;
 // CMB
 class CMB;
 class BKMap;
-// Leaf Cache
-class LEAF_CACHE;
-class LRU_QUEUE;
-class LRU_QUEUE_ENTRY;
-class RBTree;
-class RBTreeNode;
 // Append operation
 template <typename T> class APPEND;
 class APPEND_ENTRY;
@@ -82,13 +73,12 @@ class BTree{
 		
 	public:
 	    CMB* cmb;
-        LEAF_CACHE* leafCache;
         APPEND<T>* append_map;
 
-		BTree(char* filename, int degree, MODE _mode, bool lfcache, bool append);
+		BTree(char* filename, int degree, MODE _mode, bool append);
 		~BTree();
 
-		void reopen(int _fd, MODE _mode, bool lfcache, bool append);
+		void reopen(int _fd, MODE _mode, bool append);
 
 		void stat();
         void memory_map_addr();
@@ -196,105 +186,6 @@ class BKMap{
         u_int64_t upper;
 };
 
-class LEAF_CACHE{
-    public:
-        LRU_QUEUE* LRU;
-        RBTree* RBTREE;
-        u_int64_t hit_lru_id;
-        u_int64_t hit_rb_id;
-
-        void rbtree_search_by_key(CMB* cmb, u_int64_t key);
-        void rbtree_search_by_node_id(CMB* cmb, u_int64_t node_id);
-        u_int64_t get_node_id(u_int64_t rb_id);
-        u_int64_t get_lru_id(u_int64_t rb_id);
-
-        void lru_enqueue(CMB* cmb, u_int64_t node_id);
-        void lru_dequeue(CMB* cmb);
-        void lru_remove(CMB* cmb, u_int64_t lru_id);
-        void lru_reenqueue(CMB* cmb, u_int64_t lru_id);
-};
-
-class LRU_QUEUE{
-    u_int64_t free_Stack_idx;
-    u_int64_t free_idx;
-    u_int64_t capacity;
-    u_int64_t num_of_cache;
-
-    public:
-        u_int64_t Q_front_idx;
-        u_int64_t Q_rear_idx;
-
-        LRU_QUEUE(CMB* cmb);
-
-        void stat(CMB* cmb);
-
-        bool full();
-
-        u_int64_t get_free_idx(CMB* cmb);
-        void free_push(CMB* cmb, u_int64_t idx);
-        u_int64_t free_pop(CMB* cmb);
-
-        u_int64_t enqueue(CMB* cmb, u_int64_t rbtree_id, u_int64_t node_id);
-        void dequeue(CMB* cmb);
-        void remove(CMB* cmb, u_int64_t lru_id);
-        void read(CMB* cmb, u_int64_t idx, LRU_QUEUE_ENTRY* buf);
-
-        u_int64_t get_rb_tree_id(CMB* cmb, u_int64_t idx);
-        void update_rb_tree_id(CMB* cmb, u_int64_t idx, u_int64_t rb_id);
-    };
-
-class LRU_QUEUE_ENTRY{
-    public:
-        u_int64_t RBTREE_idx;
-        u_int64_t node_id;
-        u_int64_t lastQ;
-        u_int64_t nextQ;
-};
-
-class RBTree{
-    u_int64_t root_idx;
-    u_int64_t capacity;
-    u_int64_t num_of_cache;
-
-    public:
-        RBTreeNode* pool;
-
-        RBTree();
-        ~RBTree();
-
-        u_int64_t insert(CMB* cmb, u_int64_t node_id, u_int64_t LRU_id);
-        void insertFix(u_int64_t idx, CMB* cmb);
-        void remove(CMB* cmb, u_int64_t rbtree_idx);
-        void removeFix(u_int64_t idx, u_int64_t parent_idx, CMB* cmb);
-        u_int64_t search_by_key(CMB* cmb, u_int64_t key);
-        u_int64_t search_by_node_id(CMB* cmb, u_int64_t node_id);
-
-        void stat(CMB* cmb);
-        void display(CMB* cmb);
-
-        void free_push(u_int64_t idx);
-        u_int64_t free_pop();
-
-        void leafRotation(u_int64_t x_idx);
-        void rightRotation(u_int64_t x_idx);
-
-        u_int64_t succesor(u_int64_t idx);
-};
-
-class RBTreeNode{
-    public:
-        u_int64_t node_id;
-        u_int64_t LRU_id;
-        u_int64_t left_child_idx;
-        u_int64_t right_child_idx;  
-        u_int64_t color;    // Red - 1, Black - 0
-        u_int64_t parent_idx;   
-
-        RBTreeNode(u_int64_t _node_id, u_int64_t LRU_id, u_int64_t _color, u_int64_t _parent_idx);   
-
-        void display(CMB* cmb, RBTreeNode* pool, u_int64_t idx, int level);
-};
-
 template <typename T>
 class APPEND{
     public:
@@ -342,7 +233,7 @@ class VALUE_POOL{
 };
 
 template <typename T>
-BTree<T>::BTree(char* filename, int degree, MODE _mode, bool lfcache, bool append){
+BTree<T>::BTree(char* filename, int degree, MODE _mode, bool append){
     mylog << "BTree()" << endl;
 
     if(degree > (int)((PAGE_SIZE - sizeof(BTreeNode<T>) - sizeof(u_int64_t)) / (sizeof(u_int64_t) + sizeof(T))) ){
@@ -357,7 +248,6 @@ BTree<T>::BTree(char* filename, int degree, MODE _mode, bool lfcache, bool appen
     block_cap = (block_size - sizeof(BTree)) * 8;
     root_id = 0;
     mode = _mode;
-    leafCache = NULL;
     append_map = NULL;
     height = 0;
     
@@ -380,15 +270,6 @@ BTree<T>::BTree(char* filename, int degree, MODE _mode, bool lfcache, bool appen
         u_int64_t first_node_id = 1;
         cmb->write(0, &first_node_id, sizeof(u_int64_t));
 
-        // Interval to Leaf Cache Optimization
-        if(lfcache){
-            leafCache = new LEAF_CACHE();
-            leafCache->LRU = new LRU_QUEUE(cmb);
-            leafCache->LRU->stat(cmb);
-            leafCache->RBTREE = new RBTree();
-            leafCache->RBTREE->stat(cmb);
-        }     
-
         // Append entry Optimization
         if(append){
             append_map = new APPEND<T>();
@@ -403,11 +284,6 @@ BTree<T>::~BTree(){
     mylog << "~BTree()" << endl;
     close(fd);
     if(cmb) delete cmb;
-    if(leafCache){
-        delete leafCache->LRU;
-        delete leafCache->RBTREE;
-        delete leafCache;
-    } 
     if(append_map){
         delete append_map->value_pool;
         delete append_map;
@@ -415,7 +291,7 @@ BTree<T>::~BTree(){
 }
 
 template <typename T>
-void BTree<T>::reopen(int _fd, MODE _mode, bool lfcache, bool append){
+void BTree<T>::reopen(int _fd, MODE _mode, bool append){
     mylog << "reopen()" << endl;
     fd = _fd;
     mode = _mode;
@@ -424,30 +300,6 @@ void BTree<T>::reopen(int _fd, MODE _mode, bool lfcache, bool append){
         cmb = NULL;
     else{
         cmb = new CMB(mode);
-        if(lfcache){
-            leafCache = new LEAF_CACHE();
-
-            off_t addr;
-
-            leafCache->LRU = (LRU_QUEUE*) malloc(sizeof(LRU_QUEUE));
-            addr = LRU_QUEUE_START_ADDR;
-            cmb->read(leafCache->LRU, addr, sizeof(LRU_QUEUE));
-
-            leafCache->RBTREE = new RBTree();
-
-            u_int64_t itr_idx = leafCache->LRU->Q_front_idx;
-            while(itr_idx){
-                LRU_QUEUE_ENTRY* buf = new LRU_QUEUE_ENTRY;
-                leafCache->LRU->read(cmb, itr_idx, buf);
-
-                u_int64_t rb_idx = leafCache->RBTREE->insert(cmb, buf->node_id, itr_idx);
-                addr = LRU_QUEUE_BASE_ADDR + itr_idx * sizeof(LRU_QUEUE_ENTRY) + ((char*)&buf->RBTREE_idx - (char*)buf);
-                cmb->write(addr, &rb_idx, sizeof(u_int64_t));
-
-                itr_idx = buf->nextQ;
-                delete buf;
-            }
-        }
 
         if(append){
             append_map = new APPEND<T>();
@@ -484,9 +336,6 @@ void BTree<T>::memory_map_addr(){
     cout << "START_ADDR:\t\t\t0x" << START_ADDR << endl;
     cout << "BLOCK_MAPPING_START_ADDR:\t0x" << BLOCK_MAPPING_START_ADDR << endl;
     cout << "BLOCK_MAPPING_END_ADDR:\t\t0x" << BLOCK_MAPPING_END_ADDR << endl;
-    cout << "LRU_QUEUE_START_ADDR:\t\t0x" << LRU_QUEUE_START_ADDR << endl;
-    cout << "LRU_QUEUE_BASE_ADDR:\t\t0x" << LRU_QUEUE_BASE_ADDR << endl;
-    cout << "LRU_QUEUE_END_ADDR:\t\t0x" << LRU_QUEUE_END_ADDR << endl;
     cout << "APPEND_OPR_START_ADDR:\t\t0x" << APPEND_OPR_START_ADDR << endl;
     cout << "APPEND_OPR_END_ADDR:\t\t0x" << APPEND_OPR_END_ADDR << endl;
     cout << "VALUE_POOL_START_ADDR:\t\t0x" << VALUE_POOL_START_ADDR << endl;
@@ -753,25 +602,6 @@ void BTree<T>::search(u_int64_t _k, T* buf){
     mylog << "search() - key:" << _k << endl;
 
     if(root_id){
-        // Interval to Leaf Optimization
-        if(leafCache){
-            leafCache->rbtree_search_by_key(cmb, _k);
-
-            if(leafCache->hit_rb_id != 0){
-                u_int64_t hit_node_id = leafCache->get_node_id(leafCache->hit_rb_id);
-                // Hit
-                // Remove the cache from the queue, then Read the value
-                // ##
-                HIT++;
-                BTreeNode<T>* leaf = new BTreeNode<T>(0, 0, 0);
-                node_read(hit_node_id, leaf);
-                leaf->search(this, _k, buf);
-                delete leaf;
-
-                return;
-            }
-        }
-
         BTreeNode<T>* root = new BTreeNode<T>(0, 0, 0);
         node_read(root_id, root);
         root->search(this, _k, buf);
@@ -787,35 +617,6 @@ void BTree<T>::update(u_int64_t _k, T _v){
 
     if(root_id){
         removeList* rmlist = NULL;
-
-        if(leafCache){
-            leafCache->rbtree_search_by_key(cmb, _k);
-
-            if(leafCache->hit_rb_id != 0){
-                u_int64_t hit_node_id = leafCache->get_node_id(leafCache->hit_rb_id);
-                // Hit
-                // Remove the cache from the queue, then Update the value 
-                // ##
-                HIT++;
-                BTreeNode<T>* leaf = new BTreeNode<T>(0, 0, 0);
-                node_read(hit_node_id, leaf);
-                leaf->update(this, _k, _v, &rmlist);
-                delete leaf;
-
-                if(rmlist){
-                    removeList* cur = rmlist;
-                    removeList* next = NULL;
-                    while(cur != NULL){
-                        next = cur->next;
-                        set_block_id(cur->id, false);
-                        delete cur;
-                        cur = next;
-                    }
-                }
-
-                return;
-            }
-        }
 
         BTreeNode<T>* root = new BTreeNode<T>(0, 0, 0);
         node_read(root_id, root);
@@ -853,37 +654,6 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
 
     if(root_id){
         removeList* rmlist = NULL;
-
-        if(leafCache){
-            leafCache->rbtree_search_by_key(cmb, _k);
-
-            if(leafCache->hit_rb_id != 0){
-                u_int64_t hit_node_id = leafCache->get_node_id(leafCache->hit_rb_id);
-
-                if(cmb->get_num_key(hit_node_id) < m - 1){
-                    //Hit and no split
-                    // ##
-                    HIT++;
-                    BTreeNode<T>* leaf = new BTreeNode<T>(0, 0, 0);
-                    node_read(hit_node_id, leaf);
-                    leaf->direct_insert(this, _k, _v, &rmlist, 0, 0);
-                    delete leaf;
-
-                    if(rmlist){
-                        removeList* cur = rmlist;
-                        removeList* next = NULL;
-                        while(cur != NULL){
-                            next = cur->next;
-                            set_block_id(cur->id, false);
-                            delete cur;
-                            cur = next;
-                        }
-                    }
-
-                    return;
-                }
-            }
-        }
 
         BTreeNode<T>* root = new BTreeNode<T>(0, 0, 0);
         node_read(root_id, root);
@@ -972,37 +742,6 @@ void BTree<T>::deletion(u_int64_t _k){
 
     if(root_id){
         removeList* rmlist = NULL;
-
-        if(leafCache){
-            leafCache->rbtree_search_by_key(cmb, _k);
-
-            if(leafCache->hit_rb_id != 0){
-                u_int64_t hit_node_id = leafCache->get_node_id(leafCache->hit_rb_id);
-
-                if(cmb->get_num_key(hit_node_id) > min_num){
-                    //Hit and no merge
-                    // ##
-                    HIT++;
-                    BTreeNode<T>* leaf = new BTreeNode<T>(0, 0, 0);
-                    node_read(hit_node_id, leaf);
-                    leaf->direct_delete(this, _k, &rmlist);
-                    delete leaf;
-
-                    if(rmlist){
-                        removeList* cur = rmlist;
-                        removeList* next = NULL;
-                        while(cur != NULL){
-                            next = cur->next;
-                            set_block_id(cur->id, false);
-                            delete cur;
-                            cur = next;
-                        }
-                    }
-
-                    return;
-                }
-            }
-        }
 
         BTreeNode<T>* root = new BTreeNode<T>(0, 0, 0);
         node_read(root_id, root);
@@ -1162,15 +901,6 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id
             T ret_val = t->append_map->get_value(t->cmb, node_id, entry_idx);
             memcpy(buf, &ret_val, sizeof(T));
 
-            if(t->leafCache && is_leaf){
-                if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == node_id){
-                    t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
-                }
-                else{
-                    t->leafCache->lru_enqueue(t->cmb, node_id);
-                }
-            } 
-
             return;
         }
     }
@@ -1182,16 +912,6 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id
 
             // Key match
             memcpy(buf, &value[i], sizeof(T));
-
-            // Add to the leaf interval cache
-            if(t->leafCache && is_leaf){
-                if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == node_id){
-                    t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
-                }
-                else{
-                    t->leafCache->lru_enqueue(t->cmb, node_id);
-                }
-            }                
 
             return;
         }
@@ -1231,16 +951,6 @@ u_int64_t BTreeNode<T>::update(BTree<T>* t, u_int64_t _k, T _v, removeList** lis
                 t->append_map->append_entry(t, node_id, U, _k, _v);
             }
 
-            // Add to the leaf interval cache
-            if(t->leafCache && is_leaf){
-                if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == node_id){
-                    t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
-                }
-                else{
-                    t->leafCache->lru_enqueue(t->cmb, node_id);
-                }
-            }    
-
             return node_id;                
         } 
     }
@@ -1265,16 +975,6 @@ u_int64_t BTreeNode<T>::update(BTree<T>* t, u_int64_t _k, T _v, removeList** lis
 
                 t->node_write(node_id, this);
             }
-
-            // Add to the leaf interval cache
-            if(t->leafCache && is_leaf){
-                if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == node_id){
-                    t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
-                }
-                else{
-                    t->leafCache->lru_enqueue(t->cmb, node_id);
-                }
-            }                
 
             return node_id;
         }
@@ -1421,21 +1121,6 @@ u_int64_t BTreeNode<T>::direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeLis
         op_size += tmp_diff;
     }
 
-    if(t->leafCache && is_leaf && num_key <= m - 1 && t->cmb->get_num_key(node_id) <= m - 1){
-        if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == node_id){
-            t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
-        }
-        else{
-            t->leafCache->rbtree_search_by_node_id(t->cmb, node_id);
-            if(t->leafCache->hit_lru_id != 0){
-                t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
-            }
-            else{
-                t->leafCache->lru_enqueue(t->cmb, node_id);
-            }
-        }
-    }
-
     return node_id;
 }
 
@@ -1506,27 +1191,6 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
     op_size += tmp_diff;
     t->node_write(new_node_id, new_node);
     op_size += tmp_diff;
-
-    // Update or Create a new cache for node
-    if(t->leafCache && node->is_leaf && node->num_key <= m - 1){
-        if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == node_id){
-            t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
-        }
-        else{
-            t->leafCache->rbtree_search_by_node_id(t->cmb, node->node_id);
-            if(t->leafCache->hit_lru_id != 0){
-                t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
-            }
-            else{
-                t->leafCache->lru_enqueue(t->cmb, node->node_id);
-            }
-        }
-    }
-
-    // Update or Create a new cache for new node
-    if(t->leafCache && new_node->is_leaf && new_node->num_key <= m - 1){
-        t->leafCache->lru_enqueue(t->cmb, new_node->node_id);
-    }
 
     delete node;
     delete parent;
@@ -1686,21 +1350,6 @@ u_int64_t BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** li
                 t->cmb->update_num_key(node_id, t->cmb->get_num_key(node_id) - 1);                
             }
 
-            if(t->leafCache && is_leaf && t->cmb->get_num_key(node_id) >= min_num){
-                if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == node_id){
-                    t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
-                }
-                else{
-                    t->leafCache->rbtree_search_by_node_id(t->cmb, node_id);
-                    if(t->leafCache->hit_lru_id != 0){
-                        t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
-                    }
-                    else{
-                        t->leafCache->lru_enqueue(t->cmb, node_id);
-                    }
-                }
-            }
-            
             return node_id;
         }        
     }
@@ -1713,21 +1362,6 @@ u_int64_t BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** li
     
     if(i == num_key){
         mylog << "~~Key not found~~" << endl;
-
-        if(t->leafCache && is_leaf && num_key >= min_num){
-            if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == node_id){
-                t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
-            }
-            else{
-                t->leafCache->rbtree_search_by_node_id(t->cmb, node_id);
-                if(t->leafCache->hit_lru_id != 0){
-                    t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
-                }
-                else{
-                    t->leafCache->lru_enqueue(t->cmb, node_id);
-                }
-            }
-        }
 
         return 0;
     } 
@@ -1762,21 +1396,6 @@ u_int64_t BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** li
 
         t->node_write(node_id, this);
         op_size += tmp_diff;
-    }
-
-    if(t->leafCache && is_leaf && num_key >= min_num){
-        if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == node_id){
-            t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
-        }
-        else{
-            t->leafCache->rbtree_search_by_node_id(t->cmb, node_id);
-            if(t->leafCache->hit_lru_id != 0){
-                t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
-            }
-            else{
-                t->leafCache->lru_enqueue(t->cmb, node_id);
-            }
-        }
     }
 
     return node_id;
@@ -1911,34 +1530,6 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             *list = new removeList(t->cmb->get_block_id(right->node_id), *list);
             t->append_map->delete_entries(t->cmb, right->node_id);     
 
-            // Remove the leaf cache of right if it is in the queue
-            if(t->leafCache && right->is_leaf){
-                if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == right->node_id){
-                    t->leafCache->lru_remove(t->cmb, t->leafCache->hit_lru_id);
-                }
-                else{
-                    t->leafCache->rbtree_search_by_node_id(t->cmb, right->node_id);
-                    if(t->leafCache->hit_lru_id != 0){
-                        t->leafCache->lru_remove(t->cmb, t->leafCache->hit_lru_id);
-                    }
-                }
-            }
-
-            // Update or Create a new cache for left
-            if(t->leafCache && left->is_leaf && left->num_key >= min_num){
-                if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == left->node_id){
-                    t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
-                }
-                else{
-                    t->leafCache->rbtree_search_by_node_id(t->cmb, left->node_id);
-                    if(t->leafCache->hit_lru_id != 0){
-                        t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
-                    }
-                    else{
-                        t->leafCache->lru_enqueue(t->cmb, left->node_id);
-                    }
-                }
-            }
         }
     }
     else{
@@ -2054,35 +1645,6 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
                 *list = new removeList(t->cmb->get_block_id(right->node_id), *list);
             else
                 *list = new removeList(right->node_id, *list);
-
-            // Remove the leaf cache of right if it is in the queue
-            if(t->leafCache && right->is_leaf){
-                if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == right->node_id){
-                    t->leafCache->lru_remove(t->cmb, t->leafCache->hit_lru_id);
-                }
-                else{
-                    t->leafCache->rbtree_search_by_node_id(t->cmb, right->node_id);
-                    if(t->leafCache->hit_lru_id != 0){
-                        t->leafCache->lru_remove(t->cmb, t->leafCache->hit_lru_id);
-                    }
-                }
-            }
-
-            // Update or Create a new cache for left
-            if(t->leafCache && left->is_leaf && left->num_key >= min_num){
-                if(t->leafCache->hit_rb_id != 0 && t->leafCache->get_node_id(t->leafCache->hit_rb_id) == left->node_id){
-                    t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
-                }
-                else{
-                    t->leafCache->rbtree_search_by_node_id(t->cmb, left->node_id);
-                    if(t->leafCache->hit_lru_id != 0){
-                        t->leafCache->lru_reenqueue(t->cmb, t->leafCache->hit_lru_id);
-                    }
-                    else{
-                        t->leafCache->lru_enqueue(t->cmb, left->node_id);
-                    }
-                }
-            }
         }
     }
 
@@ -2401,923 +1963,6 @@ void CMB::update_upper(u_int64_t node_id, u_int64_t value){
     }
 
 	write(addr, &value, sizeof(u_int64_t));
-}
-
-void LEAF_CACHE::rbtree_search_by_key(CMB* cmb, u_int64_t key){
-    hit_lru_id = 0;
-    hit_rb_id = 0;
-    
-    hit_rb_id = RBTREE->search_by_key(cmb, key);
-    if(hit_rb_id) hit_lru_id = get_lru_id(hit_rb_id);
-        
-}
-
-void LEAF_CACHE::rbtree_search_by_node_id(CMB* cmb, u_int64_t node_id){
-    hit_lru_id = 0;
-    hit_rb_id = 0;
-
-    hit_rb_id = RBTREE->search_by_node_id(cmb, node_id);
-    if(hit_rb_id) hit_lru_id = get_lru_id(hit_rb_id);
-}
-
-u_int64_t LEAF_CACHE::get_node_id(u_int64_t rb_id){
-    return RBTREE->pool[rb_id].node_id;
-}
-
-u_int64_t LEAF_CACHE::get_lru_id(u_int64_t rb_id){
-    return RBTREE->pool[rb_id].LRU_id;
-}
-
-void LEAF_CACHE::lru_enqueue(CMB* cmb, u_int64_t node_id){
-    mylog << "LEAF_CACHE::lru_enqueue() - node_id = " << node_id << endl;
-    if(LRU->full()){
-        lru_dequeue(cmb);
-    }
-    u_int64_t lru_id = LRU->enqueue(cmb, 0, node_id);
-    u_int64_t rb_id = RBTREE->insert(cmb, node_id, lru_id);
-    LRU->update_rb_tree_id(cmb, lru_id, rb_id);
-}
-
-void LEAF_CACHE::lru_dequeue(CMB* cmb){
-    mylog << "LEAF_CACHE::lru_dequeue()" << endl;
-    u_int64_t rb_id = LRU->get_rb_tree_id(cmb, LRU->Q_front_idx);
-    LRU->dequeue(cmb);
-    RBTREE->remove(cmb, rb_id);
-}
-
-void LEAF_CACHE::lru_remove(CMB* cmb, u_int64_t lru_id){
-    mylog << "LEAF_CACHE::lru_remove() - lru_id = " << lru_id << endl;
-    u_int64_t rb_id = LRU->get_rb_tree_id(cmb, lru_id);
-    LRU->remove(cmb, lru_id);
-    RBTREE->remove(cmb, rb_id);
-}
-
-void LEAF_CACHE::lru_reenqueue(CMB* cmb, u_int64_t lru_id){
-    mylog << "LEAF_CACHE::lru_reenqueue() - lru_id = " << lru_id << endl;
-    LRU_QUEUE_ENTRY* buf = new LRU_QUEUE_ENTRY;
-
-    LRU->read(cmb, lru_id, buf);
-    LRU->remove(cmb, lru_id);
-    u_int64_t new_id = LRU->enqueue(cmb, buf->RBTREE_idx, buf->node_id);
-    if(new_id != lru_id)
-        RBTREE->pool[buf->RBTREE_idx].LRU_id = new_id;
-
-    delete buf;
-}
-
-LRU_QUEUE::LRU_QUEUE(CMB* cmb){
-    mylog << "LRU_QUEUE()" << endl;
-    Q_front_idx = 0;
-    Q_rear_idx = 0;
-    free_Stack_idx = 0;
-    free_idx = 1;
-    capacity = ((LRU_QUEUE_END_ADDR - LRU_QUEUE_BASE_ADDR) / sizeof(LRU_QUEUE_ENTRY)) - 1;
-    num_of_cache = 0;
-
-    off_t addr = LRU_QUEUE_START_ADDR;
-
-    cmb->write(addr, this, sizeof(LRU_QUEUE));
-}
-
-void LRU_QUEUE::stat(CMB* cmb){
-    LRU_QUEUE* meta = (LRU_QUEUE*) malloc(sizeof(LRU_QUEUE));
-
-    off_t addr = LRU_QUEUE_START_ADDR;
-    cmb->read(meta, addr, sizeof(LRU_QUEUE));
-
-    cout << "LRU_QUEUE: stat()" << endl;
-    cout << "Q_front_idx = " << meta->Q_front_idx << endl;
-    cout << "Q_rear_idx = " << meta->Q_rear_idx << endl;
-    cout << "free_Stack_idx = " << meta->free_Stack_idx << endl;
-    cout << "free_idx = " << meta->free_idx << endl;
-    cout << "capacity = " << meta->capacity << endl;
-    cout << "num_of_cache = " << meta->num_of_cache << endl;
-
-    int num = 0;
-    u_int64_t cur_idx = meta->Q_front_idx;
-    cout << "< [LRU_ID] RBTree_ID -> Node_ID : Lower-Upper >" << endl;
-    while(cur_idx){
-        num++;
-        off_t addr = LRU_QUEUE_BASE_ADDR + cur_idx * sizeof(LRU_QUEUE_ENTRY);
-        LRU_QUEUE_ENTRY* entry = new LRU_QUEUE_ENTRY();
-        read(cmb, cur_idx, entry);
-
-        cout << "<" << "(" << num << ".)"<< "[" << cur_idx << "] " << entry->RBTREE_idx << "->" << entry->node_id << ": " << cmb->get_lower(entry->node_id) << "-" << cmb->get_upper(entry->node_id) << " > - ";
-
-        cur_idx = entry->nextQ;
-        delete entry;
-    }
-    cout << endl;
-
-    free(meta);
-}
-
-bool LRU_QUEUE::full(){
-    mylog << "LRU_QUEUE::full(): " << num_of_cache << "/" << capacity << endl;
-    if(num_of_cache >= capacity)
-        return true;
-    return false;
-}
-
-u_int64_t LRU_QUEUE::get_free_idx(CMB* cmb){
-    mylog << "LRU_QUEUE::get_free_idx()" << endl;
-    // If the stack is empty
-    if(free_Stack_idx == 0){
-        off_t ret_idx = free_idx;
-        free_idx++;
-
-        // Write the new free_idx back
-        off_t addr = LRU_QUEUE_START_ADDR + ((char*) &free_idx - (char*) this);
-        cmb->write(addr, &free_idx, sizeof(u_int64_t));
-
-        return ret_idx;
-    }
-    else
-        return free_pop(cmb);
-}
-
-void LRU_QUEUE::free_push(CMB* cmb, u_int64_t idx){
-    mylog << "LRU_QUEUE::free_push(): idx = " << idx << endl;
-    // Set the new head->next as the current head idx
-    off_t addr = LRU_QUEUE_BASE_ADDR + idx * sizeof(LRU_QUEUE_ENTRY);
-    if(addr >= LRU_QUEUE_END_ADDR){
-        cout << "Leaf Cache Limit Exceed" << endl;
-        mylog << "Leaf Cache Limit Exceed" << endl;
-        exit(1);
-    }
-    cmb->write(addr, &free_Stack_idx, sizeof(u_int64_t));
-
-    // Set the stack head to the new head
-    addr = LRU_QUEUE_START_ADDR + ((char*)&free_Stack_idx - (char*)this);
-    cmb->write(addr, &idx, sizeof(u_int64_t)); 
-
-    free_Stack_idx = idx;
-}
-
-u_int64_t LRU_QUEUE::free_pop(CMB* cmb){
-    mylog << "LRU_QUEUE::free_pop()" << endl;
-    u_int64_t ret, next;
-
-    if(free_Stack_idx == 0)
-        return 0;
-
-    // Return value would be the stack head
-    ret = free_Stack_idx;
-    
-    // Read the new stack head from the head idx
-    off_t addr = LRU_QUEUE_BASE_ADDR + free_Stack_idx * sizeof(LRU_QUEUE_ENTRY);
-    if(addr >= LRU_QUEUE_END_ADDR){
-        cout << "Leaf Cache Limit Excced" << endl;
-        mylog << "Leaf Cache Limit Excced" << endl;
-        exit(1);
-    }
-    cmb->read(&next, addr, sizeof(u_int64_t));
-
-    // Write the new stack head back
-    free_Stack_idx = next;
-
-    addr = LRU_QUEUE_START_ADDR + ((char*)&free_Stack_idx - (char*)this);
-    cmb->write(addr, &free_Stack_idx, sizeof(u_int64_t));
-
-    return ret;
-}
-
-u_int64_t LRU_QUEUE::enqueue(CMB* cmb, u_int64_t rbtree_id, u_int64_t node_id){
-    mylog << "LRU::enqueue() : " << "rbtree_id = " << rbtree_id << " node_id = " << node_id << endl;
-    if(full()){
-        cout << "LRU::enqueue() FAIL: Queue full" << endl;
-        mylog << "LRU::enqueue() FAIL: Queue full" << endl;
-        exit(1);
-    }
-    
-    // Get the new idx
-    u_int64_t new_idx = get_free_idx(cmb);
-
-    // Write the cache to the CMB
-    LRU_QUEUE_ENTRY* new_cache = new LRU_QUEUE_ENTRY();
-    
-    new_cache->RBTREE_idx = rbtree_id;
-    new_cache->node_id = node_id;
-    new_cache->lastQ = Q_rear_idx;
-    new_cache->nextQ = 0;
-
-    off_t addr = LRU_QUEUE_BASE_ADDR + new_idx * sizeof(LRU_QUEUE_ENTRY);
-    if(addr >= LRU_QUEUE_END_ADDR){
-        cout << "Leaf Cache Limit Excced" << endl;
-        mylog << "Leaf Cache Limit Excced" << endl;
-        exit(1);
-    }
-    cmb->write(addr, new_cache, sizeof(LRU_QUEUE_ENTRY));
-
-    // Set the old rear->next to new cache
-    if(Q_rear_idx != 0){
-        addr = LRU_QUEUE_BASE_ADDR + Q_rear_idx * sizeof(LRU_QUEUE_ENTRY) + ((char*)&(new_cache->nextQ) - (char*)new_cache);
-        if(addr >= LRU_QUEUE_END_ADDR){
-            cout << "Leaf Cache Limit Excced" << endl;
-            mylog << "Leaf Cache Limit Excced" << endl;
-            exit(1);
-        }
-        cmb->write(addr, &new_idx, sizeof(u_int64_t));
-    }
-
-    // Set the rear idx to the new cache idx
-    // If front == 0 which means the queue is empty, set the front as well
-    addr = LRU_QUEUE_START_ADDR + ((char*)&Q_rear_idx - (char*)this);
-    if(addr >= LRU_QUEUE_END_ADDR){
-        cout << "Leaf Cache Limit Excced" << endl;
-        mylog << "Leaf Cache Limit Excced" << endl;
-        exit(1);
-    }
-    cmb->write(addr, &new_idx, sizeof(u_int64_t));
-    Q_rear_idx = new_idx;
-
-    if(Q_front_idx == 0){
-        addr = LRU_QUEUE_START_ADDR + ((char*)&Q_front_idx - (char*)this);
-        if(addr >= LRU_QUEUE_END_ADDR){
-            cout << "Leaf Cache Limit Excced" << endl;
-            mylog << "Leaf Cache Limit Excced" << endl;
-            exit(1);
-        }
-        cmb->write(addr, &new_idx, sizeof(u_int64_t));
-        Q_front_idx = new_idx;
-    }
-
-    num_of_cache++;
-    addr = LRU_QUEUE_START_ADDR + ((char*) &num_of_cache - (char*) this);
-    cmb->write(addr, &num_of_cache, sizeof(u_int64_t));
-
-    delete new_cache;
-
-    return new_idx;
-}
-
-void LRU_QUEUE::dequeue(CMB* cmb){
-    mylog << "LRU::dequeue()" << endl;
-    if(Q_front_idx == 0)
-        return;
-
-    u_int64_t del_idx = Q_front_idx;
-
-    // Read the second idx
-    LRU_QUEUE_ENTRY* buf = new LRU_QUEUE_ENTRY();
-    off_t addr = LRU_QUEUE_BASE_ADDR + Q_front_idx * sizeof(LRU_QUEUE_ENTRY);
-    cmb->read(buf, addr, sizeof(LRU_QUEUE_ENTRY));
-
-    // Set the front to the second idx
-    addr = LRU_QUEUE_START_ADDR + ((char*) &Q_front_idx - (char*)this);
-    cmb->write(addr, &(buf->nextQ), sizeof(u_int64_t));
-    Q_front_idx = buf->nextQ;
-
-    // If the Q_front_idx == 0, which means the queue is empty, set the rear to 0 as well
-    if(Q_front_idx == 0){
-        addr = LRU_QUEUE_START_ADDR + ((char*) &Q_rear_idx - (char*)this);
-        cmb->write(addr, &Q_front_idx, sizeof(u_int64_t));
-        Q_rear_idx = 0;
-    }
-    else{
-        // Set front->lastQ to 0
-        u_int64_t zero = 0;
-        addr = LRU_QUEUE_BASE_ADDR + Q_front_idx * sizeof(LRU_QUEUE_ENTRY) + ((char*)&(buf->lastQ) - (char*)buf);
-        cmb->write(addr, &zero, sizeof(u_int64_t));
-    }
-
-    // return the free cache slot to free stack
-    free_push(cmb, del_idx);
-
-    num_of_cache--;
-    addr = LRU_QUEUE_START_ADDR + ((char*) &num_of_cache - (char*) this);
-    cmb->write(addr, &num_of_cache, sizeof(u_int64_t));
-
-    delete buf;
-}
-
-void LRU_QUEUE::remove(CMB* cmb, u_int64_t lru_id){
-    mylog << "LRU::remove(): lru_id = " << lru_id << endl;
-    if(lru_id == 0) return;
-
-    off_t addr;
-    u_int64_t zero = 0;
-
-    LRU_QUEUE_ENTRY* buf = new LRU_QUEUE_ENTRY();
-    read(cmb, lru_id, buf);
-
-    if(Q_front_idx != lru_id){
-        // Set the last->next = cur->next
-        addr = LRU_QUEUE_BASE_ADDR + buf->lastQ * sizeof(LRU_QUEUE_ENTRY) + ((char*)&(buf->nextQ) - (char*)buf);
-        cmb->write(addr, &(buf->nextQ), sizeof(u_int64_t));
-    }
-    else{
-        // Set the front = cur->next
-        addr = LRU_QUEUE_START_ADDR + ((char*)&Q_front_idx - (char*)this);
-        cmb->write(addr, &(buf->nextQ), sizeof(u_int64_t));
-        Q_front_idx = buf->nextQ;
-    }
-
-    if(Q_rear_idx != lru_id){
-        // Set the next->last = cur->last
-        addr = LRU_QUEUE_BASE_ADDR + buf->nextQ * sizeof(LRU_QUEUE_ENTRY) + ((char*)&(buf->lastQ) - (char*)buf);
-        cmb->write(addr, &(buf->lastQ), sizeof(u_int64_t));
-    }
-    else{
-        // Set the rear = cur->last
-        addr = LRU_QUEUE_START_ADDR + ((char*)&Q_rear_idx - (char*)this);
-        cmb->write(addr, &(buf->lastQ), sizeof(u_int64_t));
-        Q_rear_idx = buf->lastQ;
-    }
-
-    free_push(cmb, lru_id);
-
-    num_of_cache--;
-    addr = LRU_QUEUE_START_ADDR + ((char*) &num_of_cache - (char*) this);
-    cmb->write(addr, &num_of_cache, sizeof(u_int64_t));
-
-    delete buf;
-}
-
-void LRU_QUEUE::read(CMB* cmb, u_int64_t idx, LRU_QUEUE_ENTRY* buf){
-    mylog << "LRU_QUEUE::read(): idx = " << idx << endl;
-    off_t addr = LRU_QUEUE_BASE_ADDR + idx * sizeof(LRU_QUEUE_ENTRY);
-    if(addr >= LRU_QUEUE_END_ADDR){
-        cout << "Leaf Cache Limit Excced" << endl;
-        mylog << "Leaf Cache Limit Excced" << endl;
-        exit(1);
-    }
-    cmb->read(buf, addr, sizeof(LRU_QUEUE_ENTRY));
-}
-
-u_int64_t LRU_QUEUE::get_rb_tree_id(CMB* cmb, u_int64_t idx){
-    mylog << "LRU_QUEUE::get_rb_tree_id(): idx = " << idx << endl;
-    LRU_QUEUE_ENTRY* ref = new LRU_QUEUE_ENTRY();
-    u_int64_t rb_id;
-
-    off_t addr = LRU_QUEUE_BASE_ADDR + idx * sizeof(LRU_QUEUE_ENTRY) + ((char*)&ref->RBTREE_idx - (char*)ref);
-    if(addr >= LRU_QUEUE_END_ADDR){
-        cout << "Leaf Cache Limit Excced" << endl;
-        mylog << "Leaf Cache Limit Excced" << endl;
-        exit(1);
-    }
-    cmb->read(&rb_id, addr, sizeof(u_int64_t));
-
-    delete ref;
-
-    return rb_id;
-}
-
-void LRU_QUEUE::update_rb_tree_id(CMB* cmb, u_int64_t idx, u_int64_t rb_id){
-    mylog << "LRU_QUEUE::update_rb_tree_id(): idx = " << idx << " rb_id = " << rb_id << endl;
-    LRU_QUEUE_ENTRY* ref = new LRU_QUEUE_ENTRY();
-
-    off_t addr = LRU_QUEUE_BASE_ADDR + idx * sizeof(LRU_QUEUE_ENTRY) + ((char*)&ref->RBTREE_idx - (char*)ref);
-    if(addr >= LRU_QUEUE_END_ADDR){
-        cout << "Leaf Cache Limit Excced" << endl;
-        mylog << "Leaf Cache Limit Excced" << endl;
-        exit(1);
-    }
-    cmb->write(addr, &rb_id, sizeof(u_int64_t));
-
-    delete ref;
-}
-
-RBTree::RBTree(){
-    root_idx = 0;
-    capacity = NUM_OF_CACHE - 1;
-    num_of_cache = 0;
-    pool = (RBTreeNode*) calloc(NUM_OF_CACHE, sizeof(RBTreeNode));
-
-    u_int64_t first_free = 1;
-    memcpy(pool, &first_free, sizeof(u_int64_t));
-}
-
-RBTree::~RBTree(){
-    free(pool);
-}
-
-RBTreeNode::RBTreeNode(u_int64_t _node_idx, u_int64_t _LRU_id, u_int64_t _color, u_int64_t _parent_idx){
-    node_id = _node_idx;
-    LRU_id = _LRU_id;
-    color = _color;
-    parent_idx = _parent_idx;
-    left_child_idx = 0;
-    right_child_idx = 0;
-}
-
-u_int64_t RBTree::insert(CMB* cmb, u_int64_t node_id, u_int64_t LRU_id){
-
-    mylog << "RBTree()::insert() - node_id : " << node_id << " LRU_id = " << LRU_id<< endl;
-    u_int64_t ret_idx;
-    if(root_idx == 0){
-        root_idx = free_pop();
-
-        RBTreeNode* new_node = new RBTreeNode(node_id, LRU_id, BLACK, 0);
-        memcpy(&pool[root_idx], new_node, sizeof(RBTreeNode));
-
-        ret_idx = root_idx;
-
-        delete new_node;
-    }
-    else{
-        u_int64_t cur_idx = root_idx;
-        u_int64_t cur_lower, cur_upper;
-        u_int64_t child_idx, new_idx;
-        RBTreeNode* cur_node;
-
-        u_int64_t lower = cmb->get_lower(node_id);
-        u_int64_t upper = cmb->get_upper(node_id);
-
-        while(cur_idx){
-            cur_node = &pool[cur_idx];
-
-            cur_lower = cmb->get_lower(cur_node->node_id);
-            if(upper < cur_lower){
-                child_idx = cur_node->left_child_idx;
-            }
-            else{
-                cur_upper = cmb->get_upper(cur_node->node_id);
-                if(lower > cur_upper){
-                    child_idx = cur_node->right_child_idx;
-                }
-                else{
-                    cout << "Overlapping intervals" << endl;
-                    mylog << "Overlapping intervals" << endl;
-                    exit(1);
-                }
-            }
-
-            if(child_idx != 0){
-                cur_idx = child_idx;
-            }
-            else{
-                // Write the new node
-                new_idx = free_pop();
-
-                RBTreeNode* new_node = new RBTreeNode(node_id, LRU_id, RED, cur_idx);
-                memcpy(&pool[new_idx], new_node, sizeof(RBTreeNode));
-
-                // Update the cur->child = new_idx
-                if(upper < cur_lower){
-                    cur_node->left_child_idx = new_idx;
-                }
-                else{
-                    cur_node->right_child_idx = new_idx;
-                }
-
-                delete new_node;
-                break;
-            }
-        }
-        insertFix(new_idx, cmb);
-
-        ret_idx = new_idx;
-    }
-
-    num_of_cache++;
-
-    return ret_idx;
-}
-
-void RBTree::insertFix(u_int64_t idx, CMB* cmb){
-    
-    u_int64_t cur_idx = idx;
-    RBTreeNode* cur;
-    while(cur_idx){
-        cur = &pool[cur_idx];    
-
-        RBTreeNode* parent = &pool[cur->parent_idx];
-
-        if(parent->color == RED){
-            u_int64_t grand_left_child = pool[parent->parent_idx].left_child_idx;
-            u_int64_t grand_right_child = pool[parent->parent_idx].right_child_idx;
-
-            if(grand_left_child == cur->parent_idx){
-                // Parent is on the left
-                RBTreeNode* uncle = &pool[grand_right_child];
-
-                if(uncle->color == RED){
-                    // Case 1
-                    parent->color = BLACK;
-                    uncle->color = BLACK;
-                    if(parent->parent_idx != root_idx){
-                        pool[parent->parent_idx].color = RED;
-                    }                   
-
-                    cur_idx = parent->parent_idx;
-                }
-                else{
-                    // Case 2 & 3
-                    u_int64_t cur_parent_idx = cur->parent_idx;
-                    if(cur_idx == parent->right_child_idx){
-                        leafRotation(cur_parent_idx);
-                        cur_idx = cur_parent_idx;
-                        cur = &pool[cur_idx];
-                        parent = &pool[cur->parent_idx];
-                    }
-
-                    parent->color = BLACK;
-                    pool[parent->parent_idx].color = RED;
-                    rightRotation(parent->parent_idx);
-
-                    cur_idx = 0;
-                }
-            }
-            else{
-                // Parent is on the right
-                RBTreeNode* uncle = &pool[grand_left_child];
-
-                if(uncle->color == RED){
-                    // Case 1
-                    parent->color = BLACK;
-                    uncle->color = BLACK;
-                    // Grandparent->color = RED;
-                    if(parent->parent_idx != root_idx){
-                        pool[parent->parent_idx].color = RED;
-                    }
-
-                    cur_idx = parent->parent_idx;
-                }
-                else{
-                    // Case 2 & 3
-                    u_int64_t cur_parent_idx = cur->parent_idx;
-                    if(cur_idx == parent->left_child_idx){
-                        rightRotation(cur_parent_idx);
-                        cur_idx = cur_parent_idx;
-                        cur = &pool[cur_idx];
-                        parent = &pool[cur->parent_idx];
-                    }
-
-                    parent->color = BLACK;
-                    pool[parent->parent_idx].color = RED;
-                    leafRotation(parent->parent_idx);
-
-                    cur_idx = 0;
-                }
-            }
-        }
-        else{
-            return;
-        }
-    }
-}
-
-void RBTree::remove(CMB* cmb, u_int64_t rbtree_idx){
-    mylog << "RBTree::remove() - rbtree_idx = " << rbtree_idx << endl;
-    u_int64_t delete_idx = rbtree_idx;
-    if(delete_idx == 0){
-        cout << "Data not found" << endl;
-        return;
-    }
-    RBTreeNode* delete_node = &pool[delete_idx];
-
-    u_int64_t target_idx = 0;
-    RBTreeNode* target_node;
-    u_int64_t replace_idx = 0;
-
-    if(delete_node->left_child_idx == 0 || delete_node->right_child_idx == 0){
-        // Has <= 1 child
-        target_idx = delete_idx;
-    }
-    else{
-        // Has two children
-        target_idx = succesor(delete_node->right_child_idx);
-    }
-    target_node = &pool[target_idx];
-
-    // Set the replace_idx as the target's child
-    if(target_node->left_child_idx != 0)
-        replace_idx = target_node->left_child_idx;
-    else
-        replace_idx = target_node->right_child_idx;
-
-    if(replace_idx != 0){
-        // If the replace_idx is not NIL, set it's parent to target->parent
-        pool[replace_idx].parent_idx = target_node->parent_idx;
-    }
-
-    if(target_node->parent_idx == 0){
-        // If the target is the root, set the root as the replacement
-        root_idx = replace_idx;
-    }
-    else{
-        RBTreeNode* parent = &pool[target_node->parent_idx];
-        if(parent->left_child_idx == target_idx){
-            // If target is the left child, set the replace to the left child of target->parent
-            parent->left_child_idx = replace_idx;
-        }
-        else{
-            parent->right_child_idx = replace_idx;
-        }
-    }
-
-    if(target_idx != delete_idx){
-        // Replace the succesor node id to the internal node
-        delete_node->node_id = target_node->node_id;
-        delete_node->LRU_id = target_node->LRU_id;
-        // Update the LRU -> RBTree relationship
-        LRU_QUEUE_ENTRY* LRU_ref = new LRU_QUEUE_ENTRY();
-        
-        off_t addr = LRU_QUEUE_BASE_ADDR + target_node->LRU_id * sizeof(LRU_QUEUE_ENTRY) + ((char*)&LRU_ref->RBTREE_idx - (char*)LRU_ref);
-        cmb->write(addr, &delete_idx, sizeof(u_int64_t));
-
-        delete LRU_ref;        
-    }
-    if(target_node->color == BLACK){
-        removeFix(replace_idx, target_node->parent_idx, cmb);
-    }
-
-    free_push(target_idx);
-
-    num_of_cache--;
-}
-
-void RBTree::removeFix(u_int64_t idx, u_int64_t parent_idx, CMB* cmb){
-    u_int64_t cur_idx = idx;
-    u_int64_t cur_parent_idx = parent_idx;
-    RBTreeNode* cur;
-    while(true){
-        cur = &pool[cur_idx];
-
-        if(cur_idx != root_idx && cur->color == BLACK){ 
-            RBTreeNode* cur_parent = &pool[cur_parent_idx];
-
-            if(cur_idx == cur_parent->left_child_idx){
-                // Current is the left child
-                u_int64_t sibling_idx = cur_parent->right_child_idx;
-                RBTreeNode* sibling = &pool[sibling_idx];
-
-                if(sibling->color == RED){
-                    //Case 1
-                    sibling->color = BLACK;
-                    cur_parent->color = RED;
-                    leafRotation(cur_parent_idx);
-                    sibling_idx = cur_parent->right_child_idx;
-                    sibling = &pool[sibling_idx];
-                }
-
-                RBTreeNode* sibling_left_child = &pool[sibling->left_child_idx];
-                RBTreeNode* sibling_right_child = &pool[sibling->right_child_idx];
-                
-                if(sibling_left_child->color == BLACK && sibling_right_child->color == BLACK){
-                    // Case 2
-                    sibling->color = RED;
-                    cur_idx = cur_parent_idx;
-                    cur_parent_idx = pool[cur_idx].parent_idx;
-                }
-                else{
-                    if(sibling_right_child->color == BLACK){
-                        // Case 3
-                        sibling_left_child->color = BLACK;
-                        sibling->color = RED;
-                        rightRotation(sibling_idx);
-
-                        sibling_idx = cur_parent->right_child_idx;
-                        sibling = &pool[sibling_idx];
-                        sibling_right_child = &pool[sibling->right_child_idx];
-                    }
-
-                    // Case 4
-                    sibling->color = cur_parent->color;
-                    cur_parent->color = BLACK;
-                    sibling_right_child->color = BLACK;
-                    leafRotation(cur_parent_idx);
-                    cur_idx = root_idx;
-                }    
-            }
-            else{
-                // Current is the right child
-                u_int64_t sibling_idx = cur_parent->left_child_idx;
-                RBTreeNode* sibling = &pool[sibling_idx];
-
-                if(sibling->color == RED){
-                    //Case 1
-                    sibling->color = BLACK;
-                    cur_parent->color = RED;
-                    rightRotation(cur_parent_idx);
-                    sibling_idx = cur_parent->left_child_idx;
-                    sibling = &pool[sibling_idx];
-                }
-
-                RBTreeNode* sibling_left_child = &pool[sibling->left_child_idx];
-                RBTreeNode* sibling_right_child = &pool[sibling->right_child_idx];
-
-                if(sibling_left_child->color == BLACK && sibling_right_child->color == BLACK){
-                    // Case 2
-                    sibling->color = RED;
-                    cur_idx = cur_parent_idx;
-                    cur_parent_idx = pool[cur_idx].parent_idx;
-                }
-                else{
-                    if(sibling_left_child->color == BLACK){
-                        // Case 3
-                        sibling_right_child->color = BLACK;
-                        sibling->color = RED;
-                        leafRotation(sibling_idx);
-
-                        sibling_idx = cur_parent->left_child_idx;
-                        sibling = &pool[sibling_idx];
-                        sibling_left_child = &pool[sibling->left_child_idx];
-                    }
-
-                    // Case 4
-                    sibling->color = cur_parent->color;
-                    cur_parent->color = BLACK;
-                    sibling_left_child->color = BLACK;
-                    rightRotation(cur_parent_idx);
-                    cur_idx = root_idx;
-                }   
-            }
-        }
-        else{
-            cur->color = BLACK;
-            break;
-        }  
-    }
-}
-
-u_int64_t RBTree::search_by_key(CMB* cmb, u_int64_t key){
-    mylog << "RBTree::search() - key = " << key << endl;
-    u_int64_t cur_idx = root_idx;
-    RBTreeNode* cur_node;
-    u_int64_t cur_lower, cur_upper;
-
-    while(cur_idx){
-        cur_node = &pool[cur_idx];
-
-        cur_lower = cmb->get_lower(cur_node->node_id);
-        if(key < cur_lower){
-            cur_idx = cur_node->left_child_idx;
-        }
-        else{
-            cur_upper = cmb->get_upper(cur_node->node_id);
-            if(key > cur_upper){
-                cur_idx = cur_node->right_child_idx;
-            }
-            else{
-                return cur_idx;
-            }
-        }
-    }
-
-    return 0;
-}
-
-u_int64_t RBTree::search_by_node_id(CMB* cmb, u_int64_t node_id){
-    mylog << "RBTree::search() - node_id = " << node_id << endl;
-    u_int64_t cur_idx = root_idx;
-    RBTreeNode* cur_node;
-    u_int64_t upper, cur_lower, cur_upper;
-
-    upper = cmb->get_upper(node_id);
-
-    while(cur_idx){
-        cur_node = &pool[cur_idx];
-
-        if(cur_node->node_id == node_id){
-            return cur_idx;
-        }
-        else{
-            cur_lower = cmb->get_lower(cur_node->node_id);
-            if(upper < cur_lower){
-                cur_idx = cur_node->left_child_idx;
-            }
-            else{
-                cur_idx = cur_node->right_child_idx;
-            }
-        }
-    }
-
-    return 0;
-}
-
-void RBTree::stat(CMB* cmb){
-    
-    cout << "RBTree: stat()" << endl;
-    cout << "root_idx = " << root_idx << endl;
-    cout << "capacity = " << capacity << endl;
-    cout << "num_of_cache = " << num_of_cache << endl;
-    
-    display(cmb);
-}
-
-void RBTree::display(CMB* cmb){
-    if(root_idx != 0){
-        RBTreeNode* node = &pool[root_idx];
-        cout << "( [LRU_ID] RBTree_ID -> Node_ID : Lower-Upper : Color)" << endl;
-        node->display(cmb, pool, root_idx, 0);
-    }
-}
-
-void RBTreeNode::display(CMB* cmb, RBTreeNode* pool, u_int64_t idx, int level){
-    if(right_child_idx != 0){
-        RBTreeNode* node = &pool[right_child_idx];        
-        node->display(cmb, pool, right_child_idx, level + 1);
-    }
-
-    for(int i = 0; i < level; i++)
-        cout << "\t";
-    string color_code = (color == RED) ? "Red" : "Black";
-    cout << " [" << LRU_id << "] " << "(" << idx << "->" << node_id << ":"<< cmb->get_lower(node_id) << "-" << cmb->get_upper(node_id) << ":" << color_code << ")" << endl;
-    
-
-    if(left_child_idx != 0){
-        RBTreeNode* node = &pool[left_child_idx];
-        node->display(cmb, pool, left_child_idx, level + 1);
-    }
-}
-
-void RBTree::free_push(u_int64_t idx){
-    memcpy(&pool[idx], pool, sizeof(u_int64_t));
-    memcpy(pool, &idx, sizeof(u_int64_t));
-}
-
-u_int64_t RBTree::free_pop(){
-    u_int64_t free_idx;
-    memcpy(&free_idx, pool, sizeof(u_int64_t));
-
-    u_int64_t new_free_idx;
-    memcpy(&new_free_idx, &pool[free_idx], sizeof(u_int64_t));
-    if(new_free_idx == 0)
-        new_free_idx = free_idx + 1;
-    memcpy(pool, &new_free_idx, sizeof(u_int64_t));
-
-    return free_idx;
-}
-
-void RBTree::leafRotation(u_int64_t x_idx){
-    off_t addr;
-    bool root = false;
-    RBTreeNode* x = &pool[x_idx];
-    u_int64_t y_idx = x->right_child_idx;
-    RBTreeNode* y = &pool[y_idx];
-    RBTreeNode* parent;
-    if(x_idx == root_idx)
-        root = true;
-    else
-        parent = &pool[x->parent_idx];
-
-    x->right_child_idx = y->left_child_idx;
-    pool[y->left_child_idx].parent_idx = x_idx;
-
-    // x->parent->child = y
-    if(root){
-        root_idx = y_idx;
-    }
-    else{
-        if(parent->left_child_idx == x_idx)
-            parent->left_child_idx = y_idx;
-        else
-            parent->right_child_idx = y_idx;
-    }      
-    y->parent_idx = x->parent_idx;
-
-    y->left_child_idx = x_idx;
-    x->parent_idx = y_idx;
-}
-
-void RBTree::rightRotation(u_int64_t x_idx){
-    off_t addr;
-    bool root = false;
-    RBTreeNode* x = &pool[x_idx];
-    u_int64_t y_idx = x->left_child_idx;
-    RBTreeNode* y = &pool[y_idx];
-    RBTreeNode* parent;
-    if(x_idx == root_idx)
-        root = true;
-    else
-        parent = &pool[x->parent_idx];
-
-    x->left_child_idx = y->right_child_idx;
-    pool[y->right_child_idx].parent_idx = x_idx;
-
-    // x->parent->child = y
-    if(root){
-        root_idx = y_idx;
-    }
-    else{
-        if(parent->left_child_idx == x_idx)
-            parent->left_child_idx = y_idx;
-        else
-            parent->right_child_idx = y_idx;
-    }    
-    y->parent_idx = x->parent_idx;    
-
-    y->right_child_idx = x_idx;
-    x->parent_idx = y_idx;
-}
-
-u_int64_t RBTree::succesor(u_int64_t idx){
-    u_int64_t cur_idx = idx;
-    RBTreeNode* cur_node;
-    
-    while(cur_idx){
-        cur_node = &pool[cur_idx];
-        if(cur_node->left_child_idx){
-            cur_idx = cur_node->left_child_idx;
-        }
-        else{
-            return cur_idx;
-        }
-    }
-
-    return 0;
 }
 
 template <typename T>
