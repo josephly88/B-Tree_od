@@ -1130,6 +1130,7 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
     }
     else
         new_node_id = t->get_free_block_id();
+
     BTreeNode<T>* new_node = new BTreeNode<T>(m, node->is_leaf, new_node_id);
 
     int i, j;
@@ -1715,7 +1716,7 @@ void CMB::cmb_memcpy(void* dest, void* src, size_t len){
 
 void CMB::remap(off_t offset){    
     if( ((bar_addr + offset) & ~MAP_MASK) != map_idx ){
-        // mylog << "remap() - offset:" << offset << " map_idx : " << map_idx << "->" << ((bar_addr + offset) & ~MAP_MASK) << endl;
+         mylog << "remap() - offset:" << offset << " map_idx : " << map_idx << "->" << ((bar_addr + offset) & ~MAP_MASK) << endl;
         if(cache_base)
             memcpy(map_base, cache_base, MAP_SIZE);  
 
@@ -2135,7 +2136,7 @@ void VALUE_POOL<T>::free_push(CMB* cmb, u_int64_t idx){
 
 template <typename T>
 u_int64_t VALUE_POOL<T>::free_pop(CMB* cmb){
-    mylog << "VALUE_POOL::free_pop()" << endl;
+    mylog << "VALUE_POOL::free_pop() - free_Stack_idx = " << free_Stack_idx << endl;
     u_int64_t ret, next;
 
     if(free_Stack_idx == 0)
