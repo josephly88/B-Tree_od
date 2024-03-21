@@ -1060,8 +1060,8 @@ u_int64_t BTreeNode<T>::direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeLis
     if(t->append_map && is_leaf){
         t->append_map->append_entry(t, node_id, I, _k, _v);
 
-        u_int64_t num_k = t->cmb->get_num_key(node_id);
-        t->cmb->update_num_key(node_id, num_k+1);
+        u_int64_t num_k = t->cmb->get_num_key(node_id) + 1;
+        t->cmb->update_num_key(node_id, num_k);
         if(num_k >= m) needsplit = true;
     }
     else{
