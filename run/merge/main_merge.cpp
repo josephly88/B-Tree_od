@@ -184,7 +184,7 @@ int main(int argc, char** argv){
                 if(!writeSize)
                     op_file << "i\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << flash_diff.count() << "\t" << cmb_diff.count() << endl;
                 else
-                    op_file << "i\t" << key << "\t" << val.str << "\t\t\t" << diff.count() << "\t" << kv_size << "\t" << op_size << "\t" << cow_size << "\t" << structural_change << endl;
+                    op_file << "i\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << kv_size << "\t" << op_size << "\t" << cow_size << "\t" << structural_change << endl;
             }
             else if(op == 'r'){
                 // Read data
@@ -222,7 +222,7 @@ int main(int argc, char** argv){
                 if(!writeSize)
                     op_file << "d\t" << key << "\t" << diff.count() << "\t" << flash_diff.count() << "\t" << cmb_diff.count() << endl;
                 else
-                    op_file << "i\t" << key << "\t\t\t" << diff.count() << "\t" << kv_size << "\t" << op_size << "\t" << cow_size << "\t" << structural_change << endl;
+                    op_file << "d\t" << key << "\t" << diff.count() << "\t" << kv_size << "\t" << op_size << "\t" << cow_size << "\t" << structural_change << endl;
             }
             else{
                 continue;
