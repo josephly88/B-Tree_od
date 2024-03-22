@@ -173,12 +173,15 @@ class CMB{
         // Meta data
         u_int64_t get_num_key(u_int64_t node_id);
         void update_num_key(u_int64_t node_id, u_int64_t value);
+        u_int64_t get_is_leaf(u_int64_t node_id);
+        void update_is_leaf(u_int64_t node_id, u_int64_t value);
 };
 
 class BKMap{
     public:
         u_int64_t block_id;
         u_int64_t num_key;
+        u_int64_t is_leaf;
 };
 
 template <typename T>
@@ -680,6 +683,10 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
                 op_size_cmb += tmp_diff;
                 cmb->update_num_key(new_root_id, 0);
                 op_size_cmb += tmp_diff;
+                if(append_map){
+                    cmb->update_is_leaf(new_root_id, 0);
+                    op_size_cmb += tmp_diff;
+                }
             }
             else
                 new_root_id = get_free_block_id();
@@ -716,6 +723,7 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
             cmb->update_num_key(root_id, 0);
             if(append_map){
                 append_map->write_num(cmb, root_id, 0);
+                cmb->update_is_leaf(root_id, 1);
             }
         }
         else
@@ -1176,6 +1184,11 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
             t->append_map->delete_entries(t->cmb, node->node_id);
             op_size_cmb += tmp_diff;
             t->append_map->write_num(t->cmb, new_node_id, 0);
+            op_size_cmb += tmp_diff;
+            if(node->is_leaf)
+                t->cmb->update_is_leaf(new_node_id, 1);
+            else
+                t->cmb->update_is_leaf(new_node_id, 0);
             op_size_cmb += tmp_diff;
         }
     }
@@ -1902,6 +1915,35 @@ void CMB::update_num_key(u_int64_t node_id, u_int64_t value){
     mylog << "update_num_key() - node id:" << node_id << " value:" << value << endl;
     BKMap ref;
     off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.num_key - (char*)&ref);
+    if(addr > BLOCK_MAPPING_END_ADDR){
+        cout << "CMB Block Mapping Write Out of Range" << endl;
+        mylog << "CMB Block Mapping Write Out of Range" << endl;
+        exit(1);
+    }
+
+	write(addr, &value, sizeof(u_int64_t));
+    tmp_diff = sizeof(u_int64_t);
+}
+
+u_int64_t CMB::get_is_leaf(u_int64_t node_id){
+    mylog << "get_is_leaf() - node id:" << node_id << endl;
+    BKMap ref;
+    off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.is_leaf - (char*)&ref);
+    if(addr > BLOCK_MAPPING_END_ADDR){
+        cout << "CMB Block Mapping Read Out of Range" << endl;
+        mylog << "CMB Block Mapping Read Out of Range" << endl;
+        exit(1);
+    }
+
+    u_int64_t readval;
+	read(&readval, addr, sizeof(u_int64_t));
+    return readval;
+}
+
+void CMB::update_is_leaf(u_int64_t node_id, u_int64_t value){
+    mylog << "update_num_key() - node id:" << node_id << " value:" << value << endl;
+    BKMap ref;
+    off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.is_leaf - (char*)&ref);
     if(addr > BLOCK_MAPPING_END_ADDR){
         cout << "CMB Block Mapping Write Out of Range" << endl;
         mylog << "CMB Block Mapping Write Out of Range" << endl;
