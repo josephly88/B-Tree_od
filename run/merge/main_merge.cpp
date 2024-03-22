@@ -164,7 +164,8 @@ int main(int argc, char** argv){
             if(writeSize){
                 tmp_diff = 0;
                 kv_size = 8 + 104;
-                op_size = 0;
+                op_size_flash = 0;
+                op_size_cmb = 0;
                 cow_size = 0;
                 structural_change = 'F';
             }
@@ -180,7 +181,7 @@ int main(int argc, char** argv){
                 if(!writeSize)
                     op_file << "i\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << flash_diff.count() << "\t" << cmb_diff.count() << endl;
                 else
-                    op_file << "i\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << kv_size << "\t" << op_size << "\t" << cow_size << "\t" << structural_change << endl;
+                    op_file << "i\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << kv_size << "\t" << op_size_flash << "\t" << op_size_cmb << "\t" << cow_size << "\t" << structural_change << endl;
             }
             else if(op == 'r'){
                 // Read data
@@ -192,10 +193,7 @@ int main(int argc, char** argv){
                 cout << " >> " << val.str;
                 mylog << " >> " << val.str << endl;
                 chrono::duration<double, micro> diff = end - start;
-                if(!writeSize)
-                    op_file << "r\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << flash_diff.count() << "\t" << cmb_diff.count() << endl;
-                else
-                    op_file << "r\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << kv_size << "\t" << op_size << "\t" << cow_size << endl;
+                op_file << "r\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << flash_diff.count() << "\t" << cmb_diff.count() << endl;
             }
             else if(op == 'u'){
                 // Update data
@@ -205,7 +203,10 @@ int main(int argc, char** argv){
                 t->update(key, val);
                 auto end = std::chrono::high_resolution_clock::now();
                 chrono::duration<double, micro> diff = end - start;
-                op_file << "u\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << flash_diff.count() << "\t" << cmb_diff.count() << endl;
+                if(!writeSize)
+                    op_file << "u\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << flash_diff.count() << "\t" << cmb_diff.count() << endl;
+                else
+                    op_file << "u\t" << key << "\t" << val.str << "\t" << diff.count() << "\t" << kv_size << "\t" << op_size_flash << "\t" << op_size_cmb << "\t" << cow_size << "\t" << structural_change << endl;
             }
             else if(op == 'd'){
                 // Delete data
@@ -216,9 +217,9 @@ int main(int argc, char** argv){
                 auto end = std::chrono::high_resolution_clock::now();
                 chrono::duration<double, micro> diff = end - start;
                 if(!writeSize)
-                    op_file << "d\t" << key << "\t" << diff.count() << "\t" << flash_diff.count() << "\t" << cmb_diff.count() << endl;
+                    op_file << "d\t" << key << "\t" << "no_value" << "\t" << diff.count() << "\t" << flash_diff.count() << "\t" << cmb_diff.count() << endl;
                 else
-                    op_file << "d\t" << key << "\t" << diff.count() << "\t" << kv_size << "\t" << op_size << "\t" << cow_size << "\t" << structural_change << endl;
+                    op_file << "d\t" << key << "\t" << "no_value" << "\t" << diff.count() << "\t" << kv_size << "\t" << op_size_flash << "\t" << op_size_cmb << "\t" << cow_size << "\t" << structural_change << endl;
             }
             else{
                 continue;
@@ -246,3 +247,4 @@ int main(int argc, char** argv){
 
     return 0;
 }
+

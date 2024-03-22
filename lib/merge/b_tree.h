@@ -44,7 +44,8 @@ chrono::duration<double, micro> cmb_diff;
 
 size_t tmp_diff;
 size_t kv_size;
-size_t op_size;
+size_t op_size_flash;
+size_t op_size_cmb;
 size_t cow_size;
 char structural_change;
 
@@ -626,6 +627,7 @@ void BTree<T>::update(u_int64_t _k, T _v){
         if(dup_node_id != root_id){
             root_id = dup_node_id;
             tree_write(fd, this);
+            cow_size += tmp_diff;
         }
 
         if(rmlist){
@@ -675,19 +677,21 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
             if(cmb){
                 new_root_id = cmb->get_new_node_id();
                 cmb->update_node_id(new_root_id, get_free_block_id());
+                op_size_cmb += tmp_diff;
                 cmb->update_num_key(new_root_id, 0);
+                op_size_cmb += tmp_diff;
             }
             else
                 new_root_id = get_free_block_id();
 
             BTreeNode<T>* new_root = new BTreeNode<T>(m, false, new_root_id);
             node_write(new_root_id, new_root);
-            op_size += tmp_diff;
+            op_size_flash += tmp_diff;
 
             root_id = root->split(this, root_id, new_root_id, &rmlist);
 
             tree_write(fd, this);
-            op_size += tmp_diff;
+            op_size_flash += tmp_diff;
 
             delete new_root;    
         }
@@ -718,11 +722,11 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
             root_id = get_free_block_id();
 
         tree_write(fd, this);
-        op_size += tmp_diff;
+        op_size_flash += tmp_diff;
 
         BTreeNode<T>* root = new BTreeNode<T>(m, true, root_id);
         node_write(root_id, root);
-        op_size += tmp_diff;
+        op_size_flash += tmp_diff;
         delete root;
         
         height++;
@@ -770,7 +774,7 @@ void BTree<T>::deletion(u_int64_t _k){
                 root_id = root->child_id[0];
             }
             tree_write(fd, this);
-            op_size += tmp_diff; 
+            op_size_flash += tmp_diff; 
         } 
         
         if(rmlist){
@@ -904,7 +908,7 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id
     int i;
     for(i = 0; i < num_key; i++){
         if(_k == key[i]){
-            op_size += tmp_diff;
+            op_size_flash += tmp_diff;
 
             // Key match
             memcpy(buf, &value[i], sizeof(T));
@@ -945,6 +949,7 @@ u_int64_t BTreeNode<T>::update(BTree<T>* t, u_int64_t _k, T _v, removeList** lis
             OPR_CODE last_opr = t->append_map->get_opr(t->cmb, node_id, entry_idx);
             if(last_opr != D){
                 t->append_map->append_entry(t, node_id, U, _k, _v);
+                op_size_cmb += tmp_diff;
             }
 
             return node_id;                
@@ -955,14 +960,17 @@ u_int64_t BTreeNode<T>::update(BTree<T>* t, u_int64_t _k, T _v, removeList** lis
     for(i = 0; i < num_key; i++){
         // Key match
         if(_k == key[i]){
-            if(t->append_map && is_leaf)
+            if(t->append_map && is_leaf){
                 t->append_map->append_entry(t, node_id, U, _k, _v);
+                op_size_cmb += tmp_diff;
+            }
             else{
                 value[i] = _v;
 
                 if(t->cmb){
                     *list = new removeList(t->cmb->get_block_id(node_id), *list);
                     t->cmb->update_node_id(node_id, t->get_free_block_id());
+                    op_size_cmb += tmp_diff;
                 }
                 else{
                     *list = new removeList(node_id, *list);
@@ -970,6 +978,7 @@ u_int64_t BTreeNode<T>::update(BTree<T>* t, u_int64_t _k, T _v, removeList** lis
                 }                
 
                 t->node_write(node_id, this);
+                op_size_flash += tmp_diff;
             }
 
             return node_id;
@@ -996,6 +1005,7 @@ u_int64_t BTreeNode<T>::update(BTree<T>* t, u_int64_t _k, T _v, removeList** lis
             *list = new removeList(node_id, *list);
             node_id = t->get_free_block_id();
             t->node_write(node_id, this);
+            cow_size += tmp_diff;
         }
 
         delete child;
@@ -1062,9 +1072,11 @@ u_int64_t BTreeNode<T>::direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeLis
 
     if(t->append_map && is_leaf){
         t->append_map->append_entry(t, node_id, I, _k, _v);
+        op_size_cmb += tmp_diff;
 
         u_int64_t num_k = t->cmb->get_num_key(node_id) + 1;
         t->cmb->update_num_key(node_id, num_k);
+        op_size_cmb += tmp_diff;
         if(num_k >= m) needsplit = true;
     }
     else{
@@ -1096,7 +1108,9 @@ u_int64_t BTreeNode<T>::direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeLis
         if(t->cmb){
             *list = new removeList(t->cmb->get_block_id(node_id), *list);
             t->cmb->update_node_id(node_id, t->get_free_block_id());
+            op_size_cmb += tmp_diff;
             t->cmb->update_num_key(node_id, num_key);
+            op_size_cmb += tmp_diff;
         }
         else{
             *list = new removeList(node_id, *list);
@@ -1104,7 +1118,7 @@ u_int64_t BTreeNode<T>::direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeLis
         }
 
         t->node_write(node_id, this);
-        op_size += tmp_diff;
+        op_size_flash += tmp_diff;
     }
 
     return node_id;
@@ -1130,10 +1144,10 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
     if(t->cmb){
         new_node_id = t->cmb->get_new_node_id();
         t->cmb->update_node_id(new_node_id, t->get_free_block_id());
+        op_size_cmb += tmp_diff;
     }
     else
         new_node_id = t->get_free_block_id();
-
     BTreeNode<T>* new_node = new BTreeNode<T>(m, node->is_leaf, new_node_id);
 
     int i, j;
@@ -1151,13 +1165,18 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
         *list = new removeList(t->cmb->get_block_id(node->node_id), *list);
         
         t->cmb->update_num_key(new_node_id, new_node->num_key);
+        op_size_cmb += tmp_diff;
 
         t->cmb->update_node_id(node->node_id, t->get_free_block_id());
+        op_size_cmb += tmp_diff;
         t->cmb->update_num_key(node->node_id, min_num);
+        op_size_cmb += tmp_diff;
         
         if(t->append_map && node->is_leaf){
             t->append_map->delete_entries(t->cmb, node->node_id);
+            op_size_cmb += tmp_diff;
             t->append_map->write_num(t->cmb, new_node_id, 0);
+            op_size_cmb += tmp_diff;
         }
     }
     else{
@@ -1172,9 +1191,9 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
     new_node->parent_id = dup_par_id;
 
     t->node_write(node->node_id, node);
-    op_size += tmp_diff;
+    op_size_flash += tmp_diff;
     t->node_write(new_node_id, new_node);
-    op_size += tmp_diff;
+    op_size_flash += tmp_diff;
 
     delete node;
     delete parent;
@@ -1240,13 +1259,14 @@ u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** 
                 if(t->cmb){
                     *list = new removeList(t->cmb->get_block_id(node_id), *list);
                     t->cmb->update_node_id(node_id, t->get_free_block_id());
+                    op_size_cmb += tmp_diff;
                 }
                 else{
                     *list = new removeList(node_id, *list);
                     node_id = t->get_free_block_id();
                 }
                 t->node_write(node_id, this);
-                op_size += tmp_diff;
+                op_size_flash += tmp_diff;
                 i = i + 1;
             }
             else{
@@ -1268,6 +1288,7 @@ u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** 
                 if(t->cmb){
                     *list = new removeList(t->cmb->get_block_id(node_id), *list);
                     t->cmb->update_node_id(node_id, t->get_free_block_id());
+                    op_size_cmb += tmp_diff;
                 }
                 else{
                     *list = new removeList(node_id, *list);
@@ -1275,7 +1296,7 @@ u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** 
                 }
 
                 t->node_write(node_id, this);
-                op_size += tmp_diff;
+                op_size_flash += tmp_diff;
                 
                 delete pred;
             }
@@ -1323,7 +1344,9 @@ u_int64_t BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** li
             if(last_opr != D){
                 T empty;
                 t->append_map->append_entry(t, node_id, D, _k, empty);
+                op_size_cmb += tmp_diff;
                 t->cmb->update_num_key(node_id, t->cmb->get_num_key(node_id) - 1);                
+                op_size_cmb += tmp_diff;
             }
 
             return node_id;
@@ -1345,7 +1368,9 @@ u_int64_t BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** li
     if(i < num_key && t->append_map && is_leaf){
         T empty;
         t->append_map->append_entry(t, node_id, D, _k, empty);
+        op_size_cmb += tmp_diff;
         t->cmb->update_num_key(node_id, t->cmb->get_num_key(node_id) - 1);
+        op_size_cmb += tmp_diff;
     }
     else{
         if(i < num_key-1){
@@ -1361,7 +1386,9 @@ u_int64_t BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** li
         if(t->cmb){
             *list = new removeList(t->cmb->get_block_id(node_id), *list);
             t->cmb->update_node_id(node_id, t->get_free_block_id());
+            op_size_cmb += tmp_diff;
             t->cmb->update_num_key(node_id, num_key);
+            op_size_cmb += tmp_diff;
         }
         else{
             *list = new removeList(node_id, *list);
@@ -1369,7 +1396,7 @@ u_int64_t BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** li
         }
 
         t->node_write(node_id, this);
-        op_size += tmp_diff;
+        op_size_flash += tmp_diff;
     }
 
     return node_id;
@@ -1412,7 +1439,9 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
 
             // Append insert to right
             t->append_map->append_entry(t, child_id[idx], I, key[idx-1], value[idx-1]);
+            op_size_cmb += tmp_diff;
             t->cmb->update_num_key(child_id[idx], t->cmb->get_num_key(child_id[idx]) + 1);
+            op_size_cmb += tmp_diff;
 
             // Borrow from left to parent
             key[idx-1] = left->key[left->num_key - 1];
@@ -1420,16 +1449,19 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             
             *list = new removeList(t->cmb->get_block_id(node_id), *list);
             t->cmb->update_node_id(node_id, t->get_free_block_id());
+             op_size_cmb += tmp_diff;
 
             t->node_write(node_id, this);   
-            op_size += tmp_diff;
+            op_size_flash += tmp_diff;
 
             // Append delete to left
             T empty;
             t->append_map->append_entry(t, left->node_id, D, left->key[left->num_key-1], empty);            
+            op_size_cmb += tmp_diff;
 
             left->num_key -= 1;
             t->cmb->update_num_key(left->node_id, left->num_key);
+            op_size_cmb += tmp_diff;
         }
         else if(idx + 1 <= num_key && t->cmb->get_num_key(right->node_id) > min_num){
             mylog << "borrow_from_right_sibling() - node id:" << child_id[idx] << endl;
@@ -1438,7 +1470,9 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
 
             // Append insert to left
             t->append_map->append_entry(t, child_id[idx], I, key[idx], value[idx]);
+            op_size_cmb += tmp_diff;
             t->cmb->update_num_key(child_id[idx], t->cmb->get_num_key(child_id[idx]) + 1);
+            op_size_cmb += tmp_diff;
 
             // Borrow from right to parent
             key[idx] = right->key[0];
@@ -1446,16 +1480,19 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             
             *list = new removeList(t->cmb->get_block_id(node_id), *list);
             t->cmb->update_node_id(node_id, t->get_free_block_id());
+            op_size_cmb += tmp_diff;
 
             t->node_write(node_id, this);  
-            op_size += tmp_diff;
+            op_size_flash += tmp_diff;
 
             // Append delete to right
             T empty;
             t->append_map->append_entry(t, right->node_id, D, right->key[0], empty);            
+            op_size_cmb += tmp_diff;
 
             right->num_key -= 1;
             t->cmb->update_num_key(right->node_id, right->num_key);
+            op_size_cmb += tmp_diff;
         }
         else{
             mylog << "merge() - node id:" << child_id[idx] << endl;
@@ -1481,18 +1518,21 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             t->cmb->update_node_id(left->node_id, t->get_free_block_id());
             t->cmb->update_num_key(left->node_id, left->num_key);
             t->append_map->delete_entries(t->cmb, left->node_id);
+            op_size_cmb += tmp_diff;
             t->node_write(left->node_id, left);
-            op_size += tmp_diff;
+            op_size_flash += tmp_diff;
 
             node_id = direct_delete(t, key[idx], list);
             child_id[idx] = left->node_id;
             *list = new removeList(t->cmb->get_block_id(node_id), *list);
             t->cmb->update_node_id(node_id, t->get_free_block_id());
+            op_size_cmb += tmp_diff;
             t->node_write(node_id, this);
-            op_size += tmp_diff;
+            op_size_flash += tmp_diff;
             
             *list = new removeList(t->cmb->get_block_id(right->node_id), *list);
             t->append_map->delete_entries(t->cmb, right->node_id);     
+            op_size_cmb += tmp_diff;
 
         }
     }
@@ -1521,7 +1561,7 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             }
 
             t->node_write(node_id, this);
-            op_size += tmp_diff;
+            op_size_flash += tmp_diff;
         }
         else if(idx + 1 <= num_key && right->num_key > min_num){
             mylog << "borrow_from_right_sibling() - node id:" << child_id[idx] << endl;
@@ -1547,7 +1587,7 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             }
 
             t->node_write(node_id, this);       
-            op_size += tmp_diff;
+            op_size_flash += tmp_diff;
         }   
         else{
             mylog << "merge() - node id:" << child_id[idx] << endl;
@@ -1575,14 +1615,16 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             if(t->cmb){
                 *list = new removeList(t->cmb->get_block_id(left->node_id), *list);
                 t->cmb->update_node_id(left->node_id, t->get_free_block_id());
+                op_size_cmb += tmp_diff;
                 t->cmb->update_num_key(left->node_id, left->num_key);
+                op_size_cmb += tmp_diff;
             }
             else{
                 *list = new removeList(left->node_id, *list);
                 left->node_id = t->get_free_block_id();
             }
             t->node_write(left->node_id, left);
-            op_size += tmp_diff;
+            op_size_flash += tmp_diff;
                 // Delete the parent's kv
             node_id = direct_delete(t, key[idx], list);
             child_id[idx] = left->node_id;
@@ -1597,7 +1639,7 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             }
 
             t->node_write(node_id, this);
-            op_size += tmp_diff;
+            op_size_flash += tmp_diff;
 
             if(t->cmb)
                 *list = new removeList(t->cmb->get_block_id(right->node_id), *list);
@@ -1837,6 +1879,8 @@ void CMB::update_node_id(u_int64_t node_id, u_int64_t block_id){
 
     u_int64_t writeval = block_id;
 	write(addr, &writeval, sizeof(u_int64_t));
+
+    tmp_diff = sizeof(u_int64_t);
 }
 
 u_int64_t CMB::get_num_key(u_int64_t node_id){
@@ -1865,6 +1909,7 @@ void CMB::update_num_key(u_int64_t node_id, u_int64_t value){
     }
 
 	write(addr, &value, sizeof(u_int64_t));
+    tmp_diff = sizeof(u_int64_t);
 }
 
 template <typename T>
@@ -1878,6 +1923,7 @@ void APPEND<T>::append_entry(BTree<T>* t, u_int64_t node_id, OPR_CODE OPR, u_int
         reduction(t, node_id, node);
         t->node_write(node_id, node);
         t->append_map->delete_entries(t->cmb, node_id);
+        op_size_cmb += tmp_diff;
         delete node;
     }
 
@@ -1895,6 +1941,8 @@ void APPEND<T>::append_entry(BTree<T>* t, u_int64_t node_id, OPR_CODE OPR, u_int
     t->cmb->write(addr, new_entry, sizeof(APPEND_ENTRY));
 
     write_num(t->cmb, node_id, num+1);
+
+    tmp_diff = sizeof(APPEND_ENTRY) + sizeof(u_int64_t) + sizeof(T);
 
     delete new_entry;
 }
@@ -2009,6 +2057,8 @@ void APPEND<T>::write_num(CMB* cmb, u_int64_t node_id, u_int64_t num){
 
     off_t addr = APPEND_OPR_START_ADDR + node_id * (sizeof(u_int64_t) + NUM_OF_APPEND * sizeof(APPEND_ENTRY));
     cmb->write(addr, &num, sizeof(u_int64_t));
+
+    tmp_diff = sizeof(u_int64_t);
 }
 
 template <typename T>
