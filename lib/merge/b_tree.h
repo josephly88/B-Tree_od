@@ -602,6 +602,18 @@ void BTree<T>::search(u_int64_t _k, T* buf){
     mylog << "search() - key:" << _k << endl;
 
     if(root_id){
+        if(append_map){
+            u_int64_t getIsLeaf = cmb->get_is_leaf(root_id);
+            if(getIsLeaf == 1){
+                u_int64_t entry_idx = append_map->search_entry(cmb, root_id, _k);
+                if(entry_idx != 0){
+                    T ret_val = append_map->get_value(cmb, root_id, entry_idx);
+                    memcpy(buf, &ret_val, sizeof(T));
+                    return;
+                }
+            }
+        }
+
         BTreeNode<T>* root = new BTreeNode<T>(0, 0, 0);
         node_read(root_id, root);
         root->search(this, _k, buf);
@@ -903,16 +915,6 @@ template <typename T>
 void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id){
     mylog << "search() - key:" << _k << endl;
 
-    if(t->append_map && is_leaf){
-        u_int64_t entry_idx = t->append_map->search_entry(t->cmb, node_id, _k);
-        if(entry_idx != 0){
-            T ret_val = t->append_map->get_value(t->cmb, node_id, entry_idx);
-            memcpy(buf, &ret_val, sizeof(T));
-
-            return;
-        }
-    }
-
     int i;
     for(i = 0; i < num_key; i++){
         if(_k == key[i]){
@@ -938,6 +940,19 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id
     }
 
     if(!is_leaf){
+        
+        if(t->append_map){
+            u_int64_t getIsLeaf = t->cmb->get_is_leaf(child_id[i]);
+            if(getIsLeaf == 1){
+                u_int64_t entry_idx = t->append_map->search_entry(t->cmb, child_id[i], _k);
+                if(entry_idx != 0){
+                    T ret_val = t->append_map->get_value(t->cmb, child_id[i], entry_idx);
+                    memcpy(buf, &ret_val, sizeof(T));
+                    return;
+                }
+            }
+        }
+
         BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
         t->node_read(child_id[i], child);
         child->search(t, _k, buf);
