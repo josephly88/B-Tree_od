@@ -195,6 +195,7 @@ class APPEND{
 
         OPR_CODE get_opr(CMB* cmb, u_int64_t node_id, u_int64_t idx);
         u_int64_t get_key(CMB* cmb, u_int64_t node_id, u_int64_t idx);
+        u_int64_t get_value_ptr(CMB* cmb, u_int64_t node_id, u_int64_t idx);
         T get_value(CMB* cmb, u_int64_t node_id, u_int64_t idx);
         void delete_entries(CMB* cmb, u_int64_t node_id);
 };
@@ -217,6 +218,8 @@ class VALUE_POOL{
         VALUE_POOL(CMB* cmb);
 
         void stat(CMB* cmb);
+
+        void update_num(CMB* cmb, u_int64_t num);
 
         u_int64_t get_free_idx(CMB* cmb);
         void free_push(CMB* cmb, u_int64_t idx);
@@ -2035,16 +2038,25 @@ u_int64_t APPEND<T>::get_key(CMB* cmb, u_int64_t node_id, u_int64_t idx){
 }
 
 template <typename T>
-T APPEND<T>::get_value(CMB* cmb, u_int64_t node_id, u_int64_t idx){
-    mylog << "APPEND::get_value() - node_id = " << node_id << ", idx = " << idx << endl;
+u_int64_t APPEND<T>::get_value_ptr(CMB* cmb, u_int64_t node_id, u_int64_t idx){
+    mylog << "APPEND::get_value_ptr() - node_id = " << node_id << ", idx = " << idx << endl;
 
     APPEND_ENTRY ref;
     u_int64_t value_idx;
-    T ret;
     off_t addr = APPEND_OPR_START_ADDR + node_id * (sizeof(u_int64_t) + NUM_OF_APPEND * sizeof(APPEND_ENTRY));
     addr += sizeof(u_int64_t) + (idx-1) * sizeof(APPEND_ENTRY) + ((char*)&ref.value_idx - (char*)&ref);
     cmb->read(&value_idx, addr, sizeof(u_int64_t));
 
+    return value_idx;
+}
+
+template <typename T>
+T APPEND<T>::get_value(CMB* cmb, u_int64_t node_id, u_int64_t idx){
+    mylog << "APPEND::get_value() - node_id = " << node_id << ", idx = " << idx << endl;
+
+    u_int64_t value_idx = get_value_ptr(cmb, node_id, idx);
+
+    T ret;
     value_pool->get_value(cmb, value_idx, &ret);
 
     return ret;
@@ -2056,19 +2068,17 @@ void APPEND<T>::delete_entries(CMB* cmb, u_int64_t node_id){
 
     APPEND_ENTRY ref;
     u_int64_t num = get_num(cmb, node_id);
-    while(num){
-        OPR_CODE opr = get_opr(cmb, node_id, num);
+    u_int64_t idx = num;
+    while(idx){
+        OPR_CODE opr = get_opr(cmb, node_id, idx);
         if(opr == I or opr == U){
-            u_int64_t value_idx;
-            off_t addr = APPEND_OPR_START_ADDR + node_id * (sizeof(u_int64_t) + NUM_OF_APPEND * sizeof(APPEND_ENTRY));
-            addr += sizeof(u_int64_t) + (num-1) * sizeof(APPEND_ENTRY) + ((char*)&ref.value_idx - (char*)&ref);
-            cmb->read(&value_idx, addr, sizeof(u_int64_t));
+            u_int64_t value_idx = get_value_ptr(cmb, node_id, idx);
 
             value_pool->free_push(cmb, value_idx);
         }
-        num--;
+        idx--;
     }
-    write_num(cmb, node_id, 0);
+    write_num(cmb, node_id, 0); 
 }
 
 template <typename T>
@@ -2098,16 +2108,36 @@ void VALUE_POOL<T>::stat(CMB* cmb){
 }
 
 template <typename T>
+void VALUE_POOL<T>::update_num(CMB* cmb, u_int64_t value){
+    
+    mylog << "VALUE_POOL::update_num(): " << num << "/" << capacity << endl;
+
+    off_t addr;
+    addr = VALUE_POOL_START_ADDR + ((char*) &num - (char*) this);
+    cmb->write(addr, &value, sizeof(u_int64_t));
+}
+
+template <typename T>
 u_int64_t VALUE_POOL<T>::get_free_idx(CMB* cmb){
     mylog << "VALUE_POOL::get_free_idx()" << endl;
+    if(num >= capacity){
+        cout << "Value Pool Limit Exceeded, No Available value" << endl;
+        mylog << "Value Pool Limit Exceeded, No Available value" << endl;
+    }
     // If the stack is empty
     if(free_Stack_idx == 0){
         off_t ret_idx = free_idx;
         free_idx++;
 
         // Write the new free_idx back
-        off_t addr = VALUE_POOL_START_ADDR + ((char*) &free_idx - (char*) this);
+        off_t addr;
+        addr = VALUE_POOL_START_ADDR + ((char*) &free_idx - (char*) this);
         cmb->write(addr, &free_idx, sizeof(u_int64_t));
+
+        mylog << "VALUE_POOL::get_free_idx() - " << ret_idx << endl;
+
+        num++;
+        update_num(cmb, num);
 
         return ret_idx;
     }
@@ -2121,8 +2151,8 @@ void VALUE_POOL<T>::free_push(CMB* cmb, u_int64_t idx){
     // Set the new head->next as the current head idx
     off_t addr = VALUE_POOL_BASE_ADDR + idx * sizeof(T);
     if(addr >= VALUE_POOL_END_ADDR){
-        cout << "Value Pool Limit Exceed" << endl;
-        mylog << "Value Pool Limit Exceed" << endl;
+        cout << "Value Pool Addr out of range: 0x" << hex << addr << " - idx = " << dec << idx << endl;
+        mylog << "Value Pool Addr out of range: 0x" << hex << addr << " - idx = " << dec << idx << endl;
         exit(1);
     }
     cmb->write(addr, &free_Stack_idx, sizeof(u_int64_t));
@@ -2130,6 +2160,8 @@ void VALUE_POOL<T>::free_push(CMB* cmb, u_int64_t idx){
     // Set the stack head to the new head
     addr = VALUE_POOL_START_ADDR + ((char*)&free_Stack_idx - (char*)this);
     cmb->write(addr, &idx, sizeof(u_int64_t)); 
+    num--;
+    update_num(cmb, num);
 
     free_Stack_idx = idx;
 }
@@ -2148,8 +2180,8 @@ u_int64_t VALUE_POOL<T>::free_pop(CMB* cmb){
     // Read the new stack head from the head idx
     off_t addr = VALUE_POOL_BASE_ADDR + free_Stack_idx * sizeof(T);
     if(addr >= VALUE_POOL_END_ADDR){
-        cout << "Value Pool Limit Excced" << endl;
-        mylog << "Value Pool Limit Excced" << endl;
+        cout << "Value Pool Addr out of range: 0x" << hex << addr << " - idx = " << dec << free_Stack_idx << endl;
+        mylog << "Value Pool Addr out of range: 0x" << hex << addr << " - idx = " << dec << free_Stack_idx << endl;
         exit(1);
     }
     cmb->read(&next, addr, sizeof(u_int64_t));
@@ -2160,6 +2192,9 @@ u_int64_t VALUE_POOL<T>::free_pop(CMB* cmb){
     addr = VALUE_POOL_START_ADDR + ((char*)&free_Stack_idx - (char*)this);
     cmb->write(addr, &free_Stack_idx, sizeof(u_int64_t));
 
+    num++;
+    update_num(cmb, num);
+
     return ret;
 }
 
@@ -2167,8 +2202,8 @@ template <typename T>
 void VALUE_POOL<T>::get_value(CMB* cmb, u_int64_t idx, T* buf){
     off_t addr = VALUE_POOL_BASE_ADDR + idx * sizeof(T);
     if(addr >= VALUE_POOL_END_ADDR){
-        cout << "Value Pool Limit Excced" << endl;
-        mylog << "Value Pool Limit Excced" << endl;
+        cout << "Value Pool Addr out of range: 0x" << hex << addr << " - idx = " << dec << idx << endl;
+        mylog << "Value Pool Addr out of range: 0x" << hex << addr << " - idx = " << dec << idx << endl;
         exit(1);
     }
     cmb->read(buf, addr, sizeof(T));
@@ -2178,8 +2213,8 @@ template <typename T>
 void VALUE_POOL<T>::write_value(CMB* cmb, u_int64_t idx, T* buf){
     off_t addr = VALUE_POOL_BASE_ADDR + idx * sizeof(T);
     if(addr >= VALUE_POOL_END_ADDR){
-        cout << "Value Pool Limit Excced" << endl;
-        mylog << "Value Pool Limit Excced" << endl;
+        cout << "Value Pool Addr out of range: 0x" << hex << addr << " - idx = " << dec << idx << endl;
+        mylog << "Value Pool Addr out of range: 0x" << hex << addr << " - idx = " << dec << idx << endl;
         exit(1);
     }
     cmb->write(addr, buf, sizeof(T));
