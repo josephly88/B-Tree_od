@@ -1,7 +1,11 @@
+#!/usr/bin/python3
+
 import random
 import os
 
-length=30000
+length=2500000
+input_file = 'insert_2_5M.txt'
+output_file = 'delete_2_5M.txt'
 
 def shuffle_lines(file_path):
     with open(file_path, 'r') as file:
@@ -13,9 +17,6 @@ def shuffle_lines(file_path):
         return lines
 
 def main():
-    output_file = 'micro_d_30K.txt'
-    input_file = 'micro_i_30K.txt'
-
     if not os.path.exists(output_file):
         with open(output_file, 'w') as file_W:
             pass

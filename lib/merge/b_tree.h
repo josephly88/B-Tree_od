@@ -34,6 +34,8 @@ typedef enum {
     U
 } OPR_CODE;
 
+int NUM_OF_APPEND;
+
 ofstream mylog;
 
 bool needsplit;
@@ -320,6 +322,9 @@ void BTree<T>::stat(){
     cout << "Block size: " << block_size << endl;
     cout << "Block Capacity: " << block_cap << endl;
     cout << "Root Block ID: " << root_id << endl;
+    if(NUM_OF_APPEND){
+        cout << "NUM_OF_APPEND: " << NUM_OF_APPEND << endl;
+    }
     cout << endl;
 
     mylog << "BTree.stat()" << endl;
@@ -328,6 +333,9 @@ void BTree<T>::stat(){
     mylog << "\tBlock size: " << block_size << endl;
     mylog << "\tBlock Capacity: " << block_cap << endl;
     mylog << "\tRoot Block ID: " << root_id << endl;
+    if(NUM_OF_APPEND){
+        mylog << "NUM_OF_APPEND: " << NUM_OF_APPEND << endl;
+    }
     print_used_block_id();
 }
 

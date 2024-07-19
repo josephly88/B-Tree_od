@@ -75,6 +75,8 @@ int main(int argc, char** argv){
             }
             else if(strcmp(argv[i], "-append") == 0){
                 append = true;
+                NUM_OF_APPEND = atoi(argv[i+1]);
+                i++;
             }
             else if(strcmp(argv[i], "-writesize") == 0){
                 writeSize = true;
