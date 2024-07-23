@@ -34,8 +34,6 @@ typedef enum {
     U
 } OPR_CODE;
 
-int NUM_OF_APPEND;
-
 ofstream mylog;
 
 bool needsplit;
@@ -179,12 +177,35 @@ class CMB{
         void update_is_leaf(u_int64_t node_id, u_int64_t value);
 };
 
+class meta_BKMap{
+    public:
+        u_int64_t clear_ptr;
+        u_int64_t total_num_iu;
+        u_int64_t next_iu_id;
+        u_int64_t free_iu_id;
+        u_int64_t next_val_id;
+        u_int64_t free_val_id;
+};
+
 class BKMap{
     public:
         u_int64_t block_id;
-        u_int64_t num_key;
+        u_int64_t num_kv;
         u_int64_t is_leaf;
+        u_int64_t iu_ptr; 
 };
+
+class LRU_list_entry{
+    public:
+        u_int64_t last;
+        u_int64_t next;
+}
+
+class node_LRU{
+   public:
+        LRU_list_entry list_pool[MAX_NUM_IU];
+        u_int64_t head; 
+}
 
 template <typename T>
 class APPEND{
@@ -210,7 +231,8 @@ class APPEND_ENTRY{
     public:
         u_int64_t opr;
         u_int64_t key;
-        u_int64_t value_idx;
+        u_int64_t next;
+        u_int64_t value_ptr;
 };
 
 template <typename T>

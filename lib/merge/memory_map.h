@@ -5,6 +5,8 @@
 #define MAP_SIZE                        (1 << 29) // 512MB
 #define MAP_MASK                        (MAP_SIZE - 1)
 
+#define MAX_NUM_IU                      10000
+
 #define CMB_ADDR                        0xC0000000
 
 #define NEXT_FREE_NODE_ID_ADDR          0x00000000
