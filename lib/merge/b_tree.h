@@ -187,6 +187,17 @@ class CMB{
         void update_num_iu(u_int64_t num);
         u_int64_t get_clear_ptr();
         void set_clear_ptr(u_int64_t node_id);
+
+        u_int64_t get_next_iu_id();
+        void update_next_iu_id(u_int64_t value);
+        u_int64_t get_free_iu_id();
+        void update_free_iu_id(u_int64_t value);
+
+        u_int64_t get_next_val_id();
+        void update_next_val_id(u_int64_t value);
+        u_int64_t get_free_val_id();
+        void update_free_val_id(u_int64_t value);
+
         u_int64_t pop_iu_id(); 
         void push_iu_id(u_int64_t iu_id); 
         u_int64_t pop_val_id(); 
@@ -1738,7 +1749,7 @@ removeList::removeList(int _id, removeList* _next){
 }
 
 template <typename T>
-CMB::CMB(MODE _mode){
+CMB<T>::CMB(MODE _mode){
     mylog << "CMB()" << endl;
 
     mode = _mode;
@@ -1780,7 +1791,7 @@ CMB::CMB(MODE _mode){
 }
 
 template <typename T>
-CMB::~CMB(){
+CMB<T>::~CMB(){
     mylog << "~CMB()" << endl;
 
     if(mode == DRAM){
@@ -1793,12 +1804,12 @@ CMB::~CMB(){
 }
 
 template <typename T>
-void* CMB::get_map_base(){
+void* CMB<T>::get_map_base(){
     return map_base;
 }
 
 template <typename T>
-void CMB::cmb_memcpy(void* dest, void* src, size_t len){
+void CMB<T>::cmb_memcpy(void* dest, void* src, size_t len){
 
     u_int64_t* d = (u_int64_t*) dest;
     u_int64_t* s = (u_int64_t*) src;
@@ -1811,7 +1822,7 @@ void CMB::cmb_memcpy(void* dest, void* src, size_t len){
 }
 
 template <typename T>
-void CMB::remap(off_t offset){    
+void CMB<T>::remap(off_t offset){    
     if( ((bar_addr + offset) & ~MAP_MASK) != map_idx ){
          mylog << "remap() - offset:" << offset << " map_idx : " << map_idx << "->" << ((bar_addr + offset) & ~MAP_MASK) << endl;
         if(cache_base)
@@ -1832,7 +1843,7 @@ void CMB::remap(off_t offset){
 }
 
 template <typename T>
-void CMB::read(void* buf, off_t offset, int size){
+void CMB<T>::read(void* buf, off_t offset, int size){
     //mylog << "CMB.read() - offset:" << offset << ", size = " << size << endl;
 
     int remain_size = size;
@@ -1861,7 +1872,7 @@ void CMB::read(void* buf, off_t offset, int size){
 }
 
 template <typename T>
-void CMB::write(off_t offset, void* buf, int size){
+void CMB<T>::write(off_t offset, void* buf, int size){
     //mylog << "CMB.write() - offset:" << offset << ", size = " << size << endl;
 
     int remain_size = size;
@@ -1890,7 +1901,7 @@ void CMB::write(off_t offset, void* buf, int size){
 }
 
 template <typename T>
-void CMB::addr_bkmap_check(off_t addr){
+void CMB<T>::addr_bkmap_check(off_t addr){
     if(addr > BLOCK_MAPPING_END_ADDR){
         cout << "CMB Block Mapping Access Out of Range" << endl;
         mylog << "CMB Block Mapping Access Out of Range" << endl;
@@ -1899,7 +1910,7 @@ void CMB::addr_bkmap_check(off_t addr){
 }
 
 template <typename T>
-void CMB::addr_bkmap_meta_check(off_t addr){
+void CMB<T>::addr_bkmap_meta_check(off_t addr){
     if(addr > BLOCK_MAPPING_START_ADDR){
         cout << "CMB Block Mapping Meta Access Out of Range" << endl;
         mylog << "CMB Block Mapping Meta Access Out of Range" << endl;
@@ -1908,7 +1919,7 @@ void CMB::addr_bkmap_meta_check(off_t addr){
 }
 
 template <typename T>
-u_int64_t CMB::get_new_node_id(){
+u_int64_t CMB<T>::get_new_node_id(){
     mylog << "get_new_node_id()" << endl;
 
     meta_BKMap ref;
@@ -1928,7 +1939,7 @@ u_int64_t CMB::get_new_node_id(){
 }
 
 template <typename T>
-u_int64_t CMB::get_block_id(u_int64_t node_id){
+u_int64_t CMB<T>::get_block_id(u_int64_t node_id){
     mylog << "get_block_id() - node id:" << node_id << endl;
     BKMap ref;
     off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.block_id - (char*)&ref);
@@ -1940,7 +1951,7 @@ u_int64_t CMB::get_block_id(u_int64_t node_id){
 }
 
 template <typename T>
-void CMB::update_node_id(u_int64_t node_id, u_int64_t block_id){
+void CMB<T>::update_node_id(u_int64_t node_id, u_int64_t block_id){
     mylog << "update_node_id() - node id:" << node_id << " block id:" << block_id << endl;
     BKMap ref;
     off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.block_id - (char*)&ref);
@@ -1953,7 +1964,7 @@ void CMB::update_node_id(u_int64_t node_id, u_int64_t block_id){
 }
 
 template <typename T>
-u_int64_t CMB::get_num_kv(u_int64_t node_id){
+u_int64_t CMB<T>::get_num_kv(u_int64_t node_id){
     mylog << "get_num_kv() - node id:" << node_id << endl;
     BKMap ref;
     off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.num_kv - (char*)&ref);
@@ -1965,7 +1976,7 @@ u_int64_t CMB::get_num_kv(u_int64_t node_id){
 }
 
 template <typename T>
-void CMB::update_num_kv(u_int64_t node_id, u_int64_t value){
+void CMB<T>::update_num_kv(u_int64_t node_id, u_int64_t value){
     mylog << "update_num_kv() - node id:" << node_id << " value:" << value << endl;
     BKMap ref;
     off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.num_kv - (char*)&ref);
@@ -1976,7 +1987,7 @@ void CMB::update_num_kv(u_int64_t node_id, u_int64_t value){
 }
 
 template <typename T>
-u_int64_t CMB::get_is_leaf(u_int64_t node_id){
+u_int64_t CMB<T>::get_is_leaf(u_int64_t node_id){
     mylog << "get_is_leaf() - node id:" << node_id << endl;
     BKMap ref;
     off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.is_leaf - (char*)&ref);
@@ -1988,7 +1999,7 @@ u_int64_t CMB::get_is_leaf(u_int64_t node_id){
 }
 
 template <typename T>
-void CMB::update_is_leaf(u_int64_t node_id, u_int64_t value){
+void CMB<T>::update_is_leaf(u_int64_t node_id, u_int64_t value){
     mylog << "update_is_leaf() - node id:" << node_id << " value:" << value << endl;
     BKMap ref;
     off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.is_leaf - (char*)&ref);
@@ -1999,7 +2010,7 @@ void CMB::update_is_leaf(u_int64_t node_id, u_int64_t value){
 }
 
 template <typename T>
-u_int64_t CMB::get_iu_ptr(u_int64_t node_id){
+u_int64_t CMB<T>::get_iu_ptr(u_int64_t node_id){
     mylog << "get_iu_ptr() - node id:" << node_id << endl;
     BKMap ref;
     off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.iu_ptr - (char*)&ref);
@@ -2011,7 +2022,7 @@ u_int64_t CMB::get_iu_ptr(u_int64_t node_id){
 }
 
 template <typename T>
-void CMB::update_iu_ptr(u_int64_t node_id, u_int64_t value){
+void CMB<T>::update_iu_ptr(u_int64_t node_id, u_int64_t value){
     mylog << "update_iu_ptr() - node id:" << node_id << " value:" << value << endl;
     BKMap ref;
     off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.iu_ptr - (char*)&ref);
@@ -2022,7 +2033,7 @@ void CMB::update_iu_ptr(u_int64_t node_id, u_int64_t value){
 }
 
 template <typename T>
-u_int64_t CMB::get_num_iu(){
+u_int64_t CMB<T>::get_num_iu(){
     meta_BKMap ref;
     off_t addr = BLOCK_MAPPING_META_ADDR + ((char*)&ref.num_iu - (char*)&ref);
     addr_bkmap_meta_check(addr);
@@ -2036,7 +2047,7 @@ u_int64_t CMB::get_num_iu(){
 }
 
 template <typename T>
-void CMB::update_num_iu(u_int64_t num){
+void CMB<T>::update_num_iu(u_int64_t num){
     mylog << "update_num_iu() - value: " << num << endl;
 
     meta_BKMap ref;
@@ -2047,7 +2058,7 @@ void CMB::update_num_iu(u_int64_t num){
 }
 
 template <typename T>
-u_int64_t CMB::get_clear_ptr(){
+u_int64_t CMB<T>::get_clear_ptr(){
     meta_BKMap ref;
     off_t addr = BLOCK_MAPPING_META_ADDR + ((char*)&ref.clear_ptr - (char*)&ref);
     addr_bkmap_meta_check(addr);
@@ -2061,11 +2072,111 @@ u_int64_t CMB::get_clear_ptr(){
 }
 
 template <typename T>
-void CMB::update_clear_ptr(u_int64_t node_id){
+void CMB<T>::update_clear_ptr(u_int64_t node_id){
     mylog << "update_clear_ptr() - value: " << node_id << endl;
 
     meta_BKMap ref;
     off_t addr = BLOCK_MAPPING_META_ADDR + ((char*)&ref.clear_ptr - (char*)&ref);
+    addr_bkmap_meta_check(addr);
+    
+	write(addr, &value, sizeof(u_int64_t));
+}
+
+template <typename T>
+u_int64_t CMB<T>::get_next_iu_id(){
+    meta_BKMap ref;
+    off_t addr = BLOCK_MAPPING_META_ADDR + ((char*)&ref.next_iu_id - (char*)&ref);
+    addr_bkmap_meta_check(addr);
+    
+    u_int64_t readval;
+    read(&readval, addr, sizeof(u_int64_t);
+
+    mylog << "get_next_iu() - node_id: " << readval << endl;
+
+    return readval;
+}
+
+template <typename T>
+void CMB<T>::update_next_iu_id(u_int64_t value){
+    mylog << "update_next_iu_id() - value: " << value << endl;
+
+    meta_BKMap ref;
+    off_t addr = BLOCK_MAPPING_META_ADDR + ((char*)&ref.next_iu_id - (char*)&ref);
+    addr_bkmap_meta_check(addr);
+    
+	write(addr, &value, sizeof(u_int64_t));
+}
+
+template <typename T>
+u_int64_t CMB<T>::get_free_iu_id(){
+    meta_BKMap ref;
+    off_t addr = BLOCK_MAPPING_META_ADDR + ((char*)&ref.free_iu_id - (char*)&ref);
+    addr_bkmap_meta_check(addr);
+    
+    u_int64_t readval;
+    read(&readval, addr, sizeof(u_int64_t);
+
+    mylog << "get_free_iu() - node_id: " << readval << endl;
+
+    return readval;
+}
+
+template <typename T>
+void CMB<T>::update_free_iu_id(u_int64_t value){
+    mylog << "update_free_iu_id() - value: " << value << endl;
+
+    meta_BKMap ref;
+    off_t addr = BLOCK_MAPPING_META_ADDR + ((char*)&ref.free_iu_id - (char*)&ref);
+    addr_bkmap_meta_check(addr);
+    
+	write(addr, &value, sizeof(u_int64_t));
+}
+
+template <typename T>
+u_int64_t CMB<T>::get_next_val_id(){
+    meta_BKMap ref;
+    off_t addr = BLOCK_MAPPING_META_ADDR + ((char*)&ref.next_val_id - (char*)&ref);
+    addr_bkmap_meta_check(addr);
+    
+    u_int64_t readval;
+    read(&readval, addr, sizeof(u_int64_t);
+
+    mylog << "get_next_val() - node_id: " << readval << endl;
+
+    return readval;
+}
+
+template <typename T>
+void CMB<T>::update_next_val_id(u_int64_t value){
+    mylog << "update_next_val_id() - value: " << value << endl;
+
+    meta_BKMap ref;
+    off_t addr = BLOCK_MAPPING_META_ADDR + ((char*)&ref.next_val_id - (char*)&ref);
+    addr_bkmap_meta_check(addr);
+    
+	write(addr, &value, sizeof(u_int64_t));
+}
+
+template <typename T>
+u_int64_t CMB<T>::get_free_val_id(){
+    meta_BKMap ref;
+    off_t addr = BLOCK_MAPPING_META_ADDR + ((char*)&ref.free_val_id - (char*)&ref);
+    addr_bkmap_meta_check(addr);
+    
+    u_int64_t readval;
+    read(&readval, addr, sizeof(u_int64_t);
+
+    mylog << "get_free_val() - node_id: " << readval << endl;
+
+    return readval;
+}
+
+template <typename T>
+void CMB<T>::update_free_val_id(u_int64_t value){
+    mylog << "update_free_val_id() - value: " << value << endl;
+
+    meta_BKMap ref;
+    off_t addr = BLOCK_MAPPING_META_ADDR + ((char*)&ref.free_val_id - (char*)&ref);
     addr_bkmap_meta_check(addr);
     
 	write(addr, &value, sizeof(u_int64_t));
