@@ -188,13 +188,13 @@ class CMB{
         u_int64_t get_clear_ptr();
         void set_clear_ptr(u_int64_t node_id);
 
-        u_int64_t get_next_iu_id();
-        void update_next_iu_id(u_int64_t value);
+        u_int64_t get_free_iu_stack_id();
+        void update_free_iu stack_id(u_int64_t value);
         u_int64_t get_free_iu_id();
         void update_free_iu_id(u_int64_t value);
 
-        u_int64_t get_next_val_id();
-        void update_next_val_id(u_int64_t value);
+        u_int64_t get_free_val_stack_id();
+        void update_free_val_stack_id(u_int64_t value);
         u_int64_t get_free_val_id();
         void update_free_val_id(u_int64_t value);
 
@@ -203,6 +203,7 @@ class CMB{
         u_int64_t pop_val_id(); 
         void push_val_id(u_int64_t val_id); 
 
+//HERE
         void append_entry(u_int64_t node_id, OPR_CODE OPR, u_int64_t _k, T _v);
         bool full(); 
         void reduction(u_int64_t node_id, BTreeNode<T>* node);
@@ -210,12 +211,16 @@ class CMB{
 
         u_int64_t search_entry(u_int64_t node_id, u_int64_t key);
 
-        OPR_CODE get_opr(u_int64_t iu_id);
-        u_int64_t get_key(u_int64_t iu_id);
-        u_int64_t get_value_id(u_int64_t iu_id);
-        u_int64_t get_next_iu_id(u_int64_t iu_id);
-        T get_value(u_int64_t val_id);
-        void write_value(u_int64_t val_id, T* buf);
+        OPR_CODE iu_get_opr(u_int64_t iu_id);
+        u_int64_t iu_get_key(u_int64_t iu_id);
+        u_int64_t iu_get_value_id(u_int64_t iu_id);
+        u_int64_t iu_get_next_iu_id(u_int64_t iu_id);
+        T iu_get_value(u_int64_t val_id);
+        void iu_write_value(u_int64_t val_id, T* buf);
+
+        void iu_update_next_iu_id(u_int64_t iu_id, u_int64_t value);
+        u_int64_t iu_get_val_next(u_int64_t val_id);
+        void iu_update_val_next(u_int64_t val_id, u_int64_t next);
 };
 
 class meta_BKMap{
@@ -223,9 +228,9 @@ class meta_BKMap{
         u_int64_t new_node_id;
         u_int64_t clear_ptr;
         u_int64_t num_iu;
-        u_int64_t next_iu_id;
+        u_int64_t free_iu_stack_id;
         u_int64_t free_iu_id;
-        u_int64_t next_val_id;
+        u_int64_t free_val_stack_id;
         u_int64_t free_val_id;
 };
 
@@ -2083,25 +2088,25 @@ void CMB<T>::update_clear_ptr(u_int64_t node_id){
 }
 
 template <typename T>
-u_int64_t CMB<T>::get_next_iu_id(){
+u_int64_t CMB<T>::get_free_iu_stack_id(){
     meta_BKMap ref;
-    off_t addr = BLOCK_MAPPING_META_ADDR + ((char*)&ref.next_iu_id - (char*)&ref);
+    off_t addr = BLOCK_MAPPING_META_ADDR + ((char*)&ref.free_iu_stack_id - (char*)&ref);
     addr_bkmap_meta_check(addr);
     
     u_int64_t readval;
     read(&readval, addr, sizeof(u_int64_t);
 
-    mylog << "get_next_iu() - node_id: " << readval << endl;
+    mylog << "get_free_iu_stack_id() - node_id: " << readval << endl;
 
     return readval;
 }
 
 template <typename T>
-void CMB<T>::update_next_iu_id(u_int64_t value){
-    mylog << "update_next_iu_id() - value: " << value << endl;
+void CMB<T>::update_free_iu_stack_id(u_int64_t value){
+    mylog << "update_free_iu_stack_id() - value: " << value << endl;
 
     meta_BKMap ref;
-    off_t addr = BLOCK_MAPPING_META_ADDR + ((char*)&ref.next_iu_id - (char*)&ref);
+    off_t addr = BLOCK_MAPPING_META_ADDR + ((char*)&ref.free_iu_stack_id - (char*)&ref);
     addr_bkmap_meta_check(addr);
     
 	write(addr, &value, sizeof(u_int64_t));
@@ -2116,7 +2121,7 @@ u_int64_t CMB<T>::get_free_iu_id(){
     u_int64_t readval;
     read(&readval, addr, sizeof(u_int64_t);
 
-    mylog << "get_free_iu() - node_id: " << readval << endl;
+    mylog << "get_free_iu() - iu id: " << readval << endl;
 
     return readval;
 }
@@ -2133,25 +2138,25 @@ void CMB<T>::update_free_iu_id(u_int64_t value){
 }
 
 template <typename T>
-u_int64_t CMB<T>::get_next_val_id(){
+u_int64_t CMB<T>::get_free_val_stack_id(){
     meta_BKMap ref;
-    off_t addr = BLOCK_MAPPING_META_ADDR + ((char*)&ref.next_val_id - (char*)&ref);
+    off_t addr = BLOCK_MAPPING_META_ADDR + ((char*)&ref.free_val_stack_id - (char*)&ref);
     addr_bkmap_meta_check(addr);
     
     u_int64_t readval;
     read(&readval, addr, sizeof(u_int64_t);
 
-    mylog << "get_next_val() - node_id: " << readval << endl;
+    mylog << "get_free_val_stack_id() - val id: " << readval << endl;
 
     return readval;
 }
 
 template <typename T>
-void CMB<T>::update_next_val_id(u_int64_t value){
-    mylog << "update_next_val_id() - value: " << value << endl;
+void CMB<T>::update_free_val_stack_id(u_int64_t value){
+    mylog << "update_free_val_stack_id() - value: " << value << endl;
 
     meta_BKMap ref;
-    off_t addr = BLOCK_MAPPING_META_ADDR + ((char*)&ref.next_val_id - (char*)&ref);
+    off_t addr = BLOCK_MAPPING_META_ADDR + ((char*)&ref.free_val_stack_id - (char*)&ref);
     addr_bkmap_meta_check(addr);
     
 	write(addr, &value, sizeof(u_int64_t));
@@ -2180,6 +2185,55 @@ void CMB<T>::update_free_val_id(u_int64_t value){
     addr_bkmap_meta_check(addr);
     
 	write(addr, &value, sizeof(u_int64_t));
+}
+
+template <typename T>
+u_int64_t CMB<T>::pop_iu_id(){
+    u_int64_t free_iu_stack_id = get_free_iu_stack_id();
+    u_int64_t ret;
+    if(free_iu_stack_id == 0){
+        u_int64_t free_iu_id = get_free_iu_id();
+        ret = free_iu_id;
+        update_free_iu_id(free_iu_id + 1); 
+    }
+    else{
+        ret = free_iu_stack_id;
+        u_int64_t new_free_iu_stack_id = iu_get_next_iu_id(free_iu_stack_id); 
+        update_free_iu_stack_id(new_free_iu_stack_id); 
+    }
+
+    mylog << "pop_iu_id() - " << ret << endl;
+    return ret;
+}
+
+template <typename T>
+void CMB<T>::push_iu_id(u_int64_t iu_id){
+    u_int64_t free_iu_stack_id = get_free_iu_stack_id();
+    iu_update_next_iu_id(iu_id, free_iu_stack_id);
+    update_free_iu_stack_id(iu_id);
+}
+
+template <typename T>
+u_int64_t CMB<T>::pop_val_id(){
+    u_int64_t free_val_stack_id = get_free_val_stack_id();
+    u_int64_t ret;
+    if(free_val_stack_id == 0){
+        u_int64_t free_val_id = get_free_val_id();
+        ret = free_val_id;
+        update_free_val_id(free_val_id + 1);
+    }
+    else{
+        ret = free_val_stack_id;
+        u_int64_t new_free_val_stack_id = iu_get_val_next(free_val_stack_id);
+        update_fre_val_stack_id(new_free_val_stack_id);
+    }
+}
+
+template <typename T>
+void CMB<T>::push_val_id(u_int64_t val_id){
+    u_int64_t free_val_stack_id = get_free_val_stack_id();
+    iu_update_val_next(val_id, free_val_stack_id);
+    update_free_val_stack_id(val_id);
 }
 
 template <typename T>
