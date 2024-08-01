@@ -55,11 +55,13 @@ template <typename T> class BTreeNode;
 class removeList;
 // CMB
 class CMB;
+class meta_BKMap;
 class BKMap;
 // Append operation
-template <typename T> class APPEND;
+class LRU_list_entry;
+class node_LRU;
 class APPEND_ENTRY;
-template <typename T> class VALUE_POOL;
+class IU_LIST;
 
 template <typename T>
 class BTree{
@@ -74,7 +76,6 @@ class BTree{
 		
 	public:
 	    CMB* cmb;
-        APPEND<T>* append_map;
 
 		BTree(char* filename, int degree, MODE _mode, bool append);
 		~BTree();
@@ -154,6 +155,7 @@ class CMB{
     u_int64_t map_idx;
     void* cache_base;
     MODE mode;
+    int MAX_NUM_IU;
 
 	public:
 		CMB(MODE _mode);
@@ -203,7 +205,6 @@ class CMB{
         u_int64_t pop_val_id(); 
         void push_val_id(u_int64_t val_id); 
 
-//HERE
         void append_entry(u_int64_t node_id, OPR_CODE OPR, u_int64_t _k, T _v);
         bool full(); 
         void reduction(u_int64_t node_id, BTreeNode<T>* node);
@@ -256,9 +257,15 @@ class LRU_list_entry{
 }
 
 class node_LRU{
-   public:
-        LRU_list_entry list_pool[MAX_NUM_IU];
+    public:
+        LRU_list_entry list_pool[MAX_NUM_NODE];
         u_int64_t head; 
+        u_int64_t tail;
+
+        //HERE
+        void insert(u_int64_t node_id);
+        u_int64_t pop();
+        void reset(u_int64_t node_id);
 }
 
 class APPEND_ENTRY{
@@ -387,7 +394,6 @@ void BTree<T>::memory_map_addr(){
     cout << "APPEND_OPR_START_ADDR:\t\t0x" << APPEND_OPR_START_ADDR << endl;
     cout << "APPEND_OPR_END_ADDR:\t\t0x" << APPEND_OPR_END_ADDR << endl;
     cout << "VALUE_POOL_START_ADDR:\t\t0x" << VALUE_POOL_START_ADDR << endl;
-    cout << "VALUE_POOL_BASE_ADDR:\t\t0x" << VALUE_POOL_BASE_ADDR << endl;
     cout << "VALUE_POOL_END_ADDR:\t\t0x" << VALUE_POOL_END_ADDR << endl; 
     cout << "END_ADDR:\t\t\t0x" << END_ADDR << endl;
     cout << dec;
@@ -2403,6 +2409,8 @@ void CMB<T>::reduction_delete(BTreeNode<T>* node, IU_LIST* iu_stack){
 template <typename T>
 void CMB<T>::clear_iu(u_int64_t node_id){
     set_clear_ptr(node_id);
+
+    u_int64_t num_iu = get_num_iu(); 
      
     u_int64_t cur_iu_id = get_iu_ptr(node_id);
     while(cur_iu_id){
@@ -2412,7 +2420,11 @@ void CMB<T>::clear_iu(u_int64_t node_id){
         push_iu_id(cur_iu_id);
 
         cur_iu_id = iu_get_next_iu_id(cur_iu_id);
+        
+        num_iu--;
     }
+
+    update_num_iu(num_iu);
 }
 
 template <typename T>
@@ -2555,214 +2567,6 @@ void CMB<T>::iu_update_val_next(u_int64_t val_id, u_int64_t next){
 }
 
 // HERE
-template <typename T>
-OPR_CODE APPEND<T>::get_opr(CMB* cmb, u_int64_t node_id, u_int64_t idx){
-    mylog << "APPEND::get_opr() - node_id = " << node_id << ", idx = " << idx << endl;
-
-    APPEND_ENTRY ref;
-    u_int64_t ret;
-    off_t addr = APPEND_OPR_START_ADDR + node_id * (sizeof(u_int64_t) + NUM_OF_APPEND * sizeof(APPEND_ENTRY));
-    addr += sizeof(u_int64_t) + (idx-1) * sizeof(APPEND_ENTRY) + ((char*)&ref.opr - (char*)&ref);
-    cmb->read(&ret, addr, sizeof(u_int64_t));
-
-    return (OPR_CODE) ret;
-}
-
-template <typename T>
-u_int64_t APPEND<T>::get_key(CMB* cmb, u_int64_t node_id, u_int64_t idx){
-    mylog << "APPEND::get_key() - node_id = " << node_id << ", idx = " << idx << endl;
-
-    APPEND_ENTRY ref;
-    u_int64_t ret;
-    off_t addr = APPEND_OPR_START_ADDR + node_id * (sizeof(u_int64_t) + NUM_OF_APPEND * sizeof(APPEND_ENTRY));
-    addr += sizeof(u_int64_t) + (idx-1) * sizeof(APPEND_ENTRY) + ((char*)&ref.key - (char*)&ref);
-    cmb->read(&ret, addr, sizeof(u_int64_t));
-
-    return ret;
-}
-
-template <typename T>
-u_int64_t APPEND<T>::get_value_ptr(CMB* cmb, u_int64_t node_id, u_int64_t idx){
-    mylog << "APPEND::get_value_ptr() - node_id = " << node_id << ", idx = " << idx << endl;
-
-    APPEND_ENTRY ref;
-    u_int64_t value_idx;
-    off_t addr = APPEND_OPR_START_ADDR + node_id * (sizeof(u_int64_t) + NUM_OF_APPEND * sizeof(APPEND_ENTRY));
-    addr += sizeof(u_int64_t) + (idx-1) * sizeof(APPEND_ENTRY) + ((char*)&ref.value_idx - (char*)&ref);
-    cmb->read(&value_idx, addr, sizeof(u_int64_t));
-
-    return value_idx;
-}
-
-template <typename T>
-T APPEND<T>::get_value(CMB* cmb, u_int64_t node_id, u_int64_t idx){
-    mylog << "APPEND::get_value() - node_id = " << node_id << ", idx = " << idx << endl;
-
-    u_int64_t value_idx = get_value_ptr(cmb, node_id, idx);
-
-    T ret;
-    value_pool->get_value(cmb, value_idx, &ret);
-
-    return ret;
-}
-
-template <typename T>
-void APPEND<T>::delete_entries(CMB* cmb, u_int64_t node_id){
-    mylog << "APPEND::delete_entries() - node_id = " << node_id << endl;
-
-    APPEND_ENTRY ref;
-    u_int64_t num = get_num(cmb, node_id);
-    u_int64_t idx = num;
-    while(idx){
-        OPR_CODE opr = get_opr(cmb, node_id, idx);
-        if(opr == I or opr == U){
-            u_int64_t value_idx = get_value_ptr(cmb, node_id, idx);
-
-            value_pool->free_push(cmb, value_idx);
-        }
-        idx--;
-    }
-    write_num(cmb, node_id, 0); 
-}
-
-template <typename T>
-VALUE_POOL<T>::VALUE_POOL(CMB* cmb){
-    free_Stack_idx = 0;
-    free_idx = 0;
-    num = 0;
-    capacity = (VALUE_POOL_END_ADDR - VALUE_POOL_BASE_ADDR) / sizeof(T) - 1;
-
-    off_t addr = VALUE_POOL_START_ADDR;
-    cmb->write(addr, this, sizeof(VALUE_POOL<T>));
-}
-
-template <typename T>
-void VALUE_POOL<T>::stat(CMB* cmb){
-    VALUE_POOL<T>* meta = (VALUE_POOL<T>*) malloc(sizeof(VALUE_POOL<T>));
-
-    off_t addr = VALUE_POOL_START_ADDR;
-    cmb->read(meta, addr, sizeof(VALUE_POOL<T>));
-
-    cout << "Free_Stack_idx = " << free_Stack_idx << endl;
-    cout << "free_idx = " << free_idx << endl;
-    cout << "capacity = " << capacity << endl;
-    cout << "num = " << num << endl;
-
-    free(meta);
-}
-
-template <typename T>
-void VALUE_POOL<T>::update_num(CMB* cmb, u_int64_t value){
-    
-    mylog << "VALUE_POOL::update_num(): " << num << "/" << capacity << endl;
-
-    off_t addr;
-    addr = VALUE_POOL_START_ADDR + ((char*) &num - (char*) this);
-    cmb->write(addr, &value, sizeof(u_int64_t));
-}
-
-template <typename T>
-u_int64_t VALUE_POOL<T>::get_free_idx(CMB* cmb){
-    mylog << "VALUE_POOL::get_free_idx()" << endl;
-    if(num >= capacity){
-        cout << "Value Pool Limit Exceeded, No Available value" << endl;
-        mylog << "Value Pool Limit Exceeded, No Available value" << endl;
-    }
-    // If the stack is empty
-    if(free_Stack_idx == 0){
-        off_t ret_idx = free_idx;
-        free_idx++;
-
-        // Write the new free_idx back
-        off_t addr;
-        addr = VALUE_POOL_START_ADDR + ((char*) &free_idx - (char*) this);
-        cmb->write(addr, &free_idx, sizeof(u_int64_t));
-
-        mylog << "VALUE_POOL::get_free_idx() - " << ret_idx << endl;
-
-        num++;
-        update_num(cmb, num);
-
-        return ret_idx;
-    }
-    else
-        return free_pop(cmb);
-}
-
-template <typename T>
-void VALUE_POOL<T>::free_push(CMB* cmb, u_int64_t idx){
-    mylog << "VALUE_POOL::free_push(): idx = " << idx << endl;
-    // Set the new head->next as the current head idx
-    off_t addr = VALUE_POOL_BASE_ADDR + idx * sizeof(T);
-    if(addr >= VALUE_POOL_END_ADDR){
-        cout << "Value Pool Addr out of range: 0x" << hex << addr << " - idx = " << dec << idx << endl;
-        mylog << "Value Pool Addr out of range: 0x" << hex << addr << " - idx = " << dec << idx << endl;
-        exit(1);
-    }
-    cmb->write(addr, &free_Stack_idx, sizeof(u_int64_t));
-
-    // Set the stack head to the new head
-    addr = VALUE_POOL_START_ADDR + ((char*)&free_Stack_idx - (char*)this);
-    cmb->write(addr, &idx, sizeof(u_int64_t)); 
-    num--;
-    update_num(cmb, num);
-
-    free_Stack_idx = idx;
-}
-
-template <typename T>
-u_int64_t VALUE_POOL<T>::free_pop(CMB* cmb){
-    mylog << "VALUE_POOL::free_pop() - free_Stack_idx = " << free_Stack_idx << endl;
-    u_int64_t ret, next;
-
-    if(free_Stack_idx == 0)
-        return 0;
-
-    // Return value would be the stack head
-    ret = free_Stack_idx;
-    
-    // Read the new stack head from the head idx
-    off_t addr = VALUE_POOL_BASE_ADDR + free_Stack_idx * sizeof(T);
-    if(addr >= VALUE_POOL_END_ADDR){
-        cout << "Value Pool Addr out of range: 0x" << hex << addr << " - idx = " << dec << free_Stack_idx << endl;
-        mylog << "Value Pool Addr out of range: 0x" << hex << addr << " - idx = " << dec << free_Stack_idx << endl;
-        exit(1);
-    }
-    cmb->read(&next, addr, sizeof(u_int64_t));
-
-    // Write the new stack head back
-    free_Stack_idx = next;
-
-    addr = VALUE_POOL_START_ADDR + ((char*)&free_Stack_idx - (char*)this);
-    cmb->write(addr, &free_Stack_idx, sizeof(u_int64_t));
-
-    num++;
-    update_num(cmb, num);
-
-    return ret;
-}
-
-template <typename T>
-void VALUE_POOL<T>::get_value(CMB* cmb, u_int64_t idx, T* buf){
-    off_t addr = VALUE_POOL_BASE_ADDR + idx * sizeof(T);
-    if(addr >= VALUE_POOL_END_ADDR){
-        cout << "Value Pool Addr out of range: 0x" << hex << addr << " - idx = " << dec << idx << endl;
-        mylog << "Value Pool Addr out of range: 0x" << hex << addr << " - idx = " << dec << idx << endl;
-        exit(1);
-    }
-    cmb->read(buf, addr, sizeof(T));
-}
-
-template <typename T>
-void VALUE_POOL<T>::write_value(CMB* cmb, u_int64_t idx, T* buf){
-    off_t addr = VALUE_POOL_BASE_ADDR + idx * sizeof(T);
-    if(addr >= VALUE_POOL_END_ADDR){
-        cout << "Value Pool Addr out of range: 0x" << hex << addr << " - idx = " << dec << idx << endl;
-        mylog << "Value Pool Addr out of range: 0x" << hex << addr << " - idx = " << dec << idx << endl;
-        exit(1);
-    }
-    cmb->write(addr, buf, sizeof(T));
-}
 
 
 #endif /* B_TREE_H */

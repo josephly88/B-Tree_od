@@ -5,8 +5,6 @@
 #define MAP_SIZE                        (1 << 29) // 512MB
 #define MAP_MASK                        (MAP_SIZE - 1)
 
-#define MAX_NUM_IU                      10000
-
 #define CMB_ADDR                        0xC0000000
 
 #define BLOCK_MAPPING_META_ADDR         0x00000000
@@ -21,5 +19,7 @@
 #define VALUE_POOL_END_ADDR             0x1FFFFFFF
 
 #define END_ADDR 0x20000000 // 512MB
+
+#define MAX_NUM_NODE                    ((BLCOK_MAPPING_END_ADDR + 1 - BLOCK_MAPPING_START_ADDR) / sizeof(u_int64_t))
 
 #endif /* MEMORY_MAP_H */
