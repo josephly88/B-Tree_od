@@ -211,6 +211,7 @@ class CMB{
 
         u_int64_t search_entry(u_int64_t node_id, u_int64_t key);
 
+        void iu_write_iu(u_int64_t iu_id, APPEND_ENTRY iu);
         OPR_CODE iu_get_opr(u_int64_t iu_id);
         u_int64_t iu_get_key(u_int64_t iu_id);
         u_int64_t iu_get_value_id(u_int64_t iu_id);
@@ -1916,7 +1917,7 @@ void CMB<T>::addr_bkmap_check(off_t addr){
 
 template <typename T>
 void CMB<T>::addr_bkmap_meta_check(off_t addr){
-    if(addr > BLOCK_MAPPING_START_ADDR){
+    if(addr >= BLOCK_MAPPING_START_ADDR){
         cout << "CMB Block Mapping Meta Access Out of Range" << endl;
         mylog << "CMB Block Mapping Meta Access Out of Range" << endl;
         exit(1);
@@ -1929,6 +1930,7 @@ u_int64_t CMB<T>::get_new_node_id(){
 
     meta_BKMap ref;
     off_t addr = BLOCK_MAPPING_META_ADDR + ((char*)&ref.new_node_id - (char*)&ref);
+    addr_bkmap_meta_check(addr);
     u_int64_t new_node_id;
     read(&new_node_id, addr, sizeof(u_int64_t));
 
@@ -2235,6 +2237,46 @@ void CMB<T>::push_val_id(u_int64_t val_id){
     iu_update_val_next(val_id, free_val_stack_id);
     update_free_val_stack_id(val_id);
 }
+
+template <typename T>
+void CMB<T>::append_entry(u_int64_t node_id, OPR_CODE OPR, u_int64_t _k, T _v){
+    mylog << "append_entry()" << endl;
+    
+    if(full()){
+        // Reduction LRU
+        // HERE
+    } 
+
+    u_int64_t iu_id = pop_iu_id();   
+
+    APPEND_ENTRY new_entry;
+    new_entry.opr = (u_int64_t) OPR;
+    new_entry.key = _k;
+    new_entry.next = get_iu_ptr(node_id); 
+
+    if(OPR == I || OPR == U)
+       new_entry.value_ptr = pop_val_id(); 
+    else
+        new_entry.value_ptr = 0;
+        
+    iu_write_value(new_entry.value_ptr, &_v);
+    iu_write_iu(iu_id, new_entry);
+
+    update_iu_ptr(node_id, iu_id);  
+}
+
+template <typename T>
+bool CMB<T>::full(){
+    u_int64_t num_iu = get_num_iu();
+    if(num_iu >= MAX_NUM_IU)
+        return true;
+    else
+        return false;
+}
+
+
+
+// HERE
 
 template <typename T>
 void APPEND<T>::append_entry(BTree<T>* t, u_int64_t node_id, OPR_CODE OPR, u_int64_t _k, T _v){
