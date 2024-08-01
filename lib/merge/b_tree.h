@@ -213,17 +213,19 @@ class CMB{
         void reduction_delete(BTreeNode<T>* node, IU_LIST* iu_stack);
         u_int64_t clear_iu(u_int64_t node_id);
 
-        u_int64_t search_entry(u_int64_t node_id, u_int64_t key);
+        u_int64_t search_entry(u_int64_t node_id, u_int64_t _k);
 
+        void addr_IU_check(off_t addr){
+        void addr_value_check(off_t addr){
         void iu_write_iu(u_int64_t iu_id, APPEND_ENTRY iu);
         OPR_CODE iu_get_opr(u_int64_t iu_id);
         u_int64_t iu_get_key(u_int64_t iu_id);
         u_int64_t iu_get_value_id(u_int64_t iu_id);
         u_int64_t iu_get_next_iu_id(u_int64_t iu_id);
+        void iu_update_next_iu_id(u_int64_t iu_id, u_int64_t value);
         T iu_get_value(u_int64_t val_id);
         void iu_write_value(u_int64_t val_id, T* buf);
 
-        void iu_update_next_iu_id(u_int64_t iu_id, u_int64_t value);
         u_int64_t iu_get_val_next(u_int64_t val_id);
         void iu_update_val_next(u_int64_t val_id, u_int64_t next);
 };
@@ -2413,41 +2415,146 @@ void CMB<T>::clear_iu(u_int64_t node_id){
     }
 }
 
-// HERE
 template <typename T>
-u_int64_t APPEND<T>::search_entry(CMB* cmb, u_int64_t node_id, u_int64_t key){
-    mylog << "APPEND::search_entry() - node_id = " << node_id << endl;
+u_int64_t CMB<T>::search_entry(u_int64_t node_id, u_int64_t _k){
+    mylog << "search_entry() - node_id = " << node_id << endl;
 
-    u_int64_t num = get_num(cmb, node_id);
-    while(num){
-        u_int64_t ret = get_key(cmb, node_id, num);
-        if(key == ret)
-            return num;
-        num--;
+    u_int64_t cur_iu_id = get_iu_ptr(node_id);
+    while(cur_iu_id){
+        u_int64_t key = iu_get_key(cur_iu_id);
+        if(key == _k)
+            return cur_iu_id;
+        cur_iu_id = iu_get_next_iu_id;
     }
     return 0;
 }
 
 template <typename T>
-u_int64_t APPEND<T>::get_num(CMB* cmb, u_int64_t node_id){
-    mylog << "APPEND::get_num() - node_id = " << node_id << endl;
+void CMB<T>::addr_IU_check(off_t addr){
+    if(addr > APPEND_OPR_END_ADDR){
+        cout << "CMB IU APPEND Access Out of Range" << endl;
+        mylog << "CMB IU APPEND Access Out of Range" << endl;
+        exit(1);
+    }
+}
+
+template <typename T>
+void CMB<T>::addr_value_check(off_t addr){
+    if(addr > VALUE_POOL_END_ADDR){
+        cout << "CMB IU APPEND Value Pool Access Out of Range" << endl;
+        mylog << "CMB IU APPEND Value Pool Access Out of Range" << endl;
+        exit(1);
+    }
+}
+
+template <typename T>
+u_int64_t CMB<T>:: iu_write_iu(u_int64_t iu_id, APPEND_ENTRY iu){
+   
+    off_t addr = APPEND_OPR_START_ADDR + iu_id * sizeof(APPEND_ENTRY);
+    addr_IU_check(addr);
     
-    off_t addr = APPEND_OPR_START_ADDR + node_id * (sizeof(u_int64_t) + NUM_OF_APPEND * sizeof(APPEND_ENTRY));
-    u_int64_t ret;
-    cmb->read(&ret, addr, sizeof(u_int64_t));
+    write(addr, &iu, sizeof(APPEND_ENTRY)); 
+}
+
+template <typename T>
+OPR_CODE CMB<T>::iu_get_opr(u_int64_t iu_id){
+    
+    APPEND_ENTRY ref;
+    off_t addr = APPEND_OPR_START_ADDR + iu_id * sizeof(APPEND_ENTRY) + ((char*)&ref.opr - (char*)&ref);
+    addr_IU_check(addr);
+    
+    OPR_CODE ret;
+    read(&ret, addr, sizeof(u_int64_t)); 
     return ret;
 }
 
 template <typename T>
-void APPEND<T>::write_num(CMB* cmb, u_int64_t node_id, u_int64_t num){
-    mylog << "APPEND::write_num() - node_id = " << node_id << ", num = " << num << endl;
-
-    off_t addr = APPEND_OPR_START_ADDR + node_id * (sizeof(u_int64_t) + NUM_OF_APPEND * sizeof(APPEND_ENTRY));
-    cmb->write(addr, &num, sizeof(u_int64_t));
-
-    tmp_diff = sizeof(u_int64_t);
+u_int64_t CMB<T>::iu_get_key(u_int64_t iu_id){
+    
+    APPEND_ENTRY ref;
+    off_t addr = APPEND_OPR_START_ADDR + iu_id * sizeof(APPEND_ENTRY) + ((char*)&ref.key - (char*)&ref);
+    addr_IU_check(addr);
+    
+    u_int64_t ret;
+    read(&ret, addr, sizeof(u_int64_t)); 
+    return ret;
 }
 
+template <typename T>
+u_int64_t CMB<T>::iu_get_value_id(u_int64_t iu_id){
+    
+    APPEND_ENTRY ref;
+    off_t addr = APPEND_OPR_START_ADDR + iu_id * sizeof(APPEND_ENTRY) + ((char*)&ref.value_ptr - (char*)&ref);
+    addr_IU_check(addr);
+    
+    u_int64_t ret;
+    read(&ret, addr, sizeof(u_int64_t)); 
+    return ret;
+}
+
+template <typename T>
+u_int64_t CMB<T>::iu_get_next_iu_id(u_int64_t iu_id){
+    
+    APPEND_ENTRY ref;
+    off_t addr = APPEND_OPR_START_ADDR + iu_id * sizeof(APPEND_ENTRY) + ((char*)&ref.next - (char*)&ref);
+    addr_IU_check(addr);
+    
+    u_int64_t ret;
+    read(&ret, addr, sizeof(u_int64_t)); 
+    return ret;
+}
+
+template <typename T>
+void CMB<T>::iu_update_next_iu_id(u_int64_t iu_id, u_int64_t value){
+    
+    APPEND_ENTRY ref;
+    off_t addr = APPEND_OPR_START_ADDR + iu_id * sizeof(APPEND_ENTRY) + ((char*)&ref.next - (char*)&ref);
+    addr_IU_check(addr);
+    
+    write(addr, &value, sizeof(u_int64_t)); 
+}
+
+template <typename T>
+T CMB<T>::iu_get_value(u_int64_t val_id){
+    
+    off_t addr = VALUE_POOL_START_ADDR + val_id * sizeof(T);
+    addr_value_check(addr);
+    
+    T ret;
+    read(&ret, addr, sizeof(T)); 
+    return ret;
+}
+
+template <typename T>
+void CMB<T>::iu_write_value(u_int64_t val_id, T* buf){
+    
+    off_t addr = VALUE_POOL_START_ADDR + val_id * sizeof(T);
+    addr_value_check(addr);
+    
+    write(addr, buf, sizeof(T)); 
+}
+
+template <typename T>
+u_int64_t CMB<T>::iu_get_val_next(u_int64_t val_id){
+    
+    off_t addr = VALUE_POOL_START_ADDR + val_id * sizeof(T);
+    addr_value_check(addr);
+    
+    u_int64_t ret;
+    read(&ret, addr, sizeof(u_int64_t)); 
+    return ret;
+}
+
+template <typename T>
+void CMB<T>::iu_update_val_next(u_int64_t val_id, u_int64_t next){
+    
+    off_t addr = VALUE_POOL_START_ADDR + val_id * sizeof(T);
+    addr_value_check(addr);
+    
+    write(addr, &next, sizeof(u_int64_t)); 
+}
+
+// HERE
 template <typename T>
 OPR_CODE APPEND<T>::get_opr(CMB* cmb, u_int64_t node_id, u_int64_t idx){
     mylog << "APPEND::get_opr() - node_id = " << node_id << ", idx = " << idx << endl;
