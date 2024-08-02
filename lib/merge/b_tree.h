@@ -102,6 +102,7 @@ class BTree{
         void search(u_int64_t _k, T* buf);
         void update(u_int64_t _k, T _v);
 		void deletion(u_int64_t _k);	
+
 };
 
 template <typename T>
@@ -191,7 +192,7 @@ class CMB{
         void set_clear_ptr(u_int64_t node_id);
 
         u_int64_t get_free_iu_stack_id();
-        void update_free_iu stack_id(u_int64_t value);
+        void update_free_iu_stack_id(u_int64_t value);
         u_int64_t get_free_iu_id();
         void update_free_iu_id(u_int64_t value);
 
