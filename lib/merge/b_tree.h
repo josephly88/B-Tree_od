@@ -263,9 +263,10 @@ class node_LRU{
         u_int64_t tail;
 
         //HERE
+        void dequeue(u_int64_t node_id);
+        bool look_up(u_int64_t node_id);
         void insert(u_int64_t node_id);
         u_int64_t pop();
-        void reset(u_int64_t node_id);
 }
 
 class APPEND_ENTRY{
@@ -2564,6 +2565,84 @@ void CMB<T>::iu_update_val_next(u_int64_t val_id, u_int64_t next){
     addr_value_check(addr);
     
     write(addr, &next, sizeof(u_int64_t)); 
+}
+
+template <typename T>
+void node_LRU::dequeue(u_int64_t node_id){
+
+    if(look_up(node_id)){
+        if(head == node_id && tail == node_id){
+            head = 0;
+            tail = 0;
+        }
+        else if(head == node_id){
+            head = list_pool[node_id].next;
+            list_pool[head].last = 0;
+        }
+        else if(tail == node_id){
+            tail = list_pool[node_id].last;
+            list_pool[tail].next = 0;
+        }
+        else{
+            u_int64_t last_id = list_pool[node_id].last;
+            u_int64_t next_id = list_pool[node_id].next;
+            list_pool[last_id].next = next_id;
+            list_pool[next_id].last = last_id;
+        }
+    }
+
+    list_pool[node_id].last = 0;
+    list_pool[next_id].next = 0;
+}
+
+template <typename T>
+bool node_LRU::look_up(u_int64_t node_id){
+    if(head == node_id || tail == node_id)
+        return true;
+
+    if(list_pool[node_id].last != 0 || list_pool[node_id].next != 0)
+        return true;  
+
+    return false;
+}
+
+template <typename T>
+void node_LRU::insert(u_int64_t node_id){
+    dequeue(node_id);
+
+    if(head == 0 && tail == 0){
+        head = node_id;
+        tail = node_id;
+        list_pool[node_id].last = 0;
+        list_pool[node_id].next = 0;
+    }
+    else{
+        list_pool[tail].next = node_id;
+        list_pool[node_id].last = tail;
+        list_pool[node_id].next = 0;
+        tail = node_id;
+    }
+}
+
+template <typename T>
+u_int64_t node_LRU::pop(){
+    if(head == 0 && tail == 0)
+        return 0;
+
+    u_int64_t ret = head;
+    if(head == tail){
+        head = 0;
+        tail = 0;
+    }
+    else{
+        head = list_pool[head].next;
+        list_pool[head].last = 0;
+    }
+
+    list_pool[ret].last = 0;
+    list_pool[ret].next = 0;
+
+    return ret;
 }
 
 // HERE
