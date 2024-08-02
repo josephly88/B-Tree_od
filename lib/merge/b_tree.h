@@ -73,9 +73,10 @@ class BTree{
 	int block_cap;
     int height;
     MODE mode;
+    bool append;
 		
 	public:
-	    CMB* cmb;
+	    CMB<T>* cmb;
 
 		BTree(char* filename, int degree, MODE _mode, bool append);
 		~BTree();
@@ -159,6 +160,8 @@ class CMB{
     int MAX_NUM_IU;
 
 	public:
+        node_LRU* nodeLRU;
+
 		CMB(MODE _mode);
 		~CMB();
 
@@ -205,6 +208,11 @@ class CMB{
         void push_iu_id(u_int64_t iu_id); 
         u_int64_t pop_val_id(); 
         void push_val_id(u_int64_t val_id); 
+
+        // Public Function
+        void append(u_int64_t node_id, OPR_CODE OPR, u_int64_t _k, T _v);
+        void reduce(u_int64_t node_id, BTreeNode<T>* node);
+        void clear(u_int64_t node_id);
 
         void append_entry(u_int64_t node_id, OPR_CODE OPR, u_int64_t _k, T _v);
         bool full(); 
@@ -259,11 +267,14 @@ class LRU_list_entry{
 
 class node_LRU{
     public:
-        LRU_list_entry list_pool[MAX_NUM_NODE];
+        LRU_list_entry* list_pool;
         u_int64_t head; 
         u_int64_t tail;
 
         //HERE
+        node_LRU();
+        ~node_LRU();
+
         void dequeue(u_int64_t node_id);
         bool look_up(u_int64_t node_id);
         void insert(u_int64_t node_id);
@@ -2568,7 +2579,14 @@ void CMB<T>::iu_update_val_next(u_int64_t val_id, u_int64_t next){
     write(addr, &next, sizeof(u_int64_t)); 
 }
 
-template <typename T>
+void node_LRU::node_LRU(){
+    list_pool = malloc((MAX_NUM_NODE+1) * sizeof(LRU_list_entry));
+}
+
+void node_LRU::~node_LRU(){
+    free(list_pool);
+}
+
 void node_LRU::dequeue(u_int64_t node_id){
 
     if(look_up(node_id)){
@@ -2596,7 +2614,6 @@ void node_LRU::dequeue(u_int64_t node_id){
     list_pool[next_id].next = 0;
 }
 
-template <typename T>
 bool node_LRU::look_up(u_int64_t node_id){
     if(head == node_id || tail == node_id)
         return true;
@@ -2607,7 +2624,6 @@ bool node_LRU::look_up(u_int64_t node_id){
     return false;
 }
 
-template <typename T>
 void node_LRU::insert(u_int64_t node_id){
     dequeue(node_id);
 
@@ -2625,7 +2641,6 @@ void node_LRU::insert(u_int64_t node_id){
     }
 }
 
-template <typename T>
 u_int64_t node_LRU::pop(){
     if(head == 0 && tail == 0)
         return 0;
