@@ -174,6 +174,7 @@ class CMB{
         void addr_bkmap_check(off_t addr);
         void addr_bkmap_meta_check(off_t addr);
 		u_int64_t get_new_node_id();
+        void new_node_id_init();
 		u_int64_t get_block_id(u_int64_t node_id);
 		void update_node_id(u_int64_t node_id, u_int64_t block_id);
         // Meta data
@@ -268,7 +269,6 @@ class node_LRU{
         u_int64_t head; 
         u_int64_t tail;
 
-        //HERE
         node_LRU();
         ~node_LRU();
 
@@ -326,15 +326,21 @@ BTree<T>::BTree(char* filename, int degree, MODE _mode, int append){
     else{
         // Map CMB
         cmb = new CMB(mode);    
-        u_int64_t first_node_id = 1;
-        cmb->write(NEXT_FREE_NODE_ID_ADDR, &first_node_id, sizeof(u_int64_t));
+        cmb->new_node_id_init();
 
         // Append entry Optimization
         cmb->nodeLRU = NULL;
-        
         if(append > 0){
             cmb->nodeLRU = new node_LRU;
             cmb->MAX_NUM_IU = append;
+
+            // HERE
+            cmb->update_num_iu(0);
+            set_clear_ptr(0);
+            update_free_iu_stack_id(0);
+            update_free_iu_id(1);
+            update_free_val_stack_id(0);
+            update_free_val_id(1);
         }
     }
 
@@ -642,8 +648,9 @@ void BTree<T>::search(u_int64_t _k, T* buf){
         if(append_map){
             u_int64_t getIsLeaf = cmb->get_is_leaf(root_id);
             if(getIsLeaf == 1){
-                u_int64_t entry_idx = append_map->search_entry(cmb, root_id, _k);
-                if(entry_idx != 0){
+                // HERE
+                u_int64_t iu_id = cmb->search_entry(cmb, root_id, _k);
+                if(iu_id != 0){
                     T ret_val = append_map->get_value(cmb, root_id, entry_idx);
                     memcpy(buf, &ret_val, sizeof(T));
                     return;
@@ -1950,6 +1957,18 @@ u_int64_t CMB<T>::get_new_node_id(){
 }
 
 template <typename T>
+void CMB<T>::new_node_id_init(void){
+    mylog << "new_node_id_init() - 1" << endl;
+
+    meta_BKMap ref;
+    off_t addr = BLOCK_MAPPING_META_ADDR + ((char*)&ref.new_node_id - (char*)&ref);
+    addr_bkmap_meta_check(addr);
+
+    u_int64_t new_node_id = 1;
+    write(addr, &new_node_id, sizeof(u_int64_t));
+}
+
+template <typename T>
 u_int64_t CMB<T>::get_block_id(u_int64_t node_id){
     mylog << "get_block_id() - node id:" << node_id << endl;
     BKMap ref;
@@ -2635,8 +2654,6 @@ u_int64_t node_LRU::pop(){
 
     return ret;
 }
-
-// HERE
 
 
 #endif /* B_TREE_H */
