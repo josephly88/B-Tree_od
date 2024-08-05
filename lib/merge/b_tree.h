@@ -73,15 +73,12 @@ class BTree{
 	int block_cap;
     int height;
     MODE mode;
-    bool append;
 		
 	public:
 	    CMB<T>* cmb;
 
-		BTree(char* filename, int degree, MODE _mode, bool append);
+		BTree(char* filename, int degree, MODE _mode, int append);
 		~BTree();
-
-		void reopen(int _fd, MODE _mode, bool append);
 
 		void stat();
         void memory_map_addr();
@@ -296,7 +293,7 @@ class IU_LIST{
 }
 
 template <typename T>
-BTree<T>::BTree(char* filename, int degree, MODE _mode, bool append){
+BTree<T>::BTree(char* filename, int degree, MODE _mode, int append){
     mylog << "BTree()" << endl;
 
     if(degree > (int)((PAGE_SIZE - sizeof(BTreeNode<T>) - sizeof(u_int64_t)) / (sizeof(u_int64_t) + sizeof(T))) ){
@@ -311,7 +308,6 @@ BTree<T>::BTree(char* filename, int degree, MODE _mode, bool append){
     block_cap = (block_size - sizeof(BTree)) * 8;
     root_id = 0;
     mode = _mode;
-    append_map = NULL;
     height = 0;
     
     char* buf;
@@ -334,10 +330,12 @@ BTree<T>::BTree(char* filename, int degree, MODE _mode, bool append){
         cmb->write(NEXT_FREE_NODE_ID_ADDR, &first_node_id, sizeof(u_int64_t));
 
         // Append entry Optimization
-        if(append){
-            append_map = new APPEND<T>();
-            append_map->value_pool = new VALUE_POOL<T>(cmb);
-        }       
+        cmb->nodeLRU = NULL;
+        
+        if(append > 0){
+            cmb->nodeLRU = new node_LRU;
+            cmb->MAX_NUM_IU = append;
+        }
     }
 
 }
@@ -347,31 +345,6 @@ BTree<T>::~BTree(){
     mylog << "~BTree()" << endl;
     close(fd);
     if(cmb) delete cmb;
-    if(append_map){
-        delete append_map->value_pool;
-        delete append_map;
-    }
-}
-
-template <typename T>
-void BTree<T>::reopen(int _fd, MODE _mode, bool append){
-    mylog << "reopen()" << endl;
-    fd = _fd;
-    mode = _mode;
-    tree_write(fd, this);
-    if(mode == COPY_ON_WRITE)
-        cmb = NULL;
-    else{
-        cmb = new CMB(mode);
-
-        if(append){
-            append_map = new APPEND<T>();
-            append_map->value_pool = (VALUE_POOL<T>*) malloc(sizeof(VALUE_POOL<T>));
-            off_t addr = VALUE_POOL_START_ADDR;
-            cmb->read(append_map->value_pool, addr, sizeof(VALUE_POOL<T>));
-        }
-    }
-
 }
 
 template <typename T>
@@ -393,9 +366,6 @@ void BTree<T>::stat(){
     mylog << "\tBlock size: " << block_size << endl;
     mylog << "\tBlock Capacity: " << block_cap << endl;
     mylog << "\tRoot Block ID: " << root_id << endl;
-    if(NUM_OF_APPEND){
-        mylog << "NUM_OF_APPEND: " << NUM_OF_APPEND << endl;
-    }
     print_used_block_id();
 }
 
@@ -1838,6 +1808,9 @@ CMB<T>::~CMB(){
 
     if (munmap(map_base, MAP_SIZE) == -1) FATAL;
 	close(fd);
+
+    if(nodeLRU)
+        delete nodeLRU;
 }
 
 template <typename T>
@@ -2581,6 +2554,8 @@ void CMB<T>::iu_update_val_next(u_int64_t val_id, u_int64_t next){
 
 void node_LRU::node_LRU(){
     list_pool = malloc((MAX_NUM_NODE+1) * sizeof(LRU_list_entry));
+    head = 0;
+    tail = 0;
 }
 
 void node_LRU::~node_LRU(){
