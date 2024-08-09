@@ -208,18 +208,16 @@ class CMB{
         void push_val_id(u_int64_t val_id); 
 
         // Public Function
-        void append(u_int64_t node_id, OPR_CODE OPR, u_int64_t _k, T _v);
-        void reduce(u_int64_t node_id, BTreeNode<T>* node);
-        void clear(u_int64_t node_id);
+        void append(BTree<T>* t, u_int64_t node_id, OPR_CODE OPR, u_int64_t _k, T _v);
+        void reduction(u_int64_t node_id, BTreeNode<T>* node);
+        void clear_iu(u_int64_t node_id);
 
         void append_entry(u_int64_t node_id, OPR_CODE OPR, u_int64_t _k, T _v);
         bool full(); 
-        void reduction(u_int64_t node_id, BTreeNode<T>* node);
         void reduction_create_iu_list(u_int64_t node_id, IU_LIST** iu_stack);
         void reduction_insert(BTreeNode<T>* node, IU_LIST* iu_stack);
         void reduction_update(BTreeNode<T>* node, IU_LIST* iu_stack);
         void reduction_delete(BTreeNode<T>* node, IU_LIST* iu_stack);
-        u_int64_t clear_iu(u_int64_t node_id);
 
         u_int64_t search_entry(u_int64_t node_id, u_int64_t _k);
 
@@ -334,7 +332,6 @@ BTree<T>::BTree(char* filename, int degree, MODE _mode, int append){
             cmb->nodeLRU = new node_LRU;
             cmb->MAX_NUM_IU = append;
 
-            // HERE
             cmb->update_num_iu(0);
             set_clear_ptr(0);
             update_free_iu_stack_id(0);
@@ -648,7 +645,6 @@ void BTree<T>::search(u_int64_t _k, T* buf){
         if(append_map){
             u_int64_t getIsLeaf = cmb->get_is_leaf(root_id);
             if(getIsLeaf == 1){
-                // HERE
                 u_int64_t iu_id = cmb->search_entry(cmb, root_id, _k);
                 if(iu_id != 0){
                     T ret_val = append_map->get_value(cmb, root_id, entry_idx);
@@ -2262,6 +2258,73 @@ void CMB<T>::push_val_id(u_int64_t val_id){
 }
 
 template <typename T>
+void CMB<T>::append(BTree<T>* t, u_int64_t node_id, OPR_CODE OPR, u_int64_t _k, T _v){
+    if(full()){
+        u_int64_t pop_id = nodeLRU->pop();
+        BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
+        t->node_read(pop_id, node);
+        reduce(pop_id, node);
+        t->node_write(pop_id, node);
+        clear_iu(pop_id);
+    }  
+
+    u_int64_t num_iu = get_num_iu();
+    append_entry(node_id, OPR, _k, _v);
+    update_num_iu(num_iu + 1); 
+    
+    nodeLRU->insert(node_id);
+}
+
+template <typename T>
+void CMB<T>::reduction(u_int64_t node_id, BTreeNode<T>* node){
+    mylog << "reduction() - node_id = " << node_id << endl;
+
+    IU_LIST* iu_stack;
+    reduction_create_iu_list(node_id, &iu_stack);
+
+    while(iu_stack){
+        OPR_CODE opr = iu_get_opr(iu_stack->iu_id);
+
+        if(opr == I)
+            reduction_insert(node, iu_stack);
+        else if(opr == U)
+            reduction_update(node, iu_stack);
+        else if(opr == D)
+            reduction_delete(node, iu_stack);
+        else{
+            cout << "Incorrect OPR: " << opr << endl;
+            mylog << "Incorrect OPR: " << opr << endl;
+            exit(1);
+        }
+
+        IU_LIST* del_iu_list = iu_stack;
+        iu_stack = iu_stack->next;
+        delete del_iu_list;
+    }
+}
+
+template <typename T>
+void CMB<T>::clear_iu(u_int64_t node_id){
+    set_clear_ptr(node_id);
+
+    u_int64_t num_iu = get_num_iu(); 
+     
+    u_int64_t cur_iu_id = get_iu_ptr(node_id);
+    while(cur_iu_id){
+        u_int64_t value_id = iu_get_value_id(cur_iu_id);
+        if(value_id)
+            push_val_id(value_id);
+        push_iu_id(cur_iu_id);
+
+        cur_iu_id = iu_get_next_iu_id(cur_iu_id);
+        
+        num_iu--;
+    }
+
+    update_num_iu(num_iu);
+}
+
+template <typename T>
 void CMB<T>::append_entry(u_int64_t node_id, OPR_CODE OPR, u_int64_t _k, T _v){
     mylog << "append_entry()" << endl;
 
@@ -2292,35 +2355,6 @@ bool CMB<T>::full(){
     }
     else
         return false;
-}
-
-template <typename T>
-void CMB<T>::reduction(u_int64_t node_id, BTreeNode<T>* node){
-    mylog << "reduction() - node_id = " << node_id << endl;
-
-    IU_LIST* iu_stack;
-    reduction_create_iu_list(node_id, &iu_stack);
-    
-    while(iu_stack){
-        OPR_CODE opr = iu_get_opr(iu_stack->iu_id);
-
-        if(opr == I)
-            reduction_insert(node, iu_stack);
-        else if(opr == U)
-            reduction_update(node, iu_stack);
-        else if(opr == D)
-            reduction_delete(node, iu_stack);
-        else{
-            cout << "Incorrect OPR: " << opr << endl;
-            mylog << "Incorrect OPR: " << opr << endl;
-            exit(1);
-        }
-
-        IU_LIST* del_iu_list = iu_stack;
-        iu_stack = iu_stack->next;
-        delete del_iu_list;
-    }
-
 }
 
 template <typename T>
@@ -2409,27 +2443,6 @@ void CMB<T>::reduction_delete(BTreeNode<T>* node, IU_LIST* iu_stack){
         }
     }
     node->num_key--;            
-}
-
-template <typename T>
-void CMB<T>::clear_iu(u_int64_t node_id){
-    set_clear_ptr(node_id);
-
-    u_int64_t num_iu = get_num_iu(); 
-     
-    u_int64_t cur_iu_id = get_iu_ptr(node_id);
-    while(cur_iu_id){
-        u_int64_t value_id = iu_get_value_id(cur_iu_id);
-        if(value_id)
-            push_val_id(value_id);
-        push_iu_id(cur_iu_id);
-
-        cur_iu_id = iu_get_next_iu_id(cur_iu_id);
-        
-        num_iu--;
-    }
-
-    update_num_iu(num_iu);
 }
 
 template <typename T>
