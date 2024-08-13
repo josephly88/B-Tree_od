@@ -38,8 +38,8 @@ int main(int argc, char** argv){
     int end = 0;
     bool create = false;
     MODE mode = COPY_ON_WRITE;
-    bool append = false;
     bool writeSize = false;
+    int append = 0;
 
     if(argc < 2){
         usage();
@@ -74,8 +74,7 @@ int main(int argc, char** argv){
                 mode = DRAM;
             }
             else if(strcmp(argv[i], "-append") == 0){
-                append = true;
-                NUM_OF_APPEND = atoi(argv[i+1]);
+                append = atoi(argv[i+1]);
                 i++;
             }
             else if(strcmp(argv[i], "-writesize") == 0){
@@ -103,15 +102,6 @@ int main(int argc, char** argv){
         cout << "Create tree <" << tree_file << ">" << endl;
         mylog << "Create tree <" << tree_file << ">" << endl;
         t = new BTree<TYPE>(tree_file, degree, mode, append);
-    }
-    else{
-    // Existed tree file
-        cout << "Read tree from <" << tree_file << ">" << endl;
-        mylog << "Read tree from <" << tree_file << ">" << endl;
-        int fd = open(tree_file, O_RDWR | O_DIRECT);
-        t = (BTree<TYPE>*) calloc(1, sizeof(BTree<TYPE>));
-        t->tree_read(fd, t);
-        t->reopen(fd, mode, append);
     }
 
     t->stat();

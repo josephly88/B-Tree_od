@@ -20,6 +20,6 @@
 
 #define END_ADDR 0x20000000 // 512MB
 
-#define MAX_NUM_NODE                    ((BLCOK_MAPPING_END_ADDR + 1 - BLOCK_MAPPING_START_ADDR) / sizeof(u_int64_t))
+#define MAX_NUM_NODE                    ((BLOCK_MAPPING_END_ADDR + 1 - BLOCK_MAPPING_START_ADDR) / sizeof(u_int64_t))
 
 #endif /* MEMORY_MAP_H */
