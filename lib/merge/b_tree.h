@@ -154,9 +154,9 @@ class CMB{
     u_int64_t map_idx;
     void* cache_base;
     MODE mode;
-    int MAX_NUM_IU;
 
 	public:
+        int MAX_NUM_IU;
         node_LRU* nodeLRU;
 
 		CMB(MODE _mode);
@@ -287,7 +287,7 @@ class APPEND_ENTRY{
 class IU_LIST{
     public:
         u_int64_t iu_id;
-        u_int64_t next;
+        IU_LIST* next;
 };
 
 template <typename T>
@@ -1133,7 +1133,7 @@ u_int64_t BTreeNode<T>::direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeLis
 
     mylog << "direct_insert() - key:" << _k << endl;
 
-    if(t->nodeLRU && is_leaf){
+    if(t->cmb->nodeLRU && is_leaf){
         t->cmb->append(t, node_id, I, _k, _v);
         op_size_cmb += tmp_diff;
 
@@ -1235,7 +1235,7 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
         t->cmb->update_num_kv(node->node_id, min_num);
         op_size_cmb += tmp_diff;
         
-        if(t->nodeLRU && node->is_leaf){
+        if(t->cmb->nodeLRU && node->is_leaf){
             t->cmb->clear_iu(node_id); 
             op_size_cmb += tmp_diff;
             if(node->is_leaf)
@@ -1276,7 +1276,7 @@ u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** 
     bool found = false;
 
     if(t->cmb->nodeLRU && is_leaf){
-        t->cmb->nodeLRU->reduction(node_id, this);
+        t->cmb->reduction(node_id, this);
     }
 
     for(i = 0; i < num_key; i++){
@@ -1314,7 +1314,7 @@ u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** 
             if(borrow_from_succ){
                 mylog << "borrow_from_succesor() - node id:" << node->node_id << endl;
                 if(t->cmb->nodeLRU)
-                    t->cmb->nodeLRU->reduction(succ_id, succ);
+                    t->cmb->reduction(succ_id, succ);
 
                 // Borrow from succ
                 key[i] = succ->key[0];
@@ -1342,7 +1342,7 @@ u_int64_t BTreeNode<T>::traverse_delete(BTree<T> *t, u_int64_t _k, removeList** 
                 BTreeNode<T>* pred = new BTreeNode<T>(0, 0, 0);  
                 t->node_read(pred_id, pred);
                 if(t->cmb->nodeLRU)
-                    t->cmb->nodeLRU->reduction(pred_id, pred);
+                    t->cmb->reduction(pred_id, pred);
 
                 mylog << "borrow_from_predecesor() - node id:" << node->node_id << endl;
                 // Borrow from pred
@@ -1522,7 +1522,7 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
 
             // Append delete to left
             T empty;
-            t->nodeLRU->append(t, left->node_id, D, left->key[left->num_key-1], empty);            
+            t->cmb->append(t, left->node_id, D, left->key[left->num_key-1], empty);            
             op_size_cmb += tmp_diff;
 
             left->num_key -= 1;
@@ -2263,7 +2263,7 @@ void CMB<T>::append(BTree<T>* t, u_int64_t node_id, OPR_CODE OPR, u_int64_t _k, 
         u_int64_t pop_id = nodeLRU->pop();
         BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
         t->node_read(pop_id, node);
-        reduce(pop_id, node);
+        reduction(pop_id, node);
         t->node_write(pop_id, node);
         clear_iu(pop_id);
     }  
@@ -2362,15 +2362,15 @@ template <typename T>
 void CMB<T>::reduction_create_iu_list(u_int64_t node_id, IU_LIST** iu_stack){
 
     u_int64_t cur_iu_id = get_iu_ptr(node_id);
-    u_int64_t last_iu_id = 0;
+    IU_LIST* last_iu_list = NULL;
     while(cur_iu_id){
         IU_LIST* new_iu_entry = new IU_LIST;
         new_iu_entry->iu_id = cur_iu_id;
-        new_iu_entry->next = last_iu_id;
+        new_iu_entry->next = last_iu_list;
 
         *iu_stack = new_iu_entry;
 
-        last_iu_id = cur_iu_id;
+        last_iu_list = new_iu_entry;
         cur_iu_id = iu_get_next_iu_id(cur_iu_id);
     }
 }
@@ -2457,7 +2457,7 @@ u_int64_t CMB<T>::search_entry(u_int64_t node_id, u_int64_t _k){
         u_int64_t key = iu_get_key(cur_iu_id);
         if(key == _k)
             return cur_iu_id;
-        cur_iu_id = iu_get_next_iu_id;
+        cur_iu_id = iu_get_next_iu_id(cur_iu_id);
     }
     return 0;
 }
