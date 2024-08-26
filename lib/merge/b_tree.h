@@ -1431,7 +1431,7 @@ u_int64_t BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** li
         return 0;
     } 
 
-    if(i < num_key && t->cmb->nodeLRU && is_leaf){
+    if(t->cmb && (i < num_key && t->cmb->nodeLRU && is_leaf)){
         T empty;
         t->cmb->append(t, node_id, D, _k, empty);
         op_size_cmb += tmp_diff;
