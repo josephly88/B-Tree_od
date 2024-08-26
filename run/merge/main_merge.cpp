@@ -36,7 +36,6 @@ int main(int argc, char** argv){
     char* tree_file = NULL;
     int start = 0;
     int end = 0;
-    bool create = false;
     MODE mode = COPY_ON_WRITE;
     bool writeSize = false;
     int append = 0;
@@ -63,9 +62,6 @@ int main(int argc, char** argv){
                 start = atoi(argv[i+1]);
                 end = atoi(argv[i+2]);
                 i += 2;
-            }
-            else if(strcmp(argv[i], "-new") == 0){ // Create a new tree
-                create = true; 
             }
             else if(strcmp(argv[i], "-cmb") == 0){ // Set as CMB mode
                 mode = REAL_CMB;
@@ -97,12 +93,9 @@ int main(int argc, char** argv){
     else
         mylog.open(log_file);
 
-    if(create){
-    // Create a new tree file
-        cout << "Create tree <" << tree_file << ">" << endl;
-        mylog << "Create tree <" << tree_file << ">" << endl;
-        t = new BTree<TYPE>(tree_file, degree, mode, append);
-    }
+    cout << "Create tree <" << tree_file << ">" << endl;
+    mylog << "Create tree <" << tree_file << ">" << endl;
+    t = new BTree<TYPE>(tree_file, degree, mode, append);
 
     t->stat();
 

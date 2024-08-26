@@ -25,22 +25,8 @@ YCSB_file::YCSB_file(char* fileIn){
 	ycsb_file.open(fileIn);
 
 	string line;
-	while(true){
-		getline(ycsb_file, line);
-
-		if(line == "**********************************************")
-			break;
-
-		string item(line);
-		item = item.substr(1, 14);
-		if(item == "operationcount"){
-			smatch m;
-			regex regexp_cnt("[0-9]+");
-			regex_search(line, m, regexp_cnt);
-			string value(m[0]);
-			recordcount = stoi(value);	
-		}
-	}
+    getline(ycsb_file, line);
+    recordcount = stoi(line);
 }
 
 YCSB_file::~YCSB_file(){

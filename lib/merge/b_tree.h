@@ -358,7 +358,7 @@ void BTree<T>::stat(){
     cout << "Block size: " << block_size << endl;
     cout << "Block Capacity: " << block_cap << endl;
     cout << "Root Block ID: " << root_id << endl;
-    if(cmb->nodeLRU){
+    if(cmb && cmb->nodeLRU){
         cout << "Maximum number of IU: " << cmb->MAX_NUM_IU << endl;
     }
     cout << endl;
