@@ -732,6 +732,8 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
 
             if(cmb){
                 new_root_id = cmb->get_new_node_id();
+                if(cmb->nodeLRU)
+                    cmb->update_iu_ptr(new_root_id, 0);  
                 cmb->update_node_id(new_root_id, get_free_block_id());
                 op_size_cmb += tmp_diff;
                 cmb->update_num_kv(new_root_id, 0);
@@ -772,6 +774,8 @@ void BTree<T>::insertion(u_int64_t _k, T _v){
     else{
         if(cmb){
             root_id = cmb->get_new_node_id();
+            if(cmb->nodeLRU)
+                cmb->update_iu_ptr(root_id, 0);
             cmb->update_node_id(root_id, get_free_block_id());
             cmb->update_num_kv(root_id, 0);
             if(cmb && cmb->nodeLRU){
@@ -1206,6 +1210,8 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
     int new_node_id;
     if(t->cmb){
         new_node_id = t->cmb->get_new_node_id();
+        if(t->cmb->nodeLRU)
+            t->cmb->update_iu_ptr(new_node_id, 0);
         t->cmb->update_node_id(new_node_id, t->get_free_block_id());
         op_size_cmb += tmp_diff;
     }
@@ -2035,13 +2041,15 @@ void CMB<T>::update_is_leaf(u_int64_t node_id, u_int64_t value){
 
 template <typename T>
 u_int64_t CMB<T>::get_iu_ptr(u_int64_t node_id){
-    mylog << "get_iu_ptr() - node id:" << node_id << endl;
     BKMap ref;
     off_t addr = BLOCK_MAPPING_START_ADDR + node_id * sizeof(BKMap) + ((char*)&ref.iu_ptr - (char*)&ref);
     addr_bkmap_check(addr);
 
     u_int64_t readval;
 	read(&readval, addr, sizeof(u_int64_t));
+
+    mylog << "get_iu_ptr() - node id:" << node_id << " -> " << readval << endl;
+
     return readval;
 }
 
@@ -2327,7 +2335,6 @@ void CMB<T>::clear_iu(u_int64_t node_id){
 
 template <typename T>
 void CMB<T>::append_entry(u_int64_t node_id, OPR_CODE OPR, u_int64_t _k, T _v){
-    mylog << "append_entry()" << endl;
 
     u_int64_t iu_id = pop_iu_id();   
 
@@ -2345,6 +2352,8 @@ void CMB<T>::append_entry(u_int64_t node_id, OPR_CODE OPR, u_int64_t _k, T _v){
     iu_write_iu(iu_id, new_entry);
 
     update_iu_ptr(node_id, iu_id);  
+
+    mylog << "append_entry() - iu_id = " << iu_id << ", next = " << new_entry.next << endl;
 }
 
 template <typename T>
