@@ -931,8 +931,9 @@ void BTreeNode<T>::inorder_traversal(BTree<T>* t, ofstream &outFile){
     BTreeNode<T>* node = new BTreeNode<T>(0,0,0);
     t->node_read(node_id, node);
 
-    if(t->cmb && t->cmb->nodeLRU && is_leaf)
+    if(t->cmb && t->cmb->nodeLRU && is_leaf){
         t->cmb->reduction(node_id, node);
+    }
 
     int i = 0;
     for(i = 0; i < node->num_key; i++){
@@ -1242,7 +1243,7 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
         op_size_cmb += tmp_diff;
         
         if(t->cmb && t->cmb->nodeLRU && node->is_leaf){
-            t->cmb->clear_iu(node_id); 
+            t->cmb->clear_iu(node->node_id); 
             op_size_cmb += tmp_diff;
             if(node->is_leaf)
                 t->cmb->update_is_leaf(new_node_id, 1);
@@ -2287,7 +2288,7 @@ template <typename T>
 void CMB<T>::reduction(u_int64_t node_id, BTreeNode<T>* node){
     mylog << "reduction() - node_id = " << node_id << endl;
 
-    IU_LIST* iu_stack;
+    IU_LIST* iu_stack = NULL;
     reduction_create_iu_list(node_id, &iu_stack);
 
     while(iu_stack){
@@ -2320,16 +2321,17 @@ void CMB<T>::clear_iu(u_int64_t node_id){
      
     u_int64_t cur_iu_id = get_iu_ptr(node_id);
     while(cur_iu_id){
+        u_int64_t next_iu_id = iu_get_next_iu_id(cur_iu_id);
         u_int64_t value_id = iu_get_value_id(cur_iu_id);
         if(value_id)
             push_val_id(value_id);
         push_iu_id(cur_iu_id);
 
-        cur_iu_id = iu_get_next_iu_id(cur_iu_id);
-        
         num_iu--;
+        cur_iu_id = next_iu_id;
     }
 
+    update_iu_ptr(node_id, 0);
     update_num_iu(num_iu);
 }
 
