@@ -2287,6 +2287,7 @@ void CMB<T>::append(BTree<T>* t, u_int64_t node_id, OPR_CODE OPR, u_int64_t _k, 
         reduction(pop_id, node);
         t->node_write(pop_id, node);
         clear_iu(pop_id);
+        delete node; 
     }  
 
     u_int64_t num_iu = get_num_iu();
