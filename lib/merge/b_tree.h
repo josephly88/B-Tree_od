@@ -672,6 +672,21 @@ void BTree<T>::update(u_int64_t _k, T _v){
     mylog << "update() : update key:" << _k << endl;
 
     if(root_id){
+
+        if(cmb && cmb->nodeLRU){
+            u_int64_t getIsLeaf = cmb->get_is_leaf(root_id);
+            if(getIsLeaf == 1){
+                u_int64_t iu_id = cmb->search_entry(root_id, _k);
+                if(iu_id != 0){
+                    OPR_CODE last_opr = cmb->iu_get_opr(iu_id);
+                    if(last_opr != D){
+                        cmb->append(this, root_id, U, _k, _v);
+                    }
+                    return;
+                }
+            }
+        }
+
         removeList* rmlist = NULL;
 
         BTreeNode<T>* root = new BTreeNode<T>(0, 0, 0);
@@ -1032,19 +1047,6 @@ template <typename T>
 u_int64_t BTreeNode<T>::update(BTree<T>* t, u_int64_t _k, T _v, removeList** list){
     mylog << "update() - key:" << _k << endl;
 
-    if(t->cmb && t->cmb->nodeLRU && is_leaf){
-        u_int64_t iu_id = t->cmb->search_entry(node_id, _k);
-        if(iu_id != 0){
-            OPR_CODE last_opr = t->cmb->iu_get_opr(iu_id);
-            if(last_opr != D){
-                t->cmb->append(t, node_id, U, _k, _v);
-                op_size_cmb += tmp_diff;
-            }
-
-            return node_id;                
-        } 
-    }
-
     int i;
     for(i = 0; i < num_key; i++){
         // Key match
@@ -1079,6 +1081,20 @@ u_int64_t BTreeNode<T>::update(BTree<T>* t, u_int64_t _k, T _v, removeList** lis
     if(is_leaf)
         return 0; // Not found
     else{
+        if(t->cmb && t->cmb->nodeLRU){
+            u_int64_t getIsLeaf = t->cmb->get_is_leaf(child_id[i]); 
+            if(getIsLeaf == 1){
+                u_int64_t iu_id = t->cmb->search_entry(child_id[i], _k);
+                if(iu_id != 0){
+                    OPR_CODE last_opr = t->cmb->iu_get_opr(iu_id);
+                    if(last_opr != D){
+                        t->cmb->append(t, child_id[i], U, _k, _v);
+                    }
+                    return node_id;                
+                } 
+            }
+        }
+
         BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
         t->node_read(child_id[i], child);
         int dup_child_id = child->update(t, _k, _v, list);
