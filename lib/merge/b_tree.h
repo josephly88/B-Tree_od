@@ -647,10 +647,13 @@ void BTree<T>::search(u_int64_t _k, T* buf){
             if(getIsLeaf == 1){
                 u_int64_t iu_id = cmb->search_entry(root_id, _k);
                 if(iu_id != 0){
-                    u_int64_t val_id = cmb->iu_get_value_id(iu_id);
-                    T ret_val = cmb->iu_get_value(val_id);
-                    memcpy(buf, &ret_val, sizeof(T));
-                    return;
+                    OPR_CODE last_opr = cmb->iu_get_opr(iu_id);
+                    if(last_opr != D){
+                        u_int64_t val_id = cmb->iu_get_value_id(iu_id);
+                        T ret_val = cmb->iu_get_value(val_id);
+                        memcpy(buf, &ret_val, sizeof(T));
+                        return;
+                    }
                 }
             }
         }
@@ -976,10 +979,13 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id
                     if(getIsLeaf == 1){
                         u_int64_t iu_id = t->cmb->search_entry(child_id[i], _k);
                         if(iu_id != 0){
-                            u_int64_t val_id = t->cmb->iu_get_value_id(iu_id);
-                            T ret_val = t->cmb->iu_get_value(val_id);
-                            memcpy(buf, &ret_val, sizeof(T));
-                            return;
+                            OPR_CODE last_opr = t->cmb->iu_get_opr(iu_id);
+                            if(last_opr != D){
+                                u_int64_t val_id = t->cmb->iu_get_value_id(iu_id);
+                                T ret_val = t->cmb->iu_get_value(val_id);
+                                memcpy(buf, &ret_val, sizeof(T));
+                                return;
+                            }
                         }
                     }
                 }
@@ -1002,10 +1008,13 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id
             if(getIsLeaf == 1){
                 u_int64_t iu_id = t->cmb->search_entry(child_id[i], _k);
                 if(iu_id != 0){
-                    u_int64_t val_id = t->cmb->iu_get_value_id(iu_id);
-                    T ret_val = t->cmb->iu_get_value(val_id);
-                    memcpy(buf, &ret_val, sizeof(T));
-                    return;
+                    OPR_CODE last_opr = t->cmb->iu_get_opr(iu_id);
+                    if(last_opr != D){
+                        u_int64_t val_id = t->cmb->iu_get_value_id(iu_id);
+                        T ret_val = t->cmb->iu_get_value(val_id);
+                        memcpy(buf, &ret_val, sizeof(T));
+                        return;
+                    }
                 }
             }
         }
