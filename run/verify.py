@@ -117,10 +117,14 @@ while True:
         break
     token = nstr.split('\t')
     # Compare data
-    if(int(token[0]) != dataset[idx][0] and token[1] != dataset[idx][1]):
-        print("Result: Key {}: Unmatched".format(token[0]))
-        print("\tExpected Value : "+dataset[idx][1])
-        print("\tTree Value : "+token[1])
+    if(int(token[0]) != int(dataset[idx][0]) or token[1].replace('\n',"") != dataset[idx][1]):
+        print("Unmatched")
+        print("\tKey : "+token[0])
+        if(int(token[0]) != int(dataset[idx][0])):
+            print("\tExpected Key : {}".format(dataset[idx][0]))
+        else:
+            print("\tTree Value : "+token[1].replace('\n', ""))
+            print("\tExpected Value : "+dataset[idx][1])
     idx = idx + 1
 tree_file.close()
 
