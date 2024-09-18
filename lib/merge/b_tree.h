@@ -674,14 +674,8 @@ void BTree<T>::update(u_int64_t _k, T _v){
         if(cmb && cmb->nodeLRU){
             u_int64_t getIsLeaf = cmb->get_is_leaf(root_id);
             if(getIsLeaf == 1){
-                u_int64_t iu_id = cmb->search_entry(root_id, _k);
-                if(iu_id != 0){
-                    OPR_CODE last_opr = cmb->iu_get_opr(iu_id);
-                    if(last_opr != D){
-                        cmb->append(this, root_id, U, _k, _v);
-                    }
-                    return;
-                }
+                cmb->append(this, root_id, U, _k, _v);
+                return;
             }
         }
 
@@ -1067,14 +1061,8 @@ u_int64_t BTreeNode<T>::update(BTree<T>* t, u_int64_t _k, T _v, removeList** lis
         if(t->cmb && t->cmb->nodeLRU){
             u_int64_t getIsLeaf = t->cmb->get_is_leaf(child_id[i]); 
             if(getIsLeaf == 1){
-                u_int64_t iu_id = t->cmb->search_entry(child_id[i], _k);
-                if(iu_id != 0){
-                    OPR_CODE last_opr = t->cmb->iu_get_opr(iu_id);
-                    if(last_opr != D){
-                        t->cmb->append(t, child_id[i], U, _k, _v);
-                    }
-                    return node_id;                
-                } 
+                t->cmb->append(t, child_id[i], U, _k, _v);
+                return node_id;                
             }
         }
 
