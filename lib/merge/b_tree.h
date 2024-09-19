@@ -125,7 +125,7 @@ class BTreeNode{
 		void display_tree(BTree<T>* t, MODE mode, int level);
         void inorder_traversal(BTree<T>* t, ofstream &outFile);
 
-		void search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id = 0);
+		void search(BTree<T>* t, u_int64_t _k, T* buf, removeList** list);
         u_int64_t update(BTree<T>* t, u_int64_t _k, T _v, removeList** list);
 
 		u_int64_t traverse_insert(BTree<T>* t, u_int64_t _k, T _v, removeList** list);
@@ -219,7 +219,7 @@ class CMB{
         void reduction_update(BTreeNode<T>* node, IU_LIST* iu_stack);
         void reduction_delete(BTreeNode<T>* node, IU_LIST* iu_stack);
 
-        u_int64_t search_entry(u_int64_t node_id, u_int64_t _k);
+        u_int64_t search_entry(u_int64_t node_id, u_int64_t _k, BTree<T>* t, removeList** list);
 
         void addr_IU_check(off_t addr);
         void addr_value_check(off_t addr);
@@ -640,10 +640,12 @@ void BTree<T>::search(u_int64_t _k, T* buf){
     mylog << "search() - key:" << _k << endl;
 
     if(root_id){
+        removeList* rmlist = NULL;
+
         if(cmb && cmb->nodeLRU){
             u_int64_t getIsLeaf = cmb->get_is_leaf(root_id);
             if(getIsLeaf == 1){
-                u_int64_t iu_id = cmb->search_entry(root_id, _k);
+                u_int64_t iu_id = cmb->search_entry(root_id, _k, this, &rmlist);
                 if(iu_id != 0){
                     OPR_CODE last_opr = cmb->iu_get_opr(iu_id);
                     if(last_opr != D){
@@ -658,7 +660,7 @@ void BTree<T>::search(u_int64_t _k, T* buf){
 
         BTreeNode<T>* root = new BTreeNode<T>(0, 0, 0);
         node_read(root_id, root);
-        root->search(this, _k, buf);
+        root->search(this, _k, buf, &rmlist);
         delete root;
     }
     else
@@ -955,7 +957,7 @@ void BTreeNode<T>::inorder_traversal(BTree<T>* t, ofstream &outFile){
 }
 
 template <typename T>
-void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id){
+void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, removeList** list){
     mylog << "search() - key:" << _k << endl;
 
     int i;
@@ -967,12 +969,11 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id
 
             return;
         }
-        if(_k < key[i]){
-            if(!is_leaf){
+        if(_k < key[i]){ if(!is_leaf){
                 if(t->cmb && t->cmb->nodeLRU){
                     u_int64_t getIsLeaf = t->cmb->get_is_leaf(child_id[i]);
                     if(getIsLeaf == 1){
-                        u_int64_t iu_id = t->cmb->search_entry(child_id[i], _k);
+                        u_int64_t iu_id = t->cmb->search_entry(child_id[i], _k, t, list);
                         if(iu_id != 0){
                             OPR_CODE last_opr = t->cmb->iu_get_opr(iu_id);
                             if(last_opr != D){
@@ -987,7 +988,7 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id
 
                 BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
                 t->node_read(child_id[i], child);
-                child->search(t, _k, buf);
+                child->search(t, _k, buf, list);
                 delete child;
             }
             else
@@ -1001,7 +1002,7 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id
         if(t->cmb && t->cmb->nodeLRU){
             u_int64_t getIsLeaf = t->cmb->get_is_leaf(child_id[i]);
             if(getIsLeaf == 1){
-                u_int64_t iu_id = t->cmb->search_entry(child_id[i], _k);
+                u_int64_t iu_id = t->cmb->search_entry(child_id[i], _k, t, list);
                 if(iu_id != 0){
                     OPR_CODE last_opr = t->cmb->iu_get_opr(iu_id);
                     if(last_opr != D){
@@ -1016,7 +1017,7 @@ void BTreeNode<T>::search(BTree<T>* t, u_int64_t _k, T* buf, u_int64_t rbtree_id
 
         BTreeNode<T>* child = new BTreeNode<T>(0, 0, 0);
         t->node_read(child_id[i], child);
-        child->search(t, _k, buf);
+        child->search(t, _k, buf, list);
         delete child;
     }
     else
@@ -1399,7 +1400,7 @@ u_int64_t BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** li
     mylog << "direct_delete() - key:" << _k << endl;
     
     if(t->cmb && t->cmb->nodeLRU && is_leaf){
-        u_int64_t iu_id = t->cmb->search_entry(node_id, _k);
+        u_int64_t iu_id = t->cmb->search_entry(node_id, _k, t, list);
         if(iu_id != 0){
             OPR_CODE last_opr = t->cmb->iu_get_opr(iu_id);
             if(last_opr != D){
@@ -2422,15 +2423,32 @@ void CMB<T>::reduction_delete(BTreeNode<T>* node, IU_LIST* iu_stack){
 }
 
 template <typename T>
-u_int64_t CMB<T>::search_entry(u_int64_t node_id, u_int64_t _k){
+u_int64_t CMB<T>::search_entry(u_int64_t node_id, u_int64_t _k, BTree<T>* t, removeList** list){
     mylog << "search_entry() - node_id = " << node_id << endl;
 
     u_int64_t cur_iu_id = get_iu_ptr(node_id);
+    int counter = 0;
     while(cur_iu_id){
+        if(counter >= 30){
+            BTreeNode<T>* node = new BTreeNode<T>(0,0,0);
+            t->node_read(node_id, node);
+            u_int64_t old_block_id = get_block_id(node_id);
+            reduction(node_id, node);
+            update_node_id(node_id, t->get_free_block_id());
+            t->node_write(node_id, node);
+            clear_iu(node_id); 
+            delete node;
+            *list = new removeList(old_block_id, *list);
+            mylog << "reduction triggered" << endl;
+            return 0;
+        }
+
         u_int64_t key = iu_get_key(cur_iu_id);
         if(key == _k)
             return cur_iu_id;
         cur_iu_id = iu_get_next_iu_id(cur_iu_id);
+
+        counter++;
     }
     return 0;
 }
