@@ -1239,7 +1239,7 @@ u_int64_t BTreeNode<T>::split(BTree<T>*t, u_int64_t spt_node_id, u_int64_t paren
         t->cmb->update_node_id(node->node_id, t->get_free_block_id());
         t->cmb->update_num_kv(node->node_id, min_num);
         
-        if(t->cmb && t->cmb->nodeLRU && node->is_leaf){
+        if(t->cmb && t->cmb->nodeLRU){
             t->cmb->clear_iu(node->node_id); 
             if(node->is_leaf)
                 t->cmb->update_is_leaf(new_node_id, 1);
@@ -2253,12 +2253,15 @@ void CMB<T>::reduction(u_int64_t node_id, BTreeNode<T>* node){
     while(iu_stack){
         OPR_CODE opr = iu_get_opr(iu_stack->iu_id);
 
-        if(opr == I)
+        if(opr == I){
             reduction_insert(node, iu_stack);
-        else if(opr == U)
+        }
+        else if(opr == U){
             reduction_update(node, iu_stack);
-        else if(opr == D)
+        }
+        else if(opr == D){
             reduction_delete(node, iu_stack);
+        }
         else{
             cout << "Incorrect OPR: " << opr << endl;
             mylog << "Incorrect OPR: " << opr << endl;
@@ -2314,7 +2317,7 @@ void CMB<T>::append_entry(u_int64_t node_id, OPR_CODE OPR, u_int64_t _k, T _v){
 
     update_iu_ptr(node_id, iu_id);  
 
-    mylog << "append_entry() - iu_id = " << iu_id << ", next = " << new_entry.next << endl;
+    mylog << "append_entry() - node_id = " << node_id << ", iu_id = " << iu_id << ", next = " << new_entry.next << endl;
 }
 
 template <typename T>
