@@ -208,7 +208,7 @@ class CMB{
         void push_val_id(u_int64_t val_id); 
 
         // Public Function
-        void append(BTree<T>* t, u_int64_t node_id, OPR_CODE OPR, u_int64_t _k, T _v);
+        void append(BTree<T>* t, u_int64_t node_id, OPR_CODE OPR, u_int64_t _k, T _v, removeList** list);
         void reduction(u_int64_t node_id, BTreeNode<T>* node);
         void clear_iu(u_int64_t node_id);
 
@@ -673,15 +673,15 @@ void BTree<T>::update(u_int64_t _k, T _v){
 
     if(root_id){
 
+        removeList* rmlist = NULL;
+
         if(cmb && cmb->nodeLRU){
             u_int64_t getIsLeaf = cmb->get_is_leaf(root_id);
             if(getIsLeaf == 1){
-                cmb->append(this, root_id, U, _k, _v);
+                cmb->append(this, root_id, U, _k, _v, &rmlist);
                 return;
             }
         }
-
-        removeList* rmlist = NULL;
 
         BTreeNode<T>* root = new BTreeNode<T>(0, 0, 0);
         node_read(root_id, root);
@@ -1033,7 +1033,7 @@ u_int64_t BTreeNode<T>::update(BTree<T>* t, u_int64_t _k, T _v, removeList** lis
         // Key match
         if(_k == key[i]){
             if(t->cmb && t->cmb->nodeLRU && is_leaf){
-                t->cmb->append(t, node_id, U, _k, _v);
+                t->cmb->append(t, node_id, U, _k, _v, list);
             }
             else{
                 value[i] = _v;
@@ -1062,7 +1062,7 @@ u_int64_t BTreeNode<T>::update(BTree<T>* t, u_int64_t _k, T _v, removeList** lis
         if(t->cmb && t->cmb->nodeLRU){
             u_int64_t getIsLeaf = t->cmb->get_is_leaf(child_id[i]); 
             if(getIsLeaf == 1){
-                t->cmb->append(t, child_id[i], U, _k, _v);
+                t->cmb->append(t, child_id[i], U, _k, _v, list);
                 return node_id;                
             }
         }
@@ -1146,7 +1146,7 @@ u_int64_t BTreeNode<T>::direct_insert(BTree<T>* t, u_int64_t _k, T _v, removeLis
     mylog << "direct_insert() - key:" << _k << endl;
 
     if(t->cmb && (t->cmb->nodeLRU && is_leaf)){
-        t->cmb->append(t, node_id, I, _k, _v);
+        t->cmb->append(t, node_id, I, _k, _v, list);
 
         u_int64_t num_k = t->cmb->get_num_kv(node_id) + 1;
         t->cmb->update_num_kv(node_id, num_k);
@@ -1405,7 +1405,7 @@ u_int64_t BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** li
             OPR_CODE last_opr = t->cmb->iu_get_opr(iu_id);
             if(last_opr != D){
                 T empty;
-                t->cmb->append(t, node_id, D, _k, empty);
+                t->cmb->append(t, node_id, D, _k, empty, list);
                 t->cmb->update_num_kv(node_id, t->cmb->get_num_kv(node_id) - 1);                
             }
 
@@ -1427,7 +1427,7 @@ u_int64_t BTreeNode<T>::direct_delete(BTree<T>* t, u_int64_t _k, removeList** li
 
     if(t->cmb && (i < num_key && t->cmb->nodeLRU && is_leaf)){
         T empty;
-        t->cmb->append(t, node_id, D, _k, empty);
+        t->cmb->append(t, node_id, D, _k, empty, list);
         t->cmb->update_num_kv(node_id, t->cmb->get_num_kv(node_id) - 1);
     }
     else{
@@ -1493,7 +1493,7 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             t->cmb->reduction(left->node_id, left);
 
             // Append insert to right
-            t->cmb->append(t, child_id[idx], I, key[idx-1], value[idx-1]);
+            t->cmb->append(t, child_id[idx], I, key[idx-1], value[idx-1], list);
             t->cmb->update_num_kv(child_id[idx], t->cmb->get_num_kv(child_id[idx]) + 1);
 
             // Borrow from left to parent
@@ -1507,7 +1507,7 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
 
             // Append delete to left
             T empty;
-            t->cmb->append(t, left->node_id, D, left->key[left->num_key-1], empty);            
+            t->cmb->append(t, left->node_id, D, left->key[left->num_key-1], empty, list);            
 
             left->num_key -= 1;
             t->cmb->update_num_kv(left->node_id, left->num_key);
@@ -1518,7 +1518,7 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
             t->cmb->reduction(right->node_id, right);
 
             // Append insert to left
-            t->cmb->append(t, child_id[idx], I, key[idx], value[idx]);
+            t->cmb->append(t, child_id[idx], I, key[idx], value[idx], list);
             t->cmb->update_num_kv(child_id[idx], t->cmb->get_num_kv(child_id[idx]) + 1);
 
             // Borrow from right to parent
@@ -1532,7 +1532,7 @@ u_int64_t BTreeNode<T>::rebalance(BTree<T>* t, int idx, removeList** list){
 
             // Append delete to right
             T empty;
-            t->cmb->append(t, right->node_id, D, right->key[0], empty);            
+            t->cmb->append(t, right->node_id, D, right->key[0], empty, list);            
 
             right->num_key -= 1;
             t->cmb->update_num_kv(right->node_id, right->num_key);
@@ -2226,15 +2226,18 @@ void CMB<T>::push_val_id(u_int64_t val_id){
 }
 
 template <typename T>
-void CMB<T>::append(BTree<T>* t, u_int64_t node_id, OPR_CODE OPR, u_int64_t _k, T _v){
+void CMB<T>::append(BTree<T>* t, u_int64_t node_id, OPR_CODE OPR, u_int64_t _k, T _v, removeList** list){
     if(full()){
         u_int64_t pop_id = nodeLRU->pop();
         BTreeNode<T>* node = new BTreeNode<T>(0, 0, 0);
         t->node_read(pop_id, node);
+        u_int64_t old_block_id = get_block_id(pop_id);
         reduction(pop_id, node);
+        update_node_id(pop_id, t->get_free_block_id());
         t->node_write(pop_id, node);
         clear_iu(pop_id);
         delete node; 
+        *list = new removeList(old_block_id, *list);
     }  
 
     u_int64_t num_iu = get_num_iu();
